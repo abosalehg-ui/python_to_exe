@@ -46,9 +46,14 @@ from py2exe_gui.core import (
     format_html,
 )
 from py2exe_gui.core.dependency_analyzer import filter_non_stdlib
-from py2exe_gui.strings import S
+from py2exe_gui.strings import (
+    LOCALE_LAYOUT,
+    S,
+    available_locales,
+    current_locale,
+)
 from py2exe_gui.styles import THEMES
-from py2exe_gui.templates import TEMPLATES
+from py2exe_gui.templates import TEMPLATES, template_description, template_name
 from py2exe_gui.ui.conversion_thread import ConversionThread
 from py2exe_gui.ui.dialogs import AddImportDialog, CommandPreviewDialog
 
@@ -71,7 +76,12 @@ class MainWindow(QMainWindow):
     def init_ui(self):
         self.setWindowTitle(S.WINDOW_TITLE_FMT.format(name=APP_NAME, version=APP_VERSION))
         self.setMinimumSize(1080, 800)
-        self.setLayoutDirection(Qt.RightToLeft)
+        direction = (
+            Qt.RightToLeft
+            if LOCALE_LAYOUT.get(current_locale(), "rtl") == "rtl"
+            else Qt.LeftToRight
+        )
+        self.setLayoutDirection(direction)
         self.setStyleSheet(THEMES.get(self.current_theme, THEMES["dark"]))
 
         central_widget = QWidget()
@@ -332,8 +342,9 @@ class MainWindow(QMainWindow):
         templates_layout.addWidget(QLabel(S.TEMPLATES_HINT))
 
         self.templates_combo = QComboBox()
-        for name, data in TEMPLATES.items():
-            self.templates_combo.addItem(f"{name} - {data['description']}", name)
+        for key in TEMPLATES:
+            label = f"{template_name(key)} - {template_description(key)}"
+            self.templates_combo.addItem(label, key)
         self.templates_combo.currentIndexChanged.connect(self.apply_template)
         templates_layout.addWidget(self.templates_combo)
 
@@ -359,6 +370,20 @@ class MainWindow(QMainWindow):
         save_btn_layout.addWidget(load_settings_btn)
         save_layout.addLayout(save_btn_layout)
         layout.addWidget(save_group)
+
+        # Language selector (Phase 3)
+        lang_row = QHBoxLayout()
+        lang_row.addWidget(QLabel(S.LANGUAGE_LABEL))
+        self.language_combo = QComboBox()
+        current = current_locale()
+        for code, native in available_locales().items():
+            self.language_combo.addItem(native, code)
+            if code == current:
+                self.language_combo.setCurrentIndex(self.language_combo.count() - 1)
+        self.language_combo.currentIndexChanged.connect(self._on_language_changed)
+        lang_row.addWidget(self.language_combo)
+        lang_row.addStretch()
+        layout.addLayout(lang_row)
 
         layout.addStretch()
         return tab
@@ -512,17 +537,17 @@ class MainWindow(QMainWindow):
             self._append_log(S.LOG_DETECT_ERROR.format(error=str(e)))
 
     def apply_template(self, index):
-        template_name = self.templates_combo.currentData()
-        if template_name and template_name in TEMPLATES:
-            template = TEMPLATES[template_name]
+        template_key = self.templates_combo.currentData()
+        if template_key and template_key in TEMPLATES:
+            template = TEMPLATES[template_key]
             imports_str = (
                 ", ".join(template["hidden_imports"])
                 if template["hidden_imports"]
                 else S.NONE
             )
             desc = S.TEMPLATE_DESC_FMT.format(
-                name=template_name,
-                desc=template["description"],
+                name=template_name(template_key),
+                desc=template_description(template_key),
                 windowed=S.YES if template["windowed"] else S.NO,
                 onefile=S.YES if template["onefile"] else S.NO,
                 imports=imports_str,
@@ -530,9 +555,9 @@ class MainWindow(QMainWindow):
             self.template_desc.setHtml(desc)
 
     def apply_selected_template(self):
-        template_name = self.templates_combo.currentData()
-        if template_name and template_name in TEMPLATES:
-            template = TEMPLATES[template_name]
+        template_key = self.templates_combo.currentData()
+        if template_key and template_key in TEMPLATES:
+            template = TEMPLATES[template_key]
             self.windowed_check.setChecked(template["windowed"])
             self.onefile_check.setChecked(template["onefile"])
             existing = [
@@ -542,9 +567,10 @@ class MainWindow(QMainWindow):
             for imp in template["hidden_imports"]:
                 if imp not in existing:
                     self.hidden_imports_list.addItem(imp)
-            self._append_log(S.LOG_TEMPLATE_APPLIED.format(name=template_name))
+            name = template_name(template_key)
+            self._append_log(S.LOG_TEMPLATE_APPLIED.format(name=name))
             QMessageBox.information(
-                self, S.MSG_SUCCESS, S.MSG_TEMPLATE_OK_FMT.format(name=template_name)
+                self, S.MSG_SUCCESS, S.MSG_TEMPLATE_OK_FMT.format(name=name)
             )
 
     def _current_config(self) -> BuildConfig:
@@ -692,7 +718,7 @@ class MainWindow(QMainWindow):
             QMessageBox.information(self, S.MSG_SUCCESS, message)
         else:
             self.progress_bar.setFormat(S.PROGRESS_FAILED)
-            if "إلغاء" not in message:
+            if message != S.CONV_CANCELLED:
                 QMessageBox.critical(self, S.MSG_ERROR, message)
 
     def open_output_folder(self):
@@ -772,6 +798,15 @@ class MainWindow(QMainWindow):
         self.current_theme = "light" if self.current_theme == "dark" else "dark"
         self.setStyleSheet(THEMES[self.current_theme])
         self.settings["theme"] = self.current_theme
+
+    def _on_language_changed(self, index):
+        """Persist the language preference and prompt for a restart."""
+        code = self.language_combo.itemData(index)
+        if not code or code == self.settings.get("locale", current_locale()):
+            return
+        self.settings["locale"] = code
+        self.save_settings()
+        QMessageBox.information(self, S.MSG_SUCCESS, S.MSG_RESTART_REQUIRED)
 
     def _register_shortcuts(self):
         """Bind keyboard shortcuts to common actions."""
