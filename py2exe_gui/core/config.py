@@ -28,6 +28,8 @@ class BuildConfig:
     upx_level: int = 0
     extra_args: str = ""
 
+    version_file: str = ""
+
     def to_dict(self) -> dict:
         return {
             "source": self.source,
@@ -46,6 +48,7 @@ class BuildConfig:
             "upx": self.upx,
             "upx_level": self.upx_level,
             "extra_args": self.extra_args,
+            "version_file": self.version_file,
         }
 
     @classmethod
@@ -67,4 +70,5 @@ class BuildConfig:
             upx=data.get("upx", False),
             upx_level=data.get("upx_level", 0),
             extra_args=data.get("extra_args", ""),
+            version_file=data.get("version_file", ""),
         )

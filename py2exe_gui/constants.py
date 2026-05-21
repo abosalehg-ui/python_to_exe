@@ -7,6 +7,7 @@ EMAIL = "abo.saleh.g@gmail.com"
 COPYRIGHT = "© 2025 [Python to EXE] - All Rights Reserved"
 
 SETTINGS_FILE = "py2exe_settings.json"
+HISTORY_FILE = "py2exe_history.json"
 
 STDLIB_MODULES = frozenset({
     "sys", "os", "json", "datetime", "pathlib",

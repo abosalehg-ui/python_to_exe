@@ -203,6 +203,40 @@ class Ar:
     LANGUAGE_NATIVE = "العربية"
     MSG_RESTART_REQUIRED = "يجب إعادة تشغيل التطبيق لتطبيق اللغة الجديدة."
 
+    # Phase 4: Version info editor
+    TAB_VERSION_INFO = "📝 معلومات الإصدار"
+    GROUP_VERSION_INFO = "📝 بيانات ملف EXE (Windows)"
+    VERSION_INFO_HINT = "اترك الحقول فارغة لتجاهلها. تُضمَّن في خصائص الـ EXE الناتج."
+    VI_COMPANY_NAME = "اسم الشركة:"
+    VI_FILE_DESCRIPTION = "وصف الملف:"
+    VI_FILE_VERSION = "إصدار الملف (1.0.0.0):"
+    VI_INTERNAL_NAME = "الاسم الداخلي:"
+    VI_LEGAL_COPYRIGHT = "حقوق النشر:"
+    VI_ORIGINAL_FILENAME = "اسم الملف الأصلي:"
+    VI_PRODUCT_NAME = "اسم المنتج:"
+    VI_PRODUCT_VERSION = "إصدار المنتج (1.0.0.0):"
+    VI_PLACEHOLDER_VERSION = "مثل: 1.0.0.0"
+
+    # Phase 4: requirements.txt import
+    BTN_IMPORT_REQUIREMENTS = "📥 استيراد من requirements.txt"
+    DIALOG_CHOOSE_REQS = "اختر ملف requirements.txt"
+    DIALOG_FILTER_REQS = "Requirements (*.txt);;All Files (*.*)"
+    LOG_REQS_IMPORTED = "✅ تم استيراد {total} حزمة من requirements.txt، أُضيفت {added} جديدة"
+    LOG_REQS_HINT = (
+        "⚠️ تنبيه: أسماء الحزم قد تختلف عن أسماء الاستيراد "
+        "(مثل Pillow → PIL). راجع القائمة."
+    )
+    LOG_REQS_ERROR = "❌ خطأ في قراءة requirements.txt: {error}"
+
+    # Phase 4: Build history
+    TAB_HISTORY = "🕓 سجل البناءات"
+    GROUP_HISTORY = "🕓 آخر البناءات"
+    HISTORY_EMPTY = "لا توجد بناءات سابقة."
+    BTN_RESTORE_BUILD = "♻️ استعادة الإعدادات"
+    BTN_CLEAR_HISTORY = "🗑️ مسح السجل"
+    HISTORY_CLEARED = "✅ تم مسح سجل البناءات"
+    LOG_RESTORED = "✅ تمت استعادة إعدادات البناء من {time}"
+
     # Template names & descriptions (Phase 3 — accessed via templates helpers)
     TPL_GUI_NAME = "تطبيق GUI (PyQt5/Tkinter)"
     TPL_GUI_DESC = "مناسب لتطبيقات الواجهة الرسومية"
@@ -415,6 +449,40 @@ class En:
     LANGUAGE_LABEL = "🌐 Language:"
     LANGUAGE_NATIVE = "English"
     MSG_RESTART_REQUIRED = "Please restart the app to apply the new language."
+
+    # Phase 4: Version info editor
+    TAB_VERSION_INFO = "📝 Version Info"
+    GROUP_VERSION_INFO = "📝 EXE Metadata (Windows)"
+    VERSION_INFO_HINT = "Leave fields blank to skip. Embedded into the resulting EXE's properties."
+    VI_COMPANY_NAME = "Company name:"
+    VI_FILE_DESCRIPTION = "File description:"
+    VI_FILE_VERSION = "File version (1.0.0.0):"
+    VI_INTERNAL_NAME = "Internal name:"
+    VI_LEGAL_COPYRIGHT = "Legal copyright:"
+    VI_ORIGINAL_FILENAME = "Original filename:"
+    VI_PRODUCT_NAME = "Product name:"
+    VI_PRODUCT_VERSION = "Product version (1.0.0.0):"
+    VI_PLACEHOLDER_VERSION = "e.g.: 1.0.0.0"
+
+    # Phase 4: requirements.txt import
+    BTN_IMPORT_REQUIREMENTS = "📥 Import from requirements.txt"
+    DIALOG_CHOOSE_REQS = "Choose requirements.txt"
+    DIALOG_FILTER_REQS = "Requirements (*.txt);;All Files (*.*)"
+    LOG_REQS_IMPORTED = "✅ Imported {total} packages from requirements.txt, added {added} new"
+    LOG_REQS_HINT = (
+        "⚠️ Note: package names can differ from import names "
+        "(e.g. Pillow → PIL). Review the list."
+    )
+    LOG_REQS_ERROR = "❌ Failed to read requirements.txt: {error}"
+
+    # Phase 4: Build history
+    TAB_HISTORY = "🕓 Build History"
+    GROUP_HISTORY = "🕓 Recent Builds"
+    HISTORY_EMPTY = "No previous builds yet."
+    BTN_RESTORE_BUILD = "♻️ Restore Settings"
+    BTN_CLEAR_HISTORY = "🗑️ Clear History"
+    HISTORY_CLEARED = "✅ Build history cleared"
+    LOG_RESTORED = "✅ Build settings restored from {time}"
 
     # Template names & descriptions
     TPL_GUI_NAME = "GUI app (PyQt5/Tkinter)"

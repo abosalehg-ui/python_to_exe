@@ -4,6 +4,8 @@ import json
 import os
 import subprocess
 import sys
+import tempfile
+import time
 
 from PyQt5.QtCore import Qt
 from PyQt5.QtGui import QFont, QKeySequence
@@ -37,13 +39,19 @@ from py2exe_gui.constants import (
     COPYRIGHT,
     DEVELOPER,
     EMAIL,
+    HISTORY_FILE,
     SETTINGS_FILE,
 )
 from py2exe_gui.core import (
     BuildConfig,
+    BuildHistory,
+    VersionInfo,
     build_pyinstaller_command,
     detect_imports,
     format_html,
+    generate_version_file,
+    make_record,
+    parse_requirements,
 )
 from py2exe_gui.core.dependency_analyzer import filter_non_stdlib
 from py2exe_gui.strings import (
@@ -66,12 +74,17 @@ class MainWindow(QMainWindow):
         self.conversion_thread = None
         self.settings = {}
         self.current_theme = "dark"
+        self._build_start_time = 0.0
+        self._build_config_snapshot = {}
+        self._temp_version_file = ""
+        self.history = BuildHistory(HISTORY_FILE)
         self.load_settings()
         self.current_theme = self.settings.get("theme", "dark")
         self.init_ui()
         self._register_shortcuts()
         self.setAcceptDrops(True)
         self.check_dependencies()
+        self._refresh_history_list()
 
     def init_ui(self):
         self.setWindowTitle(S.WINDOW_TITLE_FMT.format(name=APP_NAME, version=APP_VERSION))
@@ -95,7 +108,9 @@ class MainWindow(QMainWindow):
         tabs = QTabWidget()
         tabs.addTab(self._create_main_tab(), S.TAB_MAIN)
         tabs.addTab(self._create_advanced_tab(), S.TAB_ADVANCED)
+        tabs.addTab(self._create_version_info_tab(), S.TAB_VERSION_INFO)
         tabs.addTab(self._create_templates_tab(), S.TAB_TEMPLATES)
+        tabs.addTab(self._create_history_tab(), S.TAB_HISTORY)
         tabs.addTab(self._create_about_tab(), S.TAB_ABOUT)
         main_layout.addWidget(tabs)
 
@@ -297,9 +312,12 @@ class MainWindow(QMainWindow):
         remove_import_btn.clicked.connect(self.remove_hidden_import)
         detect_imports_btn = QPushButton(S.BTN_AUTO_DETECT)
         detect_imports_btn.clicked.connect(self.detect_imports_action)
+        import_reqs_btn = QPushButton(S.BTN_IMPORT_REQUIREMENTS)
+        import_reqs_btn.clicked.connect(self.import_requirements_file)
         imports_btn_layout.addWidget(add_import_btn)
         imports_btn_layout.addWidget(remove_import_btn)
         imports_btn_layout.addWidget(detect_imports_btn)
+        imports_btn_layout.addWidget(import_reqs_btn)
         imports_layout.addWidget(self.hidden_imports_list)
         imports_layout.addLayout(imports_btn_layout)
         layout.addWidget(imports_group)
@@ -386,6 +404,69 @@ class MainWindow(QMainWindow):
         layout.addLayout(lang_row)
 
         layout.addStretch()
+        return tab
+
+    def _create_version_info_tab(self):
+        """Form for the optional Windows file metadata (--version-file)."""
+        tab = QWidget()
+        layout = QVBoxLayout(tab)
+
+        group = QGroupBox(S.GROUP_VERSION_INFO)
+        grid = QGridLayout(group)
+        grid.addWidget(QLabel(S.VERSION_INFO_HINT), 0, 0, 1, 2)
+
+        self.vi_company_name = QLineEdit()
+        self.vi_file_description = QLineEdit()
+        self.vi_file_version = QLineEdit()
+        self.vi_file_version.setPlaceholderText(S.VI_PLACEHOLDER_VERSION)
+        self.vi_internal_name = QLineEdit()
+        self.vi_legal_copyright = QLineEdit()
+        self.vi_original_filename = QLineEdit()
+        self.vi_product_name = QLineEdit()
+        self.vi_product_version = QLineEdit()
+        self.vi_product_version.setPlaceholderText(S.VI_PLACEHOLDER_VERSION)
+
+        rows = [
+            (S.VI_COMPANY_NAME, self.vi_company_name),
+            (S.VI_FILE_DESCRIPTION, self.vi_file_description),
+            (S.VI_FILE_VERSION, self.vi_file_version),
+            (S.VI_INTERNAL_NAME, self.vi_internal_name),
+            (S.VI_LEGAL_COPYRIGHT, self.vi_legal_copyright),
+            (S.VI_ORIGINAL_FILENAME, self.vi_original_filename),
+            (S.VI_PRODUCT_NAME, self.vi_product_name),
+            (S.VI_PRODUCT_VERSION, self.vi_product_version),
+        ]
+        for i, (label, widget) in enumerate(rows, start=1):
+            grid.addWidget(QLabel(label), i, 0)
+            grid.addWidget(widget, i, 1)
+
+        layout.addWidget(group)
+        layout.addStretch()
+        return tab
+
+    def _create_history_tab(self):
+        """List of recent builds with restore + clear actions."""
+        tab = QWidget()
+        layout = QVBoxLayout(tab)
+
+        group = QGroupBox(S.GROUP_HISTORY)
+        group_layout = QVBoxLayout(group)
+
+        self.history_list = QListWidget()
+        self.history_list.setMinimumHeight(220)
+        group_layout.addWidget(self.history_list)
+
+        btn_row = QHBoxLayout()
+        restore_btn = QPushButton(S.BTN_RESTORE_BUILD)
+        restore_btn.clicked.connect(self.restore_from_history)
+        clear_btn = QPushButton(S.BTN_CLEAR_HISTORY)
+        clear_btn.setObjectName("dangerBtn")
+        clear_btn.clicked.connect(self.clear_history)
+        btn_row.addWidget(restore_btn)
+        btn_row.addWidget(clear_btn)
+        group_layout.addLayout(btn_row)
+
+        layout.addWidget(group)
         return tab
 
     def _create_about_tab(self):
@@ -666,10 +747,17 @@ class MainWindow(QMainWindow):
             pass
 
     def start_conversion(self):
-        cmd, error = build_pyinstaller_command(self._current_config())
+        config = self._current_config()
+        version_path = self._materialize_version_file()
+        if version_path:
+            config.version_file = version_path
+        cmd, error = build_pyinstaller_command(config)
         if error:
+            self._cleanup_temp_version_file()
             QMessageBox.warning(self, S.MSG_WARNING, error)
             return
+        self._build_start_time = time.monotonic()
+        self._build_config_snapshot = config.to_dict()
 
         try:
             subprocess.run(
@@ -713,6 +801,19 @@ class MainWindow(QMainWindow):
     def on_conversion_finished(self, success, message):
         self.convert_btn.setEnabled(True)
         self.cancel_btn.setEnabled(False)
+        duration = max(0.0, time.monotonic() - self._build_start_time)
+        if self._build_config_snapshot:
+            record = make_record(
+                source=self._build_config_snapshot.get("source", ""),
+                output_name=self._build_config_snapshot.get("output_name", ""),
+                success=success,
+                duration_seconds=round(duration, 2),
+                config=self._build_config_snapshot,
+            )
+            self.history.add(record)
+            self._refresh_history_list()
+            self._build_config_snapshot = {}
+        self._cleanup_temp_version_file()
         if success:
             self.progress_bar.setFormat(S.PROGRESS_DONE)
             QMessageBox.information(self, S.MSG_SUCCESS, message)
@@ -807,6 +908,105 @@ class MainWindow(QMainWindow):
         self.settings["locale"] = code
         self.save_settings()
         QMessageBox.information(self, S.MSG_SUCCESS, S.MSG_RESTART_REQUIRED)
+
+    # ─── Phase 4: requirements / version info / history ────────────────
+
+    def import_requirements_file(self):
+        """Read a requirements.txt and merge into hidden imports."""
+        file_path, _ = QFileDialog.getOpenFileName(
+            self, S.DIALOG_CHOOSE_REQS, "", S.DIALOG_FILTER_REQS
+        )
+        if not file_path:
+            return
+        try:
+            with open(file_path, encoding="utf-8") as f:
+                content = f.read()
+        except Exception as e:
+            self._append_log(S.LOG_REQS_ERROR.format(error=str(e)))
+            return
+
+        packages = parse_requirements(content)
+        existing = [
+            self.hidden_imports_list.item(i).text()
+            for i in range(self.hidden_imports_list.count())
+        ]
+        new_pkgs = filter_non_stdlib(packages, existing=existing)
+        for pkg in sorted(new_pkgs):
+            self.hidden_imports_list.addItem(pkg)
+        self._append_log(
+            S.LOG_REQS_IMPORTED.format(total=len(packages), added=len(new_pkgs))
+        )
+        if new_pkgs:
+            self._append_log(S.LOG_REQS_HINT)
+
+    def _current_version_info(self) -> VersionInfo:
+        """Read the version-info form into a VersionInfo dataclass."""
+        return VersionInfo(
+            company_name=self.vi_company_name.text().strip(),
+            file_description=self.vi_file_description.text().strip(),
+            file_version=self.vi_file_version.text().strip(),
+            internal_name=self.vi_internal_name.text().strip(),
+            legal_copyright=self.vi_legal_copyright.text().strip(),
+            original_filename=self.vi_original_filename.text().strip(),
+            product_name=self.vi_product_name.text().strip(),
+            product_version=self.vi_product_version.text().strip(),
+        )
+
+    def _materialize_version_file(self) -> str:
+        """If the version-info form has data, write a temp version.txt and return its path."""
+        info = self._current_version_info()
+        if info.is_empty():
+            return ""
+        content = generate_version_file(info)
+        fd, path = tempfile.mkstemp(prefix="py2exe_version_", suffix=".txt", text=True)
+        try:
+            with os.fdopen(fd, "w", encoding="utf-8") as f:
+                f.write(content)
+        except Exception:
+            return ""
+        self._temp_version_file = path
+        return path
+
+    def _cleanup_temp_version_file(self):
+        if self._temp_version_file and os.path.exists(self._temp_version_file):
+            try:
+                os.unlink(self._temp_version_file)
+            except OSError:
+                pass
+        self._temp_version_file = ""
+
+    # ─── History ────────────────────────────────────────────────────────
+
+    def _refresh_history_list(self):
+        """Repopulate the history list widget from BuildHistory."""
+        if not hasattr(self, "history_list"):
+            return
+        self.history_list.clear()
+        if len(self.history) == 0:
+            self.history_list.addItem(S.HISTORY_EMPTY)
+            return
+        for record in self.history.records:
+            self.history_list.addItem(record.short_label())
+
+    def restore_from_history(self):
+        """Load the selected history record's config back into the form."""
+        row = self.history_list.currentRow()
+        if row < 0:
+            return
+        record = self.history.get(row)
+        if record is None:
+            return
+        self._apply_config(BuildConfig.from_dict(record.config))
+        try:
+            label_time = record.short_label().split("@", 1)[1].strip()
+        except IndexError:
+            label_time = record.timestamp
+        self._append_log(S.LOG_RESTORED.format(time=label_time))
+
+    def clear_history(self):
+        self.history.clear()
+        self._refresh_history_list()
+        self._append_log(S.HISTORY_CLEARED)
 
     def _register_shortcuts(self):
         """Bind keyboard shortcuts to common actions."""

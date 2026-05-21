@@ -181,3 +181,20 @@ def test_custom_python_executable(source_file):
         BuildConfig(source=source_file), python_executable="/usr/bin/python3.11"
     )
     assert cmd[0] == "/usr/bin/python3.11"
+
+
+def test_version_file_added_when_present(source_file, tmp_path):
+    vf = tmp_path / "version.txt"
+    vf.write_text("VSVersionInfo(...)")
+    cmd, _ = build_pyinstaller_command(
+        BuildConfig(source=source_file, version_file=str(vf))
+    )
+    assert "--version-file" in cmd
+    assert cmd[cmd.index("--version-file") + 1] == str(vf)
+
+
+def test_version_file_skipped_when_missing(source_file, tmp_path):
+    cmd, _ = build_pyinstaller_command(
+        BuildConfig(source=source_file, version_file=str(tmp_path / "absent.txt"))
+    )
+    assert "--version-file" not in cmd

@@ -38,3 +38,12 @@ def test_to_dict_returns_independent_lists():
     d = config.to_dict()
     d["hidden_imports"].append("y")
     assert config.hidden_imports == ["x"]
+
+
+def test_version_file_roundtrip():
+    cfg = BuildConfig(version_file="/tmp/v.txt")
+    assert BuildConfig.from_dict(cfg.to_dict()).version_file == "/tmp/v.txt"
+
+
+def test_version_file_default_is_empty():
+    assert BuildConfig().version_file == ""

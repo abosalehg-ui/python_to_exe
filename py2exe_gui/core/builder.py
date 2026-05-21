@@ -48,6 +48,9 @@ def build_pyinstaller_command(
     if config.icon and os.path.isfile(config.icon):
         cmd.extend(["--icon", config.icon])
 
+    if config.version_file and os.path.isfile(config.version_file):
+        cmd.extend(["--version-file", config.version_file])
+
     if config.output_dir:
         cmd.extend(["--distpath", os.path.join(config.output_dir, "dist")])
         cmd.extend(["--workpath", os.path.join(config.output_dir, "build")])
