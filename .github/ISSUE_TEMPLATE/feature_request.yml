@@ -1,0 +1,45 @@
+name: ✨ Feature Request
+description: Suggest an idea or enhancement
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Have an idea? Awesome. Please describe it below — and check
+        [IDEAS.md](../blob/main/IDEAS.md) first to see if it's already
+        on the roadmap.
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: What problem does this solve?
+      description: What can't you do today, or what's painful about how it works?
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed solution
+      description: How would this feature work from the user's perspective?
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      description: Any workarounds or other approaches you thought about?
+
+  - type: dropdown
+    id: phase
+    attributes:
+      label: Roadmap phase (if known)
+      description: Which IDEAS.md phase does this belong to?
+      options:
+        - "Not sure"
+        - "Phase 6 — Templates / Docs"
+        - "Phase 7 — Future"
+        - "New phase needed"
+    validations:
+      required: false
