@@ -30,6 +30,10 @@ class BuildConfig:
 
     version_file: str = ""
 
+    # Phase 5: deployment-time options
+    splash_image: str = ""
+    manifest_file: str = ""
+
     def to_dict(self) -> dict:
         return {
             "source": self.source,
@@ -49,6 +53,8 @@ class BuildConfig:
             "upx_level": self.upx_level,
             "extra_args": self.extra_args,
             "version_file": self.version_file,
+            "splash_image": self.splash_image,
+            "manifest_file": self.manifest_file,
         }
 
     @classmethod
@@ -71,4 +77,6 @@ class BuildConfig:
             upx_level=data.get("upx_level", 0),
             extra_args=data.get("extra_args", ""),
             version_file=data.get("version_file", ""),
+            splash_image=data.get("splash_image", ""),
+            manifest_file=data.get("manifest_file", ""),
         )

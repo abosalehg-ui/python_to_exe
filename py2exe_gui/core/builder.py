@@ -51,6 +51,12 @@ def build_pyinstaller_command(
     if config.version_file and os.path.isfile(config.version_file):
         cmd.extend(["--version-file", config.version_file])
 
+    if config.splash_image and os.path.isfile(config.splash_image):
+        cmd.extend(["--splash", config.splash_image])
+
+    if config.manifest_file and os.path.isfile(config.manifest_file):
+        cmd.extend(["--manifest", config.manifest_file])
+
     if config.output_dir:
         cmd.extend(["--distpath", os.path.join(config.output_dir, "dist")])
         cmd.extend(["--workpath", os.path.join(config.output_dir, "build")])
