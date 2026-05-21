@@ -1,0 +1,67 @@
+name: 🐛 Bug Report
+description: Report a problem with the application
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to file a bug report! Please fill in
+        the details below to help reproduce and fix it.
+
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: A clear description of the bug.
+      placeholder: When I click X, Y happens, but I expected Z.
+    validations:
+      required: true
+
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Steps to reproduce
+      description: Numbered steps that produce the bug.
+      placeholder: |
+        1. Open the app
+        2. Choose template X
+        3. Click Build
+        4. See error...
+    validations:
+      required: true
+
+  - type: input
+    id: os
+    attributes:
+      label: Operating System
+      placeholder: "e.g. Windows 11, Ubuntu 22.04"
+    validations:
+      required: true
+
+  - type: input
+    id: python-version
+    attributes:
+      label: Python version
+      placeholder: "e.g. 3.11.4"
+    validations:
+      required: true
+
+  - type: input
+    id: pyinstaller-version
+    attributes:
+      label: PyInstaller version
+      placeholder: "e.g. 6.0.0"
+
+  - type: textarea
+    id: command-preview
+    attributes:
+      label: Command preview (Ctrl+P)
+      description: Paste the output of the "Preview Command" dialog if applicable.
+      render: shell
+
+  - type: textarea
+    id: log
+    attributes:
+      label: Log output
+      description: Click "Export Log" and paste the contents (or attach the file).
+      render: shell
