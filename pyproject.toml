@@ -1,0 +1,59 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "py2exe-gui"
+version = "1.0.0"
+description = "Arabic-localized PyQt5 GUI to convert Python scripts to Windows executables via PyInstaller"
+readme = "README.md"
+requires-python = ">=3.8"
+authors = [{ name = "عبدالكريم العبود", email = "abo.saleh.g@gmail.com" }]
+license = { text = "Proprietary" }
+keywords = ["pyinstaller", "exe", "converter", "gui", "arabic"]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Operating System :: Microsoft :: Windows",
+    "Operating System :: POSIX :: Linux",
+    "Operating System :: MacOS",
+    "Topic :: Software Development :: Build Tools",
+    "Natural Language :: Arabic",
+]
+dependencies = [
+    "PyQt5>=5.15",
+    "pyinstaller>=5.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0",
+    "pytest-cov>=4.0",
+    "ruff>=0.1",
+]
+
+[project.scripts]
+py2exe-gui = "py2exe_gui.app:main"
+
+[tool.setuptools.packages.find]
+include = ["py2exe_gui*"]
+exclude = ["tests*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py38"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "UP", "B"]
+ignore = ["E501"]
+
+[tool.ruff.lint.per-file-ignores]
+"py2exe_gui/strings.py" = ["E501"]
