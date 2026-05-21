@@ -198,3 +198,37 @@ def test_version_file_skipped_when_missing(source_file, tmp_path):
         BuildConfig(source=source_file, version_file=str(tmp_path / "absent.txt"))
     )
     assert "--version-file" not in cmd
+
+
+def test_splash_image_added_when_present(source_file, tmp_path):
+    img = tmp_path / "splash.png"
+    img.write_bytes(b"\x89PNG\r\n")
+    cmd, _ = build_pyinstaller_command(
+        BuildConfig(source=source_file, splash_image=str(img))
+    )
+    assert "--splash" in cmd
+    assert cmd[cmd.index("--splash") + 1] == str(img)
+
+
+def test_splash_image_skipped_when_missing(source_file, tmp_path):
+    cmd, _ = build_pyinstaller_command(
+        BuildConfig(source=source_file, splash_image=str(tmp_path / "nope.png"))
+    )
+    assert "--splash" not in cmd
+
+
+def test_manifest_file_added_when_present(source_file, tmp_path):
+    mf = tmp_path / "app.manifest"
+    mf.write_text("<assembly/>")
+    cmd, _ = build_pyinstaller_command(
+        BuildConfig(source=source_file, manifest_file=str(mf))
+    )
+    assert "--manifest" in cmd
+    assert cmd[cmd.index("--manifest") + 1] == str(mf)
+
+
+def test_manifest_file_skipped_when_missing(source_file, tmp_path):
+    cmd, _ = build_pyinstaller_command(
+        BuildConfig(source=source_file, manifest_file=str(tmp_path / "absent.xml"))
+    )
+    assert "--manifest" not in cmd

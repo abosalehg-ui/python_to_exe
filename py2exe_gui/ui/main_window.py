@@ -45,13 +45,20 @@ from py2exe_gui.constants import (
 from py2exe_gui.core import (
     BuildConfig,
     BuildHistory,
+    ManifestConfig,
+    SigningConfig,
     VersionInfo,
     build_pyinstaller_command,
+    build_signtool_command,
     detect_imports,
     format_html,
+    generate_manifest,
     generate_version_file,
+    locate_built_executable,
     make_record,
     parse_requirements,
+    redact_password,
+    run_smoke_test,
 )
 from py2exe_gui.core.dependency_analyzer import filter_non_stdlib
 from py2exe_gui.strings import (
@@ -77,6 +84,7 @@ class MainWindow(QMainWindow):
         self._build_start_time = 0.0
         self._build_config_snapshot = {}
         self._temp_version_file = ""
+        self._temp_manifest_file = ""
         self.history = BuildHistory(HISTORY_FILE)
         self.load_settings()
         self.current_theme = self.settings.get("theme", "dark")
@@ -109,6 +117,7 @@ class MainWindow(QMainWindow):
         tabs.addTab(self._create_main_tab(), S.TAB_MAIN)
         tabs.addTab(self._create_advanced_tab(), S.TAB_ADVANCED)
         tabs.addTab(self._create_version_info_tab(), S.TAB_VERSION_INFO)
+        tabs.addTab(self._create_deploy_tab(), S.TAB_DEPLOY)
         tabs.addTab(self._create_templates_tab(), S.TAB_TEMPLATES)
         tabs.addTab(self._create_history_tab(), S.TAB_HISTORY)
         tabs.addTab(self._create_about_tab(), S.TAB_ABOUT)
@@ -444,6 +453,102 @@ class MainWindow(QMainWindow):
         layout.addStretch()
         return tab
 
+    def _create_deploy_tab(self):
+        """Splash / Manifest / Code signing / Smoke test sections."""
+        tab = QWidget()
+        layout = QVBoxLayout(tab)
+
+        # ── Splash ──
+        splash_group = QGroupBox(S.GROUP_SPLASH)
+        splash_layout = QHBoxLayout(splash_group)
+        splash_layout.addWidget(QLabel(S.SPLASH_LABEL))
+        self.splash_input = QLineEdit()
+        self.splash_input.setPlaceholderText(S.SPLASH_PLACEHOLDER)
+        splash_btn = QPushButton("📂")
+        splash_btn.clicked.connect(self.browse_splash_image)
+        splash_layout.addWidget(self.splash_input, stretch=4)
+        splash_layout.addWidget(splash_btn, stretch=1)
+        layout.addWidget(splash_group)
+
+        # ── Manifest ──
+        manifest_group = QGroupBox(S.GROUP_MANIFEST)
+        manifest_layout = QVBoxLayout(manifest_group)
+        manifest_layout.addWidget(QLabel(S.MANIFEST_HINT))
+
+        self.manifest_enable = QCheckBox(S.MANIFEST_ENABLE)
+        manifest_layout.addWidget(self.manifest_enable)
+
+        self.manifest_dpi = QCheckBox(S.MANIFEST_DPI)
+        self.manifest_admin = QCheckBox(S.MANIFEST_ADMIN)
+        manifest_layout.addWidget(self.manifest_dpi)
+        manifest_layout.addWidget(self.manifest_admin)
+
+        manifest_layout.addWidget(QLabel(S.MANIFEST_OS_LABEL))
+        os_row = QHBoxLayout()
+        self.manifest_os = {
+            "vista": QCheckBox(S.OS_VISTA),
+            "7": QCheckBox(S.OS_7),
+            "8": QCheckBox(S.OS_8),
+            "8.1": QCheckBox(S.OS_81),
+            "10": QCheckBox(S.OS_10),
+            "11": QCheckBox(S.OS_11),
+        }
+        # Default: modern Windows supported.
+        for code in ("7", "8", "8.1", "10"):
+            self.manifest_os[code].setChecked(True)
+        for cb in self.manifest_os.values():
+            os_row.addWidget(cb)
+        manifest_layout.addLayout(os_row)
+        layout.addWidget(manifest_group)
+
+        # ── Signing ──
+        signing_group = QGroupBox(S.GROUP_SIGNING)
+        signing_layout = QGridLayout(signing_group)
+        signing_layout.addWidget(QLabel(S.SIGNING_HINT), 0, 0, 1, 3)
+
+        self.signing_enable = QCheckBox(S.SIGNING_ENABLE)
+        signing_layout.addWidget(self.signing_enable, 1, 0, 1, 3)
+
+        signing_layout.addWidget(QLabel(S.SIGNING_CERT_LABEL), 2, 0)
+        self.signing_cert = QLineEdit()
+        self.signing_cert.setPlaceholderText(S.SIGNING_CERT_PLACEHOLDER)
+        cert_btn = QPushButton("📂")
+        cert_btn.clicked.connect(self.browse_signing_cert)
+        signing_layout.addWidget(self.signing_cert, 2, 1)
+        signing_layout.addWidget(cert_btn, 2, 2)
+
+        signing_layout.addWidget(QLabel(S.SIGNING_PASSWORD_LABEL), 3, 0)
+        self.signing_password = QLineEdit()
+        self.signing_password.setEchoMode(QLineEdit.Password)
+        self.signing_password.setPlaceholderText(S.SIGNING_PASSWORD_PLACEHOLDER)
+        signing_layout.addWidget(self.signing_password, 3, 1, 1, 2)
+
+        signing_layout.addWidget(QLabel(S.SIGNING_TIMESTAMP_LABEL), 4, 0)
+        self.signing_timestamp = QLineEdit("http://timestamp.digicert.com")
+        signing_layout.addWidget(self.signing_timestamp, 4, 1, 1, 2)
+
+        signing_layout.addWidget(QLabel(S.SIGNING_DESC_LABEL), 5, 0)
+        self.signing_description = QLineEdit()
+        self.signing_description.setPlaceholderText(S.SIGNING_DESC_PLACEHOLDER)
+        signing_layout.addWidget(self.signing_description, 5, 1, 1, 2)
+
+        layout.addWidget(signing_group)
+
+        # ── Smoke test ──
+        smoke_group = QGroupBox(S.GROUP_SMOKE)
+        smoke_layout = QGridLayout(smoke_group)
+        self.smoke_enable = QCheckBox(S.SMOKE_ENABLE)
+        smoke_layout.addWidget(self.smoke_enable, 0, 0, 1, 2)
+        smoke_layout.addWidget(QLabel(S.SMOKE_TIMEOUT_LABEL), 1, 0)
+        self.smoke_timeout = QSpinBox()
+        self.smoke_timeout.setRange(1, 60)
+        self.smoke_timeout.setValue(5)
+        smoke_layout.addWidget(self.smoke_timeout, 1, 1)
+        layout.addWidget(smoke_group)
+
+        layout.addStretch()
+        return tab
+
     def _create_history_tab(self):
         """List of recent builds with restore + clear actions."""
         tab = QWidget()
@@ -678,6 +783,7 @@ class MainWindow(QMainWindow):
             upx=self.upx_check.isChecked(),
             upx_level=self.upx_level.value(),
             extra_args=self.extra_args.text(),
+            splash_image=self.splash_input.text().strip(),
         )
 
     def _apply_config(self, config: BuildConfig):
@@ -701,6 +807,8 @@ class MainWindow(QMainWindow):
         self.upx_check.setChecked(config.upx)
         self.upx_level.setValue(config.upx_level)
         self.extra_args.setText(config.extra_args)
+        if hasattr(self, "splash_input"):
+            self.splash_input.setText(config.splash_image)
 
     def save_current_settings(self):
         file_path, _ = QFileDialog.getSaveFileName(
@@ -751,9 +859,13 @@ class MainWindow(QMainWindow):
         version_path = self._materialize_version_file()
         if version_path:
             config.version_file = version_path
+        manifest_path = self._materialize_manifest_file()
+        if manifest_path:
+            config.manifest_file = manifest_path
         cmd, error = build_pyinstaller_command(config)
         if error:
             self._cleanup_temp_version_file()
+            self._cleanup_temp_manifest_file()
             QMessageBox.warning(self, S.MSG_WARNING, error)
             return
         self._build_start_time = time.monotonic()
@@ -802,18 +914,26 @@ class MainWindow(QMainWindow):
         self.convert_btn.setEnabled(True)
         self.cancel_btn.setEnabled(False)
         duration = max(0.0, time.monotonic() - self._build_start_time)
-        if self._build_config_snapshot:
+        snapshot = self._build_config_snapshot
+        if snapshot:
             record = make_record(
-                source=self._build_config_snapshot.get("source", ""),
-                output_name=self._build_config_snapshot.get("output_name", ""),
+                source=snapshot.get("source", ""),
+                output_name=snapshot.get("output_name", ""),
                 success=success,
                 duration_seconds=round(duration, 2),
-                config=self._build_config_snapshot,
+                config=snapshot,
             )
             self.history.add(record)
             self._refresh_history_list()
-            self._build_config_snapshot = {}
+        # Run post-build actions only on a successful build.
+        if success and snapshot:
+            try:
+                self._run_post_build_actions(BuildConfig.from_dict(snapshot))
+            except Exception as e:
+                self._append_log(S.LOG_SIGNING_FAIL.format(error=str(e)))
+        self._build_config_snapshot = {}
         self._cleanup_temp_version_file()
+        self._cleanup_temp_manifest_file()
         if success:
             self.progress_bar.setFormat(S.PROGRESS_DONE)
             QMessageBox.information(self, S.MSG_SUCCESS, message)
@@ -1007,6 +1127,121 @@ class MainWindow(QMainWindow):
         self.history.clear()
         self._refresh_history_list()
         self._append_log(S.HISTORY_CLEARED)
+
+    # ─── Phase 5: deployment (splash / manifest / signing / smoke) ────
+
+    def browse_splash_image(self):
+        file_path, _ = QFileDialog.getOpenFileName(
+            self, S.DIALOG_CHOOSE_SPLASH, "", S.DIALOG_FILTER_IMAGE
+        )
+        if file_path:
+            self.splash_input.setText(file_path)
+
+    def browse_signing_cert(self):
+        file_path, _ = QFileDialog.getOpenFileName(
+            self, S.DIALOG_CHOOSE_CERT, "", S.DIALOG_FILTER_CERT
+        )
+        if file_path:
+            self.signing_cert.setText(file_path)
+
+    def _selected_supported_os(self):
+        return [code for code, cb in self.manifest_os.items() if cb.isChecked()]
+
+    def _materialize_manifest_file(self) -> str:
+        """If manifest generation is on, write a temp manifest.xml and return its path."""
+        if not self.manifest_enable.isChecked():
+            return ""
+        config = ManifestConfig(
+            name=self.output_name.text() or "MyApp",
+            version=self.vi_product_version.text() or self.vi_file_version.text() or "1.0.0.0",
+            description=self.vi_file_description.text(),
+            dpi_aware=self.manifest_dpi.isChecked(),
+            require_admin=self.manifest_admin.isChecked(),
+            supported_os=self._selected_supported_os(),
+        )
+        xml = generate_manifest(config)
+        fd, path = tempfile.mkstemp(prefix="py2exe_manifest_", suffix=".xml", text=True)
+        try:
+            with os.fdopen(fd, "w", encoding="utf-8") as f:
+                f.write(xml)
+        except Exception:
+            return ""
+        self._temp_manifest_file = path
+        return path
+
+    def _cleanup_temp_manifest_file(self):
+        if getattr(self, "_temp_manifest_file", "") and os.path.exists(
+            self._temp_manifest_file
+        ):
+            try:
+                os.unlink(self._temp_manifest_file)
+            except OSError:
+                pass
+        self._temp_manifest_file = ""
+
+    def _current_signing_config(self) -> SigningConfig:
+        return SigningConfig(
+            enabled=self.signing_enable.isChecked(),
+            cert_path=self.signing_cert.text().strip(),
+            cert_password=self.signing_password.text(),
+            timestamp_url=self.signing_timestamp.text().strip()
+            or "http://timestamp.digicert.com",
+            description=self.signing_description.text().strip(),
+        )
+
+    def _run_post_build_actions(self, config: BuildConfig):
+        """Run signing and/or smoke test on the produced EXE."""
+        exe_path = locate_built_executable(
+            config.output_dir or os.path.dirname(config.source),
+            config.output_name or os.path.splitext(os.path.basename(config.source))[0],
+            config.onefile,
+        )
+        if not exe_path:
+            if self.signing_enable.isChecked() or self.smoke_enable.isChecked():
+                self._append_log(S.LOG_SMOKE_NOT_FOUND)
+            return
+
+        # Signing
+        sign_cfg = self._current_signing_config()
+        if sign_cfg.enabled:
+            self._sign_executable(exe_path, sign_cfg)
+
+        # Smoke test
+        if self.smoke_enable.isChecked():
+            self._smoke_test_executable(exe_path)
+
+    def _sign_executable(self, exe_path: str, sign_cfg: SigningConfig):
+        cmd, error = build_signtool_command(exe_path, sign_cfg)
+        if error or cmd is None:
+            self._append_log(S.LOG_SIGNING_SKIPPED.format(reason=error or "unknown"))
+            return
+        self._append_log(S.LOG_SIGNING_START)
+        # Log a redacted copy of the command so the password never lands in the log.
+        self._append_log(" ".join(redact_password(cmd)))
+        try:
+            result = subprocess.run(cmd, capture_output=True, text=True, timeout=120)
+        except FileNotFoundError:
+            self._append_log(S.LOG_SIGNING_FAIL.format(error="signtool not found on PATH"))
+            return
+        except subprocess.TimeoutExpired:
+            self._append_log(S.LOG_SIGNING_FAIL.format(error="timed out"))
+            return
+        if result.returncode == 0:
+            self._append_log(S.LOG_SIGNING_OK)
+        else:
+            msg = (result.stderr or result.stdout or "").strip()[:300]
+            self._append_log(S.LOG_SIGNING_FAIL.format(error=msg))
+
+    def _smoke_test_executable(self, exe_path: str):
+        self._append_log(S.LOG_SMOKE_START)
+        timeout = float(self.smoke_timeout.value())
+        result = run_smoke_test(exe_path, timeout=timeout)
+        if result.passed:
+            self._append_log(S.LOG_SMOKE_OK)
+        else:
+            self._append_log(
+                S.LOG_SMOKE_FAIL.format(error=result.error or f"exit={result.returncode}")
+            )
 
     def _register_shortcuts(self):
         """Bind keyboard shortcuts to common actions."""

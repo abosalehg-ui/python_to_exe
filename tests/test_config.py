@@ -47,3 +47,16 @@ def test_version_file_roundtrip():
 
 def test_version_file_default_is_empty():
     assert BuildConfig().version_file == ""
+
+
+def test_splash_and_manifest_roundtrip():
+    cfg = BuildConfig(splash_image="/tmp/s.png", manifest_file="/tmp/m.xml")
+    restored = BuildConfig.from_dict(cfg.to_dict())
+    assert restored.splash_image == "/tmp/s.png"
+    assert restored.manifest_file == "/tmp/m.xml"
+
+
+def test_phase5_fields_default_empty():
+    cfg = BuildConfig()
+    assert cfg.splash_image == ""
+    assert cfg.manifest_file == ""

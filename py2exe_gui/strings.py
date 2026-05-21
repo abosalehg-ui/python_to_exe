@@ -237,6 +237,59 @@ class Ar:
     HISTORY_CLEARED = "✅ تم مسح سجل البناءات"
     LOG_RESTORED = "✅ تمت استعادة إعدادات البناء من {time}"
 
+    # Phase 5: Deployment tab
+    TAB_DEPLOY = "🚀 النشر"
+
+    # Splash
+    GROUP_SPLASH = "🖼️ شاشة البداية (Splash)"
+    SPLASH_LABEL = "صورة شاشة البداية:"
+    SPLASH_PLACEHOLDER = "اختياري - PNG / JPG"
+    DIALOG_CHOOSE_SPLASH = "اختر صورة شاشة البداية"
+    DIALOG_FILTER_IMAGE = "Images (*.png *.jpg *.jpeg *.bmp);;All Files (*.*)"
+
+    # Manifest
+    GROUP_MANIFEST = "📜 Windows Manifest"
+    MANIFEST_HINT = "يُولَّد ملف XML ويُمرَّر عبر --manifest عند البناء."
+    MANIFEST_ENABLE = "تفعيل توليد Manifest"
+    MANIFEST_DPI = "DPI Aware (PerMonitorV2)"
+    MANIFEST_ADMIN = "يتطلب صلاحيات المدير (requireAdministrator)"
+    MANIFEST_OS_LABEL = "أنظمة Windows المدعومة:"
+
+    # Signing
+    GROUP_SIGNING = "🔐 التوقيع الرقمي"
+    SIGNING_HINT = "بعد إكمال البناء، يُوقَّع الـ EXE باستخدام signtool.exe (Windows)."
+    SIGNING_ENABLE = "تفعيل التوقيع الرقمي"
+    SIGNING_CERT_LABEL = "ملف الشهادة (.pfx):"
+    SIGNING_CERT_PLACEHOLDER = "اختر ملف .pfx"
+    SIGNING_PASSWORD_LABEL = "كلمة المرور:"
+    SIGNING_PASSWORD_PLACEHOLDER = "كلمة مرور الشهادة"
+    SIGNING_TIMESTAMP_LABEL = "خادم Timestamp:"
+    SIGNING_DESC_LABEL = "وصف للتوقيع:"
+    SIGNING_DESC_PLACEHOLDER = "اختياري - مثل اسم المنتج"
+    DIALOG_CHOOSE_CERT = "اختر ملف الشهادة"
+    DIALOG_FILTER_CERT = "Certificate Files (*.pfx *.p12);;All Files (*.*)"
+    LOG_SIGNING_START = "🔐 جاري التوقيع الرقمي..."
+    LOG_SIGNING_OK = "✅ تم التوقيع الرقمي بنجاح"
+    LOG_SIGNING_FAIL = "❌ فشل التوقيع الرقمي: {error}"
+    LOG_SIGNING_SKIPPED = "⏭️ تم تخطي التوقيع: {reason}"
+
+    # Smoke test
+    GROUP_SMOKE = "🧪 اختبار ما بعد البناء"
+    SMOKE_ENABLE = "تشغيل الـ EXE الناتج تلقائياً للتحقق"
+    SMOKE_TIMEOUT_LABEL = "مدة الانتظار (ثواني):"
+    LOG_SMOKE_START = "🧪 جاري اختبار الـ EXE الناتج..."
+    LOG_SMOKE_OK = "✅ نجاح الاختبار: EXE يعمل بشكل صحيح"
+    LOG_SMOKE_FAIL = "❌ فشل الاختبار: {error}"
+    LOG_SMOKE_NOT_FOUND = "⚠️ لم يُعثَر على الـ EXE الناتج للاختبار"
+
+    # OS list labels (kept short - no version prefix needed)
+    OS_VISTA = "Vista"
+    OS_7 = "Windows 7"
+    OS_8 = "Windows 8"
+    OS_81 = "Windows 8.1"
+    OS_10 = "Windows 10"
+    OS_11 = "Windows 11"
+
     # Template names & descriptions (Phase 3 — accessed via templates helpers)
     TPL_GUI_NAME = "تطبيق GUI (PyQt5/Tkinter)"
     TPL_GUI_DESC = "مناسب لتطبيقات الواجهة الرسومية"
@@ -483,6 +536,54 @@ class En:
     BTN_CLEAR_HISTORY = "🗑️ Clear History"
     HISTORY_CLEARED = "✅ Build history cleared"
     LOG_RESTORED = "✅ Build settings restored from {time}"
+
+    # Phase 5: Deployment tab
+    TAB_DEPLOY = "🚀 Deploy"
+
+    GROUP_SPLASH = "🖼️ Splash Screen"
+    SPLASH_LABEL = "Splash image:"
+    SPLASH_PLACEHOLDER = "Optional - PNG / JPG"
+    DIALOG_CHOOSE_SPLASH = "Choose splash image"
+    DIALOG_FILTER_IMAGE = "Images (*.png *.jpg *.jpeg *.bmp);;All Files (*.*)"
+
+    GROUP_MANIFEST = "📜 Windows Manifest"
+    MANIFEST_HINT = "Generates an XML manifest passed via --manifest at build time."
+    MANIFEST_ENABLE = "Generate manifest"
+    MANIFEST_DPI = "DPI Aware (PerMonitorV2)"
+    MANIFEST_ADMIN = "Require administrator (requireAdministrator)"
+    MANIFEST_OS_LABEL = "Supported Windows versions:"
+
+    GROUP_SIGNING = "🔐 Code Signing"
+    SIGNING_HINT = "After build, signs the EXE using signtool.exe (Windows-only)."
+    SIGNING_ENABLE = "Enable code signing"
+    SIGNING_CERT_LABEL = "Certificate file (.pfx):"
+    SIGNING_CERT_PLACEHOLDER = "Choose .pfx file"
+    SIGNING_PASSWORD_LABEL = "Password:"
+    SIGNING_PASSWORD_PLACEHOLDER = "Certificate password"
+    SIGNING_TIMESTAMP_LABEL = "Timestamp URL:"
+    SIGNING_DESC_LABEL = "Signature description:"
+    SIGNING_DESC_PLACEHOLDER = "Optional - e.g. product name"
+    DIALOG_CHOOSE_CERT = "Choose certificate"
+    DIALOG_FILTER_CERT = "Certificate Files (*.pfx *.p12);;All Files (*.*)"
+    LOG_SIGNING_START = "🔐 Signing executable..."
+    LOG_SIGNING_OK = "✅ Code signing succeeded"
+    LOG_SIGNING_FAIL = "❌ Code signing failed: {error}"
+    LOG_SIGNING_SKIPPED = "⏭️ Signing skipped: {reason}"
+
+    GROUP_SMOKE = "🧪 Post-build Smoke Test"
+    SMOKE_ENABLE = "Run built EXE automatically to verify it starts"
+    SMOKE_TIMEOUT_LABEL = "Timeout (seconds):"
+    LOG_SMOKE_START = "🧪 Testing built executable..."
+    LOG_SMOKE_OK = "✅ Smoke test passed: EXE runs"
+    LOG_SMOKE_FAIL = "❌ Smoke test failed: {error}"
+    LOG_SMOKE_NOT_FOUND = "⚠️ Built EXE not found for smoke test"
+
+    OS_VISTA = "Vista"
+    OS_7 = "Windows 7"
+    OS_8 = "Windows 8"
+    OS_81 = "Windows 8.1"
+    OS_10 = "Windows 10"
+    OS_11 = "Windows 11"
 
     # Template names & descriptions
     TPL_GUI_NAME = "GUI app (PyQt5/Tkinter)"

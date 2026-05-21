@@ -2,6 +2,11 @@
 
 from py2exe_gui.core.build_history import BuildHistory, BuildRecord, make_record
 from py2exe_gui.core.builder import build_pyinstaller_command
+from py2exe_gui.core.code_signer import (
+    SigningConfig,
+    build_signtool_command,
+    redact_password,
+)
 from py2exe_gui.core.config import BuildConfig
 from py2exe_gui.core.dependency_analyzer import (
     detect_imports,
@@ -9,19 +14,33 @@ from py2exe_gui.core.dependency_analyzer import (
     parse_requirements,
 )
 from py2exe_gui.core.log_formatter import classify_line, format_html
+from py2exe_gui.core.manifest_generator import ManifestConfig, generate_manifest
+from py2exe_gui.core.smoke_test import (
+    SmokeResult,
+    locate_built_executable,
+    run_smoke_test,
+)
 from py2exe_gui.core.version_info import VersionInfo, generate_version_file
 
 __all__ = [
     "BuildConfig",
     "BuildHistory",
     "BuildRecord",
+    "ManifestConfig",
+    "SigningConfig",
+    "SmokeResult",
     "VersionInfo",
     "build_pyinstaller_command",
+    "build_signtool_command",
     "classify_line",
     "detect_imports",
     "filter_non_stdlib",
     "format_html",
+    "generate_manifest",
     "generate_version_file",
+    "locate_built_executable",
     "make_record",
     "parse_requirements",
+    "redact_password",
+    "run_smoke_test",
 ]
