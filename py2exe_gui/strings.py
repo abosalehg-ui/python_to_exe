@@ -117,6 +117,30 @@ class Ar:
     DIALOG_LOAD_SETTINGS = "تحميل إعدادات"
     DIALOG_FILTER_JSON = "JSON Files (*.json)"
 
+    # Log enhancements (Phase 2)
+    LOG_SEARCH_PLACEHOLDER = "🔍 ابحث في السجل..."
+    BTN_EXPORT_LOG = "💾 تصدير السجل"
+    DIALOG_EXPORT_LOG = "تصدير السجل"
+    DIALOG_FILTER_LOG = "Log Files (*.log *.txt);;All Files (*.*)"
+    LOG_EXPORT_OK = "✅ تم تصدير السجل: {path}"
+    LOG_EXPORT_FAIL = "فشل تصدير السجل:\n{error}"
+    LOG_DROPPED_SOURCE = "📁 تم سحب الملف: {path}"
+    LOG_DROPPED_ICON = "🎨 تم سحب الأيقونة: {path}"
+    LOG_DROPPED_EXTRA = "➕ تم سحب ملف إضافي: {path}"
+
+    # Dry-run preview (Phase 2)
+    BTN_PREVIEW_CMD = "👁️ معاينة الأمر"
+    DIALOG_PREVIEW_TITLE = "معاينة أمر PyInstaller"
+    DIALOG_PREVIEW_HINT = "هذا هو الأمر الذي سيُنفَّذ عند الضغط على \"بدء التحويل\":"
+    BTN_COPY_CMD = "📋 نسخ"
+    BTN_CLOSE = "إغلاق"
+    MSG_COPIED = "تم نسخ الأمر إلى الحافظة"
+
+    # Theme toggle (Phase 2)
+    BTN_TOGGLE_THEME = "🌓 تبديل السمة"
+    THEME_DARK = "dark"
+    THEME_LIGHT = "light"
+
     # Status / Progress
     PROGRESS_READY = "%p% - جاهز للتحويل"
     PROGRESS_CONVERTING = "%p% - جاري التحويل..."

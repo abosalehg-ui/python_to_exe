@@ -6,7 +6,7 @@ import subprocess
 import sys
 
 from PyQt5.QtCore import Qt
-from PyQt5.QtGui import QFont
+from PyQt5.QtGui import QFont, QKeySequence
 from PyQt5.QtWidgets import (
     QCheckBox,
     QComboBox,
@@ -23,6 +23,7 @@ from PyQt5.QtWidgets import (
     QMessageBox,
     QProgressBar,
     QPushButton,
+    QShortcut,
     QSpinBox,
     QTabWidget,
     QTextEdit,
@@ -42,13 +43,14 @@ from py2exe_gui.core import (
     BuildConfig,
     build_pyinstaller_command,
     detect_imports,
+    format_html,
 )
 from py2exe_gui.core.dependency_analyzer import filter_non_stdlib
 from py2exe_gui.strings import S
-from py2exe_gui.styles import DARK_THEME
+from py2exe_gui.styles import THEMES
 from py2exe_gui.templates import TEMPLATES
 from py2exe_gui.ui.conversion_thread import ConversionThread
-from py2exe_gui.ui.dialogs import AddImportDialog
+from py2exe_gui.ui.dialogs import AddImportDialog, CommandPreviewDialog
 
 
 class MainWindow(QMainWindow):
@@ -58,15 +60,19 @@ class MainWindow(QMainWindow):
         super().__init__()
         self.conversion_thread = None
         self.settings = {}
+        self.current_theme = "dark"
         self.load_settings()
+        self.current_theme = self.settings.get("theme", "dark")
         self.init_ui()
+        self._register_shortcuts()
+        self.setAcceptDrops(True)
         self.check_dependencies()
 
     def init_ui(self):
         self.setWindowTitle(S.WINDOW_TITLE_FMT.format(name=APP_NAME, version=APP_VERSION))
         self.setMinimumSize(1080, 800)
         self.setLayoutDirection(Qt.RightToLeft)
-        self.setStyleSheet(DARK_THEME)
+        self.setStyleSheet(THEMES.get(self.current_theme, THEMES["dark"]))
 
         central_widget = QWidget()
         self.setCentralWidget(central_widget)
@@ -106,13 +112,23 @@ class MainWindow(QMainWindow):
         self.cancel_btn.setEnabled(False)
         self.cancel_btn.clicked.connect(self.cancel_conversion)
 
+        self.preview_btn = QPushButton(S.BTN_PREVIEW_CMD)
+        self.preview_btn.setMinimumHeight(50)
+        self.preview_btn.clicked.connect(self.preview_command)
+
         self.open_folder_btn = QPushButton(S.BTN_OPEN_FOLDER)
         self.open_folder_btn.setMinimumHeight(50)
         self.open_folder_btn.clicked.connect(self.open_output_folder)
 
+        self.theme_btn = QPushButton(S.BTN_TOGGLE_THEME)
+        self.theme_btn.setMinimumHeight(50)
+        self.theme_btn.clicked.connect(self.toggle_theme)
+
         buttons_layout.addWidget(self.convert_btn)
         buttons_layout.addWidget(self.cancel_btn)
+        buttons_layout.addWidget(self.preview_btn)
         buttons_layout.addWidget(self.open_folder_btn)
+        buttons_layout.addWidget(self.theme_btn)
         main_layout.addLayout(buttons_layout)
 
         self.statusBar().showMessage(f"{COPYRIGHT} | {DEVELOPER}")
@@ -209,13 +225,29 @@ class MainWindow(QMainWindow):
 
         log_group = QGroupBox(S.GROUP_LOG)
         log_layout = QVBoxLayout(log_group)
+
         self.log_output = QTextEdit()
         self.log_output.setReadOnly(True)
         self.log_output.setMinimumHeight(150)
+
+        search_row = QHBoxLayout()
+        self.log_search = QLineEdit()
+        self.log_search.setPlaceholderText(S.LOG_SEARCH_PLACEHOLDER)
+        self.log_search.returnPressed.connect(self._search_log_next)
+        self.log_search.textChanged.connect(self._search_log_next)
+        search_row.addWidget(self.log_search)
+
+        log_btn_row = QHBoxLayout()
         clear_log_btn = QPushButton(S.CLEAR_LOG)
         clear_log_btn.clicked.connect(lambda: self.log_output.clear())
+        export_log_btn = QPushButton(S.BTN_EXPORT_LOG)
+        export_log_btn.clicked.connect(self.export_log)
+        log_btn_row.addWidget(clear_log_btn)
+        log_btn_row.addWidget(export_log_btn)
+
+        log_layout.addLayout(search_row)
         log_layout.addWidget(self.log_output)
-        log_layout.addWidget(clear_log_btn)
+        log_layout.addLayout(log_btn_row)
         layout.addWidget(log_group)
 
         return tab
@@ -363,14 +395,14 @@ class MainWindow(QMainWindow):
     # ─── Actions ────────────────────────────────────────────────────────
 
     def check_dependencies(self):
-        self.log_output.append(S.LOG_CHECKING_DEPS)
+        self._append_log(S.LOG_CHECKING_DEPS)
         try:
             result = subprocess.run(
                 [sys.executable, "--version"], capture_output=True, text=True
             )
-            self.log_output.append(S.LOG_PYTHON_FOUND.format(version=result.stdout.strip()))
+            self._append_log(S.LOG_PYTHON_FOUND.format(version=result.stdout.strip()))
         except Exception:
-            self.log_output.append(S.LOG_PYTHON_MISSING)
+            self._append_log(S.LOG_PYTHON_MISSING)
 
         try:
             result = subprocess.run(
@@ -379,16 +411,16 @@ class MainWindow(QMainWindow):
                 text=True,
             )
             if result.returncode == 0:
-                self.log_output.append(
+                self._append_log(
                     S.LOG_PYINSTALLER_FOUND.format(version=result.stdout.strip())
                 )
             else:
-                self.log_output.append(S.LOG_PYINSTALLER_MISSING)
+                self._append_log(S.LOG_PYINSTALLER_MISSING)
         except Exception:
-            self.log_output.append(S.LOG_PYINSTALLER_MISSING)
+            self._append_log(S.LOG_PYINSTALLER_MISSING)
 
-        self.log_output.append("─" * 50)
-        self.log_output.append(S.LOG_READY)
+        self._append_log("─" * 50)
+        self._append_log(S.LOG_READY)
 
     def browse_source(self):
         file_path, _ = QFileDialog.getOpenFileName(
@@ -459,7 +491,7 @@ class MainWindow(QMainWindow):
             QMessageBox.warning(self, S.MSG_WARNING, S.ERR_NO_SOURCE)
             return
 
-        self.log_output.append(S.LOG_DETECTING_IMPORTS)
+        self._append_log(S.LOG_DETECTING_IMPORTS)
         try:
             with open(source, encoding="utf-8") as f:
                 content = f.read()
@@ -473,11 +505,11 @@ class MainWindow(QMainWindow):
             for imp in new_imports:
                 self.hidden_imports_list.addItem(imp)
 
-            self.log_output.append(
+            self._append_log(
                 S.LOG_DETECT_RESULT.format(total=len(imports), added=len(new_imports))
             )
         except Exception as e:
-            self.log_output.append(S.LOG_DETECT_ERROR.format(error=str(e)))
+            self._append_log(S.LOG_DETECT_ERROR.format(error=str(e)))
 
     def apply_template(self, index):
         template_name = self.templates_combo.currentData()
@@ -510,7 +542,7 @@ class MainWindow(QMainWindow):
             for imp in template["hidden_imports"]:
                 if imp not in existing:
                     self.hidden_imports_list.addItem(imp)
-            self.log_output.append(S.LOG_TEMPLATE_APPLIED.format(name=template_name))
+            self._append_log(S.LOG_TEMPLATE_APPLIED.format(name=template_name))
             QMessageBox.information(
                 self, S.MSG_SUCCESS, S.MSG_TEMPLATE_OK_FMT.format(name=template_name)
             )
@@ -572,7 +604,7 @@ class MainWindow(QMainWindow):
         try:
             with open(file_path, "w", encoding="utf-8") as f:
                 json.dump(self._current_config().to_dict(), f, ensure_ascii=False, indent=2)
-            self.log_output.append(S.LOG_SETTINGS_SAVED.format(path=file_path))
+            self._append_log(S.LOG_SETTINGS_SAVED.format(path=file_path))
             QMessageBox.information(self, S.MSG_SUCCESS, S.MSG_SAVED_OK)
         except Exception as e:
             QMessageBox.critical(self, S.MSG_ERROR, S.ERR_SAVE_FAIL.format(error=str(e)))
@@ -587,7 +619,7 @@ class MainWindow(QMainWindow):
             with open(file_path, encoding="utf-8") as f:
                 data = json.load(f)
             self._apply_config(BuildConfig.from_dict(data))
-            self.log_output.append(S.LOG_SETTINGS_LOADED.format(path=file_path))
+            self._append_log(S.LOG_SETTINGS_LOADED.format(path=file_path))
             QMessageBox.information(self, S.MSG_SUCCESS, S.MSG_LOADED_OK)
         except Exception as e:
             QMessageBox.critical(self, S.MSG_ERROR, S.ERR_LOAD_FAIL.format(error=str(e)))
@@ -620,14 +652,14 @@ class MainWindow(QMainWindow):
                 check=True,
             )
         except Exception:
-            self.log_output.append(S.LOG_INSTALL_PYINSTALLER)
+            self._append_log(S.LOG_INSTALL_PYINSTALLER)
             try:
                 subprocess.run(
                     [sys.executable, "-m", "pip", "install", "pyinstaller"],
                     capture_output=True,
                     check=True,
                 )
-                self.log_output.append(S.LOG_INSTALL_PYINSTALLER_OK)
+                self._append_log(S.LOG_INSTALL_PYINSTALLER_OK)
             except Exception as e:
                 QMessageBox.critical(
                     self, S.MSG_ERROR, S.ERR_INSTALL_PYINSTALLER_FAIL.format(error=str(e))
@@ -642,7 +674,7 @@ class MainWindow(QMainWindow):
         self.progress_bar.setFormat(S.PROGRESS_CONVERTING)
 
         self.conversion_thread = ConversionThread(cmd, work_dir)
-        self.conversion_thread.log_signal.connect(self.log_output.append)
+        self.conversion_thread.log_signal.connect(self._append_log)
         self.conversion_thread.progress_signal.connect(self.progress_bar.setValue)
         self.conversion_thread.finished_signal.connect(self.on_conversion_finished)
         self.conversion_thread.start()
@@ -650,7 +682,7 @@ class MainWindow(QMainWindow):
     def cancel_conversion(self):
         if self.conversion_thread and self.conversion_thread.isRunning():
             self.conversion_thread.cancel()
-            self.log_output.append(S.LOG_CANCELLING)
+            self._append_log(S.LOG_CANCELLING)
 
     def on_conversion_finished(self, success, message):
         self.convert_btn.setEnabled(True)
@@ -680,6 +712,119 @@ class MainWindow(QMainWindow):
             subprocess.run(["open", target])
         else:
             subprocess.run(["xdg-open", target])
+
+    # ─── Phase 2: log / preview / theme / shortcuts / drag-drop ────────
+
+    def _append_log(self, line: str):
+        """Append a single line to the log, coloured by severity."""
+        if line is None:
+            return
+        text = str(line)
+        # Preserve blank lines without HTML wrapping.
+        if text.strip() == "":
+            self.log_output.append("")
+            return
+        self.log_output.append(format_html(text))
+
+    def _search_log_next(self):
+        """Find the next occurrence of the search query in the log."""
+        query = self.log_search.text().strip()
+        if not query:
+            return
+        if not self.log_output.find(query):
+            # Wrap to the start and try again.
+            cursor = self.log_output.textCursor()
+            cursor.movePosition(cursor.Start)
+            self.log_output.setTextCursor(cursor)
+            self.log_output.find(query)
+
+    def export_log(self):
+        """Save the current log contents to a text file."""
+        if not self.log_output.toPlainText().strip():
+            return
+        file_path, _ = QFileDialog.getSaveFileName(
+            self,
+            S.DIALOG_EXPORT_LOG,
+            "py2exe_log.txt",
+            S.DIALOG_FILTER_LOG,
+        )
+        if not file_path:
+            return
+        try:
+            with open(file_path, "w", encoding="utf-8") as f:
+                f.write(self.log_output.toPlainText())
+            self._append_log(S.LOG_EXPORT_OK.format(path=file_path))
+        except Exception as e:
+            QMessageBox.critical(
+                self, S.MSG_ERROR, S.LOG_EXPORT_FAIL.format(error=str(e))
+            )
+
+    def preview_command(self):
+        """Show the PyInstaller command that would be executed."""
+        cmd, error = build_pyinstaller_command(self._current_config())
+        if error:
+            QMessageBox.warning(self, S.MSG_WARNING, error)
+            return
+        CommandPreviewDialog(cmd, parent=self).exec_()
+
+    def toggle_theme(self):
+        """Swap between dark and light themes and persist the choice."""
+        self.current_theme = "light" if self.current_theme == "dark" else "dark"
+        self.setStyleSheet(THEMES[self.current_theme])
+        self.settings["theme"] = self.current_theme
+
+    def _register_shortcuts(self):
+        """Bind keyboard shortcuts to common actions."""
+        bindings = [
+            (QKeySequence("Ctrl+O"), self.browse_source),
+            (QKeySequence("Ctrl+B"), self.start_conversion),
+            (QKeySequence("Ctrl+Shift+B"), self.cancel_conversion),
+            (QKeySequence("Ctrl+P"), self.preview_command),
+            (QKeySequence("Ctrl+L"), self.log_output.clear),
+            (QKeySequence("Ctrl+E"), self.export_log),
+            (QKeySequence("Ctrl+S"), self.save_current_settings),
+            (QKeySequence("Ctrl+T"), self.toggle_theme),
+            (QKeySequence("F5"), self.detect_imports_action),
+            (QKeySequence("Ctrl+F"), self.log_search.setFocus),
+        ]
+        for seq, slot in bindings:
+            shortcut = QShortcut(seq, self)
+            shortcut.activated.connect(slot)
+
+    # ─── Drag & drop ─────────────────────────────────────────────────────
+
+    def dragEnterEvent(self, event):
+        if event.mimeData().hasUrls():
+            event.acceptProposedAction()
+
+    def dropEvent(self, event):
+        urls = event.mimeData().urls()
+        if not urls:
+            return
+        for url in urls:
+            path = url.toLocalFile()
+            if not path:
+                continue
+            self._handle_dropped_path(path)
+        event.acceptProposedAction()
+
+    def _handle_dropped_path(self, path: str):
+        """Route a dropped path to the appropriate field based on its kind."""
+        if os.path.isdir(path):
+            self.extra_files_list.addItem(path)
+            self._append_log(S.LOG_DROPPED_EXTRA.format(path=path))
+            return
+
+        ext = os.path.splitext(path)[1].lower()
+        if ext in (".py", ".pyw"):
+            self.source_input.setText(path)
+            self._append_log(S.LOG_DROPPED_SOURCE.format(path=path))
+        elif ext == ".ico":
+            self.icon_input.setText(path)
+            self._append_log(S.LOG_DROPPED_ICON.format(path=path))
+        else:
+            self.extra_files_list.addItem(path)
+            self._append_log(S.LOG_DROPPED_EXTRA.format(path=path))
 
     def closeEvent(self, event):
         self.save_settings()
