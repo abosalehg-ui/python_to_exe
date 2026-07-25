@@ -16,6 +16,7 @@ signing, version metadata, build history, and a Windows manifest editor.
 | **Templates** | 11 pre-configured project types (GUI, Console, Flask, FastAPI, Streamlit, Pandas, Pygame, Kivy, Discord, Click CLI, Custom) |
 | **Smart Analysis** | AST-based import detection (incl. `__import__` and `importlib`), `requirements.txt` import, hidden-imports auto-suggest |
 | **Deployment** | Splash screen, Windows manifest (DPI, UAC, supported OS), Authenticode code signing, post-build smoke test |
+| **Installer** | Full Inno Setup pipeline: generated `.iss`, stable upgrade-safe AppId, 13 languages, shortcuts, file association, signed `Setup.exe` |
 | **Metadata** | Embed company name, product/file version, description, copyright, etc. in the EXE properties |
 | **UX** | Drag & drop, command preview (dry-run), real-time colored log with search/export, dark/light theme, 10+ keyboard shortcuts |
 | **i18n** | Full Arabic (RTL) and English (LTR) translations with on-the-fly locale switching |
@@ -86,6 +87,37 @@ FileVersion, ProductVersion, etc.). When any field is filled, a temp
 - **Manifest:** DPI awareness, UAC level, supported Windows versions → XML → `--manifest`
 - **Code signing:** post-build `signtool.exe` invocation with timestamp URL
 - **Smoke test:** run the built EXE briefly to verify it starts
+
+### 📦 Installer
+Completes the chain: `.py` → **PyInstaller** → `.exe` → **Inno Setup** →
+`Setup.exe`.
+
+Requires [Inno Setup 6](https://jrsoftware.org/isdl.php). `ISCC.exe` is located
+via the `INNO_SETUP_ISCC` environment variable, then `PATH`, then the standard
+`C:\Program Files (x86)\Inno Setup 6\` install directories.
+
+| Generated section | Contents |
+|---|---|
+| `[Setup]` | Stable `AppId`, version, publisher, privileges (admin / current user), architecture, compression, license, setup icon |
+| `[Languages]` | 13 bundled Inno Setup languages; Arabic via an external `.isl` |
+| `[Tasks]` / `[Icons]` | Desktop shortcut, Start-menu entry, uninstall shortcut |
+| `[Files]` | Single EXE (onefile) or the whole output folder (onedir) |
+| `[Registry]` | Optional file association with icon and open command |
+| `[Run]` | Optional launch-after-install |
+
+Two actions are available: **Generate .iss only** (inspect the script before
+running anything) and **Build installer now** (compiles via `ISCC.exe` on a
+background thread).
+
+Notes:
+- The `AppId` is a UUIDv5 derived from *(publisher, app name)*. Keeping it
+  stable is what makes a newer setup **upgrade** the existing install rather
+  than installing side by side.
+- Inno Setup does **not** ship an Arabic translation. Selecting Arabic without
+  supplying an `Arabic.isl` logs a warning and falls back rather than failing
+  the compile.
+- Enabling installer signing passes the Deploy tab's `signtool` command to ISCC
+  as `/Sbyparam=`, so `Setup.exe` itself is Authenticode-signed.
 
 ### 📋 Templates
 11 presets including:

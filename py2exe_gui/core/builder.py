@@ -1,6 +1,7 @@
 """Pure logic: turn a BuildConfig into a PyInstaller command list."""
 
 import os
+import shlex
 import sys
 from typing import List, Optional, Tuple
 
@@ -11,6 +12,23 @@ def _add_data_separator(platform: Optional[str] = None) -> str:
     """Return the PyInstaller --add-data separator for the platform."""
     plat = platform if platform is not None else sys.platform
     return ";" if plat == "win32" else ":"
+
+
+def split_extra_args(raw: str, platform: Optional[str] = None) -> List[str]:
+    """Tokenize free-form extra arguments, respecting quoted paths.
+
+    A plain ``str.split()`` breaks any argument containing spaces, which is the
+    common case on Windows ("C:\\Program Files\\..."). shlex is used in
+    non-POSIX mode on Windows so backslashes stay intact.
+    """
+    if not raw or not raw.strip():
+        return []
+    plat = platform if platform is not None else sys.platform
+    if plat == "win32":
+        tokens = shlex.split(raw, posix=False)
+        # Non-POSIX mode keeps the surrounding quotes; drop them.
+        return [t[1:-1] if len(t) > 1 and t[0] == t[-1] == '"' else t for t in tokens]
+    return shlex.split(raw)
 
 
 def build_pyinstaller_command(
@@ -64,25 +82,30 @@ def build_pyinstaller_command(
 
     sep = _add_data_separator(platform)
     for path in config.extra_files:
-        if os.path.exists(path):
-            dest = os.path.basename(path)
-            cmd.extend(["--add-data", f"{path}{sep}{dest}"])
+        if not os.path.exists(path):
+            continue
+        # PyInstaller's DEST is a *directory* inside the bundle. Files go to
+        # the bundle root ("."); a directory keeps its own name as the target.
+        dest = os.path.basename(path.rstrip("\\/")) if os.path.isdir(path) else "."
+        cmd.extend(["--add-data", f"{path}{sep}{dest}"])
 
     for imp in config.hidden_imports:
         cmd.extend(["--hidden-import", imp])
 
     if config.optimize > 0:
-        cmd.append(f"-O{config.optimize}")
+        # PyInstaller has no -O flag; the bytecode level is --optimize (6.0+).
+        cmd.extend(["--optimize", str(config.optimize)])
 
     if config.upx:
-        cmd.append("--upx-dir=upx")
-        if config.upx_level > 0:
-            cmd.append(f"--upx-level={config.upx_level}")
+        # PyInstaller searches PATH for UPX by default; --upx-dir only narrows
+        # that search. There is no --upx-level option.
+        if config.upx_dir:
+            cmd.append(f"--upx-dir={config.upx_dir}")
     else:
         cmd.append("--noupx")
 
     if config.extra_args:
-        cmd.extend(config.extra_args.split())
+        cmd.extend(split_extra_args(config.extra_args, platform))
 
     cmd.append(config.source)
 

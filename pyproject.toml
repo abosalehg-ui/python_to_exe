@@ -26,7 +26,9 @@ classifiers = [
 ]
 dependencies = [
     "PyQt5>=5.15",
-    "pyinstaller>=5.0",
+    # 6.0 is the floor: --optimize only exists from 6.0 onwards, and 6.0 also
+    # carries the fix for the onefile temp-dir privilege issue in earlier lines.
+    "pyinstaller>=6.0",
 ]
 
 [project.optional-dependencies]

@@ -112,6 +112,29 @@ def test_extra_files_use_correct_separator_on_windows(source_file, tmp_path):
     assert ":" not in cmd[add_data_idx + 1].replace(":\\", "")
 
 
+def test_extra_file_lands_in_bundle_root(source_file, tmp_path):
+    """--add-data DEST is a directory: a plain file belongs at '.'."""
+    extra = tmp_path / "data.txt"
+    extra.write_text("x")
+    cmd, _ = build_pyinstaller_command(
+        BuildConfig(source=source_file, extra_files=[str(extra)]),
+        platform="linux",
+    )
+    value = cmd[cmd.index("--add-data") + 1]
+    assert value == f"{extra}:."
+
+
+def test_extra_folder_keeps_its_own_name(source_file, tmp_path):
+    assets = tmp_path / "assets"
+    assets.mkdir()
+    cmd, _ = build_pyinstaller_command(
+        BuildConfig(source=source_file, extra_files=[str(assets)]),
+        platform="linux",
+    )
+    value = cmd[cmd.index("--add-data") + 1]
+    assert value == f"{assets}:assets"
+
+
 def test_extra_files_use_colon_on_unix(source_file, tmp_path):
     extra = tmp_path / "data.txt"
     extra.write_text("x")
@@ -131,13 +154,16 @@ def test_missing_extra_file_is_skipped(source_file, tmp_path):
 
 
 def test_optimize_level(source_file):
+    """PyInstaller has no -O flag; the real option is --optimize LEVEL."""
     cmd, _ = build_pyinstaller_command(BuildConfig(source=source_file, optimize=2))
-    assert "-O2" in cmd
+    idx = cmd.index("--optimize")
+    assert cmd[idx + 1] == "2"
+    assert not any(x.startswith("-O") for x in cmd)
 
 
 def test_optimize_zero_omitted(source_file):
     cmd, _ = build_pyinstaller_command(BuildConfig(source=source_file, optimize=0))
-    assert not any(x.startswith("-O") for x in cmd)
+    assert "--optimize" not in cmd
 
 
 def test_upx_disabled_adds_noupx(source_file):
@@ -145,13 +171,26 @@ def test_upx_disabled_adds_noupx(source_file):
     assert "--noupx" in cmd
 
 
-def test_upx_enabled_adds_dir_and_level(source_file):
+def test_upx_enabled_without_dir_lets_pyinstaller_search_path(source_file):
+    cmd, _ = build_pyinstaller_command(BuildConfig(source=source_file, upx=True))
+    assert "--noupx" not in cmd
+    assert not any(x.startswith("--upx-dir") for x in cmd)
+
+
+def test_upx_enabled_with_dir_passes_it(source_file):
+    cmd, _ = build_pyinstaller_command(
+        BuildConfig(source=source_file, upx=True, upx_dir="C:\\tools\\upx")
+    )
+    assert "--upx-dir=C:\\tools\\upx" in cmd
+    assert "--noupx" not in cmd
+
+
+def test_upx_level_is_never_emitted(source_file):
+    """--upx-level is not a PyInstaller option and must not reach the CLI."""
     cmd, _ = build_pyinstaller_command(
         BuildConfig(source=source_file, upx=True, upx_level=7)
     )
-    assert "--upx-dir=upx" in cmd
-    assert "--upx-level=7" in cmd
-    assert "--noupx" not in cmd
+    assert not any("upx-level" in x for x in cmd)
 
 
 def test_extra_args_appended(source_file):
@@ -162,6 +201,32 @@ def test_extra_args_appended(source_file):
     assert "all" in cmd
     assert "--log-level" in cmd
     assert "INFO" in cmd
+
+
+def test_extra_args_keep_quoted_paths_together(source_file):
+    """str.split() would shred a path with spaces into two broken arguments."""
+    cmd, _ = build_pyinstaller_command(
+        BuildConfig(
+            source=source_file,
+            extra_args='--paths "/opt/my libs/pkg"',
+        ),
+        platform="linux",
+    )
+    assert cmd[cmd.index("--paths") + 1] == "/opt/my libs/pkg"
+
+
+def test_extra_args_preserve_backslashes_on_windows(source_file):
+    cmd, _ = build_pyinstaller_command(
+        BuildConfig(source=source_file, extra_args='--paths "C:\\my libs\\pkg"'),
+        platform="win32",
+    )
+    assert cmd[cmd.index("--paths") + 1] == "C:\\my libs\\pkg"
+
+
+def test_extra_args_empty_string_adds_nothing(source_file):
+    baseline, _ = build_pyinstaller_command(BuildConfig(source=source_file))
+    cmd, _ = build_pyinstaller_command(BuildConfig(source=source_file, extra_args="   "))
+    assert cmd == baseline
 
 
 def test_source_is_last_argument(source_file):

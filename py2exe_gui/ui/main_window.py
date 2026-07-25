@@ -25,6 +25,7 @@ from PyQt5.QtWidgets import (
     QMessageBox,
     QProgressBar,
     QPushButton,
+    QScrollArea,
     QShortcut,
     QSpinBox,
     QTabWidget,
@@ -45,22 +46,35 @@ from py2exe_gui.constants import (
 from py2exe_gui.core import (
     BuildConfig,
     BuildHistory,
+    InstallerConfig,
     ManifestConfig,
     SigningConfig,
     VersionInfo,
+    build_iscc_command,
     build_pyinstaller_command,
     build_signtool_command,
     detect_imports,
+    find_iscc,
     format_html,
+    generate_iss_script,
     generate_manifest,
     generate_version_file,
+    installer_output_path,
     locate_built_executable,
     make_record,
     parse_requirements,
     redact_password,
+    resolve_languages,
     run_smoke_test,
 )
 from py2exe_gui.core.dependency_analyzer import filter_non_stdlib
+from py2exe_gui.core.installer import (
+    COMPRESSION_CHOICES,
+    LANGUAGE_LABELS,
+)
+from py2exe_gui.core.installer import (
+    validate as validate_installer,
+)
 from py2exe_gui.strings import (
     LOCALE_LAYOUT,
     S,
@@ -71,6 +85,7 @@ from py2exe_gui.styles import THEMES
 from py2exe_gui.templates import TEMPLATES, template_description, template_name
 from py2exe_gui.ui.conversion_thread import ConversionThread
 from py2exe_gui.ui.dialogs import AddImportDialog, CommandPreviewDialog
+from py2exe_gui.ui.installer_thread import InstallerThread
 
 
 class MainWindow(QMainWindow):
@@ -79,12 +94,14 @@ class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
         self.conversion_thread = None
+        self.installer_thread = None
         self.settings = {}
         self.current_theme = "dark"
         self._build_start_time = 0.0
         self._build_config_snapshot = {}
         self._temp_version_file = ""
         self._temp_manifest_file = ""
+        self._last_built_exe = ""
         self.history = BuildHistory(HISTORY_FILE)
         self.load_settings()
         self.current_theme = self.settings.get("theme", "dark")
@@ -118,6 +135,7 @@ class MainWindow(QMainWindow):
         tabs.addTab(self._create_advanced_tab(), S.TAB_ADVANCED)
         tabs.addTab(self._create_version_info_tab(), S.TAB_VERSION_INFO)
         tabs.addTab(self._create_deploy_tab(), S.TAB_DEPLOY)
+        tabs.addTab(self._create_installer_tab(), S.TAB_INSTALLER)
         tabs.addTab(self._create_templates_tab(), S.TAB_TEMPLATES)
         tabs.addTab(self._create_history_tab(), S.TAB_HISTORY)
         tabs.addTab(self._create_about_tab(), S.TAB_ABOUT)
@@ -338,16 +356,19 @@ class MainWindow(QMainWindow):
         self.optimize_combo.addItems(S.OPT_LEVELS)
         extra_layout.addWidget(self.optimize_combo, 0, 1)
 
-        extra_layout.addWidget(QLabel(S.UPX_LEVEL_LABEL), 1, 0)
-        self.upx_level = QSpinBox()
-        self.upx_level.setRange(0, 9)
-        self.upx_level.setValue(0)
-        self.upx_level.setToolTip(S.UPX_LEVEL_TIP)
-        extra_layout.addWidget(self.upx_level, 1, 1)
+        extra_layout.addWidget(QLabel(S.UPX_DIR_LABEL), 1, 0)
+        self.upx_dir = QLineEdit()
+        self.upx_dir.setPlaceholderText(S.UPX_DIR_PLACEHOLDER)
+        upx_dir_btn = QPushButton("📂")
+        upx_dir_btn.setToolTip(S.UPX_DIR_LABEL)
+        upx_dir_btn.setAccessibleName(S.UPX_DIR_LABEL)
+        upx_dir_btn.clicked.connect(self.browse_upx_dir)
+        extra_layout.addWidget(self.upx_dir, 1, 1)
+        extra_layout.addWidget(upx_dir_btn, 1, 2)
 
         self.upx_check = QCheckBox(S.UPX_USE)
         self.upx_check.setToolTip(S.UPX_USE_TIP)
-        extra_layout.addWidget(self.upx_check, 2, 0, 1, 2)
+        extra_layout.addWidget(self.upx_check, 2, 0, 1, 3)
         layout.addWidget(extra_group)
 
         cmd_group = QGroupBox(S.GROUP_EXTRA_ARGS)
@@ -549,6 +570,192 @@ class MainWindow(QMainWindow):
         layout.addStretch()
         return tab
 
+    def _create_installer_tab(self):
+        """Inno Setup installer configuration (Phase 7)."""
+        inner = QWidget()
+        layout = QVBoxLayout(inner)
+
+        header = QGroupBox(S.GROUP_INSTALLER)
+        header_layout = QVBoxLayout(header)
+        hint = QLabel(S.INSTALLER_HINT)
+        hint.setWordWrap(True)
+        header_layout.addWidget(hint)
+        self.installer_enable = QCheckBox(S.INSTALLER_ENABLE)
+        header_layout.addWidget(self.installer_enable)
+        layout.addWidget(header)
+
+        # ── Identity ──
+        identity = QGroupBox(S.GROUP_INSTALLER_IDENTITY)
+        identity_grid = QGridLayout(identity)
+
+        self.inst_app_name = QLineEdit()
+        self.inst_app_name.setPlaceholderText(S.INST_APP_NAME_PLACEHOLDER)
+        self.inst_version = QLineEdit("1.0.0")
+        self.inst_version.setPlaceholderText(S.INST_VERSION_PLACEHOLDER)
+        self.inst_publisher = QLineEdit()
+        self.inst_publisher.setPlaceholderText(S.INST_PUBLISHER_PLACEHOLDER)
+        self.inst_url = QLineEdit()
+        self.inst_url.setPlaceholderText(S.INST_URL_PLACEHOLDER)
+        self.inst_app_id = QLineEdit()
+        self.inst_app_id.setPlaceholderText(S.INST_APPID_PLACEHOLDER)
+        self.inst_app_id.setToolTip(S.INST_APPID_TIP)
+
+        for row, (label, widget) in enumerate(
+            [
+                (S.INST_APP_NAME_LABEL, self.inst_app_name),
+                (S.INST_VERSION_LABEL, self.inst_version),
+                (S.INST_PUBLISHER_LABEL, self.inst_publisher),
+                (S.INST_URL_LABEL, self.inst_url),
+                (S.INST_APPID_LABEL, self.inst_app_id),
+            ]
+        ):
+            identity_grid.addWidget(QLabel(label), row, 0)
+            identity_grid.addWidget(widget, row, 1)
+        layout.addWidget(identity)
+
+        # ── Output ──
+        output = QGroupBox(S.GROUP_INSTALLER_OUTPUT)
+        output_grid = QGridLayout(output)
+
+        self.inst_out_dir = QLineEdit()
+        self.inst_out_dir.setPlaceholderText(S.INST_OUT_DIR_PLACEHOLDER)
+        self.inst_out_name = QLineEdit()
+        self.inst_out_name.setPlaceholderText(S.INST_OUT_NAME_PLACEHOLDER)
+        self.inst_license = QLineEdit()
+        self.inst_license.setPlaceholderText(S.INST_LICENSE_PLACEHOLDER)
+        self.inst_readme = QLineEdit()
+        self.inst_readme.setPlaceholderText(S.INST_README_PLACEHOLDER)
+        self.inst_setup_icon = QLineEdit()
+        self.inst_setup_icon.setPlaceholderText(S.INST_SETUP_ICON_PLACEHOLDER)
+
+        browse_rows = [
+            (S.INST_OUT_DIR_LABEL, self.inst_out_dir, self.browse_installer_out_dir),
+            (S.INST_OUT_NAME_LABEL, self.inst_out_name, None),
+            (S.INST_LICENSE_LABEL, self.inst_license, self.browse_installer_license),
+            (S.INST_README_LABEL, self.inst_readme, self.browse_installer_readme),
+            (S.INST_SETUP_ICON_LABEL, self.inst_setup_icon, self.browse_installer_icon),
+        ]
+        for row, (label, widget, handler) in enumerate(browse_rows):
+            output_grid.addWidget(QLabel(label), row, 0)
+            output_grid.addWidget(widget, row, 1)
+            if handler is not None:
+                btn = QPushButton("📂")
+                btn.setToolTip(label)
+                btn.setAccessibleName(label)
+                btn.clicked.connect(handler)
+                output_grid.addWidget(btn, row, 2)
+        layout.addWidget(output)
+
+        # ── Options ──
+        options = QGroupBox(S.GROUP_INSTALLER_OPTIONS)
+        options_grid = QGridLayout(options)
+
+        options_grid.addWidget(QLabel(S.INST_PRIVILEGES_LABEL), 0, 0)
+        self.inst_privileges = QComboBox()
+        self.inst_privileges.addItem(S.INST_PRIV_ADMIN, "admin")
+        self.inst_privileges.addItem(S.INST_PRIV_LOWEST, "lowest")
+        options_grid.addWidget(self.inst_privileges, 0, 1)
+
+        options_grid.addWidget(QLabel(S.INST_ARCH_LABEL), 1, 0)
+        self.inst_arch = QComboBox()
+        self.inst_arch.addItem(S.INST_ARCH_X64, "x64")
+        self.inst_arch.addItem(S.INST_ARCH_X86, "x86")
+        self.inst_arch.addItem(S.INST_ARCH_ANY, "any")
+        options_grid.addWidget(self.inst_arch, 1, 1)
+
+        options_grid.addWidget(QLabel(S.INST_COMPRESSION_LABEL), 2, 0)
+        self.inst_compression = QComboBox()
+        self.inst_compression.addItems(list(COMPRESSION_CHOICES))
+        options_grid.addWidget(self.inst_compression, 2, 1)
+
+        options_grid.addWidget(QLabel(S.INST_LANGUAGES_LABEL), 3, 0)
+        lang_box = QWidget()
+        lang_layout = QGridLayout(lang_box)
+        lang_layout.setContentsMargins(0, 0, 0, 0)
+        self.inst_languages = {}
+        codes = ["ar"] + list(LANGUAGE_LABELS)
+        for i, code in enumerate(codes):
+            label = "العربية" if code == "ar" else LANGUAGE_LABELS[code]
+            checkbox = QCheckBox(label)
+            if code == "en":
+                checkbox.setChecked(True)
+            self.inst_languages[code] = checkbox
+            lang_layout.addWidget(checkbox, i // 4, i % 4)
+        options_grid.addWidget(lang_box, 3, 1, 1, 2)
+
+        options_grid.addWidget(QLabel(S.INST_ARABIC_ISL_LABEL), 4, 0)
+        self.inst_arabic_isl = QLineEdit()
+        self.inst_arabic_isl.setPlaceholderText(S.INST_ARABIC_ISL_PLACEHOLDER)
+        self.inst_arabic_isl.setToolTip(S.INST_ARABIC_ISL_TIP)
+        isl_btn = QPushButton("📂")
+        isl_btn.setToolTip(S.INST_ARABIC_ISL_LABEL)
+        isl_btn.setAccessibleName(S.INST_ARABIC_ISL_LABEL)
+        isl_btn.clicked.connect(self.browse_arabic_isl)
+        options_grid.addWidget(self.inst_arabic_isl, 4, 1)
+        options_grid.addWidget(isl_btn, 4, 2)
+
+        options_grid.addWidget(QLabel(S.INST_ASSOC_LABEL), 5, 0)
+        self.inst_assoc = QLineEdit()
+        self.inst_assoc.setPlaceholderText(S.INST_ASSOC_PLACEHOLDER)
+        options_grid.addWidget(self.inst_assoc, 5, 1)
+
+        self.inst_desktop_icon = QCheckBox(S.INST_DESKTOP_ICON)
+        self.inst_desktop_icon.setChecked(True)
+        self.inst_launch_after = QCheckBox(S.INST_LAUNCH_AFTER)
+        self.inst_launch_after.setChecked(True)
+        self.inst_allow_dir_change = QCheckBox(S.INST_ALLOW_DIR_CHANGE)
+        self.inst_allow_dir_change.setChecked(True)
+        self.inst_uninstall_icon = QCheckBox(S.INST_UNINSTALL_ICON)
+        self.inst_uninstall_icon.setChecked(True)
+        self.inst_sign = QCheckBox(S.INST_SIGN_INSTALLER)
+        self.inst_sign.setToolTip(S.INST_SIGN_TIP)
+        for i, cb in enumerate(
+            [
+                self.inst_desktop_icon,
+                self.inst_launch_after,
+                self.inst_allow_dir_change,
+                self.inst_uninstall_icon,
+                self.inst_sign,
+            ]
+        ):
+            options_grid.addWidget(cb, 6 + i, 0, 1, 3)
+        layout.addWidget(options)
+
+        # ── Toolchain ──
+        toolchain = QGroupBox(S.GROUP_INSTALLER_TOOLCHAIN)
+        toolchain_layout = QGridLayout(toolchain)
+        toolchain_layout.addWidget(QLabel(S.INST_ISCC_LABEL), 0, 0)
+        self.inst_iscc_path = QLineEdit()
+        self.inst_iscc_path.setPlaceholderText(S.INST_ISCC_PLACEHOLDER)
+        toolchain_layout.addWidget(self.inst_iscc_path, 0, 1)
+        iscc_btn = QPushButton("📂")
+        iscc_btn.setToolTip(S.INST_ISCC_LABEL)
+        iscc_btn.setAccessibleName(S.INST_ISCC_LABEL)
+        iscc_btn.clicked.connect(self.browse_iscc_path)
+        toolchain_layout.addWidget(iscc_btn, 0, 2)
+
+        detect_btn = QPushButton(S.BTN_DETECT_ISCC)
+        detect_btn.clicked.connect(self.detect_iscc)
+        toolchain_layout.addWidget(detect_btn, 1, 0)
+
+        gen_btn = QPushButton(S.BTN_GENERATE_ISS)
+        gen_btn.clicked.connect(self.generate_iss_only)
+        toolchain_layout.addWidget(gen_btn, 1, 1)
+
+        build_btn = QPushButton(S.BTN_BUILD_INSTALLER)
+        build_btn.setObjectName("successBtn")
+        build_btn.clicked.connect(self.build_installer_now)
+        toolchain_layout.addWidget(build_btn, 1, 2)
+        layout.addWidget(toolchain)
+
+        layout.addStretch()
+
+        # The tab is field-dense; keep it usable on short screens.
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        scroll.setWidget(inner)
+        return scroll
+
     def _create_history_tab(self):
         """List of recent builds with restore + clear actions."""
         tab = QWidget()
@@ -667,6 +874,11 @@ class MainWindow(QMainWindow):
         if file_path:
             self.icon_input.setText(file_path)
 
+    def browse_upx_dir(self):
+        dir_path = QFileDialog.getExistingDirectory(self, S.UPX_DIR_LABEL, "")
+        if dir_path:
+            self.upx_dir.setText(dir_path)
+
     def add_extra_file(self):
         file_path, _ = QFileDialog.getOpenFileName(
             self, S.DIALOG_CHOOSE_EXTRA_FILE, "", S.DIALOG_FILTER_ALL
@@ -781,7 +993,7 @@ class MainWindow(QMainWindow):
             ],
             optimize=self.optimize_combo.currentIndex(),
             upx=self.upx_check.isChecked(),
-            upx_level=self.upx_level.value(),
+            upx_dir=self.upx_dir.text().strip(),
             extra_args=self.extra_args.text(),
             splash_image=self.splash_input.text().strip(),
         )
@@ -805,7 +1017,7 @@ class MainWindow(QMainWindow):
             self.hidden_imports_list.addItem(imp)
         self.optimize_combo.setCurrentIndex(config.optimize)
         self.upx_check.setChecked(config.upx)
-        self.upx_level.setValue(config.upx_level)
+        self.upx_dir.setText(config.upx_dir)
         self.extra_args.setText(config.extra_args)
         if hasattr(self, "splash_input"):
             self.splash_input.setText(config.splash_image)
@@ -1197,9 +1409,15 @@ class MainWindow(QMainWindow):
             config.onefile,
         )
         if not exe_path:
-            if self.signing_enable.isChecked() or self.smoke_enable.isChecked():
+            self._last_built_exe = ""
+            if (
+                self.signing_enable.isChecked()
+                or self.smoke_enable.isChecked()
+                or self.installer_enable.isChecked()
+            ):
                 self._append_log(S.LOG_SMOKE_NOT_FOUND)
             return
+        self._last_built_exe = exe_path
 
         # Signing
         sign_cfg = self._current_signing_config()
@@ -1209,6 +1427,11 @@ class MainWindow(QMainWindow):
         # Smoke test
         if self.smoke_enable.isChecked():
             self._smoke_test_executable(exe_path)
+
+        # Installer (runs asynchronously; it is the slowest post-build step)
+        inst_cfg = self._current_installer_config()
+        if inst_cfg.enabled:
+            self._run_installer(inst_cfg, config)
 
     def _sign_executable(self, exe_path: str, sign_cfg: SigningConfig):
         cmd, error = build_signtool_command(exe_path, sign_cfg)
@@ -1242,6 +1465,227 @@ class MainWindow(QMainWindow):
             self._append_log(
                 S.LOG_SMOKE_FAIL.format(error=result.error or f"exit={result.returncode}")
             )
+
+    # ─── Phase 7: Inno Setup installer ──────────────────────────────────
+
+    def browse_installer_out_dir(self):
+        dir_path = QFileDialog.getExistingDirectory(self, S.DIALOG_CHOOSE_OUT_DIR, "")
+        if dir_path:
+            self.inst_out_dir.setText(dir_path)
+
+    def browse_installer_license(self):
+        file_path, _ = QFileDialog.getOpenFileName(
+            self, S.DIALOG_CHOOSE_LICENSE, "", S.DIALOG_FILTER_TEXT
+        )
+        if file_path:
+            self.inst_license.setText(file_path)
+
+    def browse_installer_readme(self):
+        file_path, _ = QFileDialog.getOpenFileName(
+            self, S.DIALOG_CHOOSE_LICENSE, "", S.DIALOG_FILTER_TEXT
+        )
+        if file_path:
+            self.inst_readme.setText(file_path)
+
+    def browse_installer_icon(self):
+        file_path, _ = QFileDialog.getOpenFileName(
+            self, S.DIALOG_CHOOSE_ICON, "", S.DIALOG_FILTER_ICON
+        )
+        if file_path:
+            self.inst_setup_icon.setText(file_path)
+
+    def browse_arabic_isl(self):
+        file_path, _ = QFileDialog.getOpenFileName(
+            self, S.DIALOG_CHOOSE_ISL, "", S.DIALOG_FILTER_ISL
+        )
+        if file_path:
+            self.inst_arabic_isl.setText(file_path)
+
+    def browse_iscc_path(self):
+        file_path, _ = QFileDialog.getOpenFileName(
+            self, S.DIALOG_CHOOSE_ISCC, "", S.DIALOG_FILTER_EXE
+        )
+        if file_path:
+            self.inst_iscc_path.setText(file_path)
+
+    def detect_iscc(self):
+        """Locate ISCC.exe and report the result in the log."""
+        path = self.inst_iscc_path.text().strip() or find_iscc()
+        if path:
+            self.inst_iscc_path.setText(path)
+            self._append_log(S.LOG_ISCC_FOUND.format(path=path))
+        else:
+            self._append_log(S.LOG_ISCC_MISSING)
+
+    def _current_installer_config(self) -> InstallerConfig:
+        """Read the installer tab into an InstallerConfig dataclass."""
+        languages = [code for code, cb in self.inst_languages.items() if cb.isChecked()]
+        return InstallerConfig(
+            enabled=self.installer_enable.isChecked(),
+            app_name=self.inst_app_name.text().strip()
+            or self.output_name.text().strip(),
+            app_version=self.inst_version.text().strip()
+            or self.vi_product_version.text().strip()
+            or "1.0.0",
+            publisher=self.inst_publisher.text().strip()
+            or self.vi_company_name.text().strip(),
+            publisher_url=self.inst_url.text().strip(),
+            app_id=self.inst_app_id.text().strip(),
+            output_dir=self.inst_out_dir.text().strip(),
+            output_base_filename=self.inst_out_name.text().strip(),
+            license_file=self.inst_license.text().strip(),
+            readme_file=self.inst_readme.text().strip(),
+            setup_icon_file=self.inst_setup_icon.text().strip()
+            or self.icon_input.text().strip(),
+            languages=languages or ["en"],
+            arabic_isl_path=self.inst_arabic_isl.text().strip(),
+            privileges=self.inst_privileges.currentData() or "admin",
+            architecture=self.inst_arch.currentData() or "x64",
+            compression=self.inst_compression.currentText(),
+            desktop_icon=self.inst_desktop_icon.isChecked(),
+            launch_after_install=self.inst_launch_after.isChecked(),
+            allow_dir_change=self.inst_allow_dir_change.isChecked(),
+            create_uninstall_icon=self.inst_uninstall_icon.isChecked(),
+            associate_extension=self.inst_assoc.text().strip(),
+            sign_installer=self.inst_sign.isChecked(),
+        )
+
+    def _installer_source(self, config: BuildConfig):
+        """Return (app_path, onefile) describing what the installer should package.
+
+        onefile → the produced .exe; onedir → the folder containing it.
+        """
+        exe_path = self._last_built_exe or locate_built_executable(
+            config.output_dir or os.path.dirname(config.source),
+            config.output_name or os.path.splitext(os.path.basename(config.source))[0],
+            config.onefile,
+        )
+        if not exe_path:
+            return "", config.onefile
+        if config.onefile:
+            return exe_path, True
+        return os.path.dirname(exe_path), False
+
+    def _write_iss_script(self, inst_cfg: InstallerConfig, build_cfg: BuildConfig):
+        """Render the .iss script to disk. Returns (path, error)."""
+        app_path, onefile = self._installer_source(build_cfg)
+        if not app_path:
+            return "", S.ERR_INSTALLER_NO_EXE
+
+        error = validate_installer(inst_cfg, app_path)
+        if error:
+            return "", error
+
+        _entries, warnings = resolve_languages(inst_cfg)
+        if warnings:
+            self._append_log(
+                S.LOG_INSTALLER_LANG_WARN.format(langs=", ".join(warnings))
+            )
+
+        exe_name = "" if onefile else os.path.basename(self._last_built_exe or "")
+        script = generate_iss_script(inst_cfg, app_path, onefile=onefile, exe_name=exe_name)
+
+        target_dir = inst_cfg.output_dir or (
+            app_path if not onefile else os.path.dirname(app_path)
+        )
+        iss_path = os.path.join(target_dir, f"{inst_cfg.app_name or 'setup'}.iss")
+        try:
+            os.makedirs(target_dir, exist_ok=True)
+            with open(iss_path, "w", encoding="utf-8") as f:
+                f.write(script)
+        except OSError as e:
+            return "", str(e)
+        return iss_path, None
+
+    def generate_iss_only(self):
+        """Write the .iss script without invoking the compiler (dry run)."""
+        inst_cfg = self._current_installer_config()
+        inst_cfg.enabled = True  # explicit button press overrides the checkbox
+        if not inst_cfg.app_name:
+            QMessageBox.warning(self, S.MSG_WARNING, S.ERR_INSTALLER_NO_NAME)
+            return
+        iss_path, error = self._write_iss_script(inst_cfg, self._current_config())
+        if error:
+            self._append_log(S.LOG_ISS_FAIL.format(error=error))
+            QMessageBox.warning(self, S.MSG_WARNING, error)
+            return
+        self._append_log(S.LOG_ISS_WRITTEN.format(path=iss_path))
+        QMessageBox.information(self, S.MSG_SUCCESS, iss_path)
+
+    def build_installer_now(self):
+        """Generate the script and run ISCC on it (manual trigger)."""
+        inst_cfg = self._current_installer_config()
+        inst_cfg.enabled = True
+        if not inst_cfg.app_name:
+            QMessageBox.warning(self, S.MSG_WARNING, S.ERR_INSTALLER_NO_NAME)
+            return
+        self._run_installer(inst_cfg, self._current_config(), interactive=True)
+
+    def _run_installer(self, inst_cfg: InstallerConfig, build_cfg: BuildConfig,
+                       interactive: bool = False):
+        """Compile the installer in a background thread."""
+        if self.installer_thread and self.installer_thread.isRunning():
+            return
+
+        iss_path, error = self._write_iss_script(inst_cfg, build_cfg)
+        if error:
+            self._append_log(S.LOG_INSTALLER_SKIPPED.format(reason=error))
+            if interactive:
+                QMessageBox.warning(self, S.MSG_WARNING, error)
+            return
+        self._append_log(S.LOG_ISS_WRITTEN.format(path=iss_path))
+
+        sign_command = None
+        if inst_cfg.sign_installer:
+            sign_cfg = self._current_signing_config()
+            # The installer is signed by ISCC itself, so build the command
+            # without a target file — ISCC substitutes it via $f.
+            candidate, sign_error = build_signtool_command("$f", sign_cfg)
+            if sign_error or candidate is None:
+                self._append_log(S.LOG_SIGNING_SKIPPED.format(reason=sign_error or "unknown"))
+            else:
+                sign_command = candidate[:-1]  # drop the "$f" placeholder token
+
+        cmd, error = build_iscc_command(
+            iss_path,
+            iscc_path=self.inst_iscc_path.text().strip() or None,
+            sign_command=sign_command,
+        )
+        if error or cmd is None:
+            self._append_log(S.LOG_INSTALLER_SKIPPED.format(reason=error or "unknown"))
+            if interactive:
+                QMessageBox.warning(self, S.MSG_WARNING, error or "")
+            return
+
+        app_path, onefile = self._installer_source(build_cfg)
+        fallback_dir = app_path if not onefile else os.path.dirname(app_path)
+        expected = installer_output_path(inst_cfg, fallback_dir)
+
+        self._append_log(S.LOG_INSTALLER_START)
+        self._append_log(" ".join(redact_password(cmd)))
+
+        self.installer_thread = InstallerThread(
+            cmd, os.path.dirname(iss_path), expected_output=expected
+        )
+        self.installer_thread.log_signal.connect(self._append_log)
+        self.installer_thread.finished_signal.connect(
+            lambda ok, msg: self._on_installer_finished(ok, msg, interactive)
+        )
+        self.installer_thread.start()
+
+    def _on_installer_finished(self, success: bool, message: str, interactive: bool):
+        if success:
+            self._append_log(S.LOG_INSTALLER_OK.format(path=message))
+            if interactive:
+                QMessageBox.information(
+                    self, S.MSG_SUCCESS, S.MSG_INSTALLER_OK.format(path=message)
+                )
+        else:
+            self._append_log(S.LOG_INSTALLER_FAIL.format(error=message))
+            if interactive:
+                QMessageBox.critical(
+                    self, S.MSG_ERROR, S.LOG_INSTALLER_FAIL.format(error=message)
+                )
 
     def _register_shortcuts(self):
         """Bind keyboard shortcuts to common actions."""

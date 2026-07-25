@@ -8,4 +8,7 @@ build/
 dist/
 *.spec
 py2exe_settings.json
+py2exe_history.json
+*.iss
+Output/
 .venv/

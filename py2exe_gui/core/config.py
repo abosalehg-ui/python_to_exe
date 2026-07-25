@@ -25,7 +25,8 @@ class BuildConfig:
 
     optimize: int = 0
     upx: bool = False
-    upx_level: int = 0
+    upx_level: int = 0  # kept for backwards-compatible config files; unused
+    upx_dir: str = ""
     extra_args: str = ""
 
     version_file: str = ""
@@ -51,6 +52,7 @@ class BuildConfig:
             "optimize": self.optimize,
             "upx": self.upx,
             "upx_level": self.upx_level,
+            "upx_dir": self.upx_dir,
             "extra_args": self.extra_args,
             "version_file": self.version_file,
             "splash_image": self.splash_image,
@@ -75,6 +77,7 @@ class BuildConfig:
             optimize=data.get("optimize", 0),
             upx=data.get("upx", False),
             upx_level=data.get("upx_level", 0),
+            upx_dir=data.get("upx_dir", ""),
             extra_args=data.get("extra_args", ""),
             version_file=data.get("version_file", ""),
             splash_image=data.get("splash_image", ""),
