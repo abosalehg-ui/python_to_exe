@@ -83,6 +83,8 @@ class Ar:
     GROUP_EXTRA_OPTS = "🔧 خيارات إضافية"
     OPT_LEVEL_LABEL = "مستوى التحسين:"
     OPT_LEVELS = ["0 - بدون تحسين", "1 - تحسين أساسي", "2 - تحسين كامل"]
+    UPX_DIR_LABEL = "مجلد UPX:"
+    UPX_DIR_PLACEHOLDER = "اختياري - مجلد يحتوي upx.exe (الافتراضي: البحث في PATH)"
     UPX_LEVEL_LABEL = "مستوى الضغط (UPX):"
     UPX_LEVEL_TIP = "0 = بدون ضغط، 9 = أقصى ضغط"
     UPX_USE = "استخدام UPX للضغط"
@@ -314,6 +316,98 @@ class Ar:
     TPL_CUSTOM_NAME = "إعدادات مخصصة"
     TPL_CUSTOM_DESC = "تخصيص جميع الإعدادات يدوياً"
 
+    # ── Phase 7: مثبّت Inno Setup ──────────────────────────────────────
+    TAB_INSTALLER = "📦 المثبِّت"
+    GROUP_INSTALLER = "📦 إنشاء مثبّت (Inno Setup)"
+    INSTALLER_HINT = (
+        "أنشئ ملف Setup.exe احترافياً بعد البناء مباشرةً. "
+        "يتطلب تثبيت Inno Setup 6 على الجهاز."
+    )
+    INSTALLER_ENABLE = "إنشاء المثبّت تلقائياً بعد نجاح البناء"
+
+    GROUP_INSTALLER_IDENTITY = "🪪 هوية التطبيق"
+    INST_APP_NAME_LABEL = "اسم التطبيق:"
+    INST_APP_NAME_PLACEHOLDER = "الاسم الظاهر في قائمة ابدأ ولوحة التحكم"
+    INST_VERSION_LABEL = "الإصدار:"
+    INST_VERSION_PLACEHOLDER = "1.0.0"
+    INST_PUBLISHER_LABEL = "الناشر:"
+    INST_PUBLISHER_PLACEHOLDER = "اسم الشركة أو المطوّر"
+    INST_URL_LABEL = "الموقع الإلكتروني:"
+    INST_URL_PLACEHOLDER = "https://example.com"
+    INST_APPID_LABEL = "AppId (GUID):"
+    INST_APPID_PLACEHOLDER = "يُشتق تلقائياً من الاسم + الناشر"
+    INST_APPID_TIP = (
+        "معرّف ثابت يجعل الإصدارات الجديدة تُحدّث التثبيت السابق بدل تكراره"
+    )
+
+    GROUP_INSTALLER_OUTPUT = "📤 مخرجات المثبّت"
+    INST_OUT_DIR_LABEL = "مجلد الإخراج:"
+    INST_OUT_DIR_PLACEHOLDER = "الافتراضي: بجانب ملف EXE الناتج"
+    INST_OUT_NAME_LABEL = "اسم ملف Setup:"
+    INST_OUT_NAME_PLACEHOLDER = "الافتراضي: <الاسم>-<الإصدار>-setup"
+    INST_LICENSE_LABEL = "ملف الترخيص:"
+    INST_LICENSE_PLACEHOLDER = "اختياري - يظهر في معالج التثبيت (.txt/.rtf)"
+    INST_README_LABEL = "ملف README:"
+    INST_README_PLACEHOLDER = "اختياري - يظهر بعد انتهاء التثبيت"
+    INST_SETUP_ICON_LABEL = "أيقونة المثبّت:"
+    INST_SETUP_ICON_PLACEHOLDER = "اختياري - ملف .ico لواجهة Setup.exe"
+
+    GROUP_INSTALLER_OPTIONS = "⚙️ خيارات التثبيت"
+    INST_PRIVILEGES_LABEL = "صلاحيات التثبيت:"
+    INST_PRIV_ADMIN = "لكل المستخدمين (يتطلب مدير)"
+    INST_PRIV_LOWEST = "للمستخدم الحالي فقط (بدون مدير)"
+    INST_ARCH_LABEL = "المعمارية:"
+    INST_ARCH_X64 = "64-bit فقط"
+    INST_ARCH_X86 = "32-bit"
+    INST_ARCH_ANY = "أي معمارية"
+    INST_COMPRESSION_LABEL = "الضغط:"
+    INST_LANGUAGES_LABEL = "لغات المثبّت:"
+    INST_ARABIC_ISL_LABEL = "ملف Arabic.isl:"
+    INST_ARABIC_ISL_PLACEHOLDER = "مطلوب لدعم العربية (ترجمة غير رسمية)"
+    INST_ARABIC_ISL_TIP = (
+        "Inno Setup لا يتضمّن العربية افتراضياً — نزّل Arabic.isl "
+        "من ترجمات المجتمع وحدّد مساره هنا"
+    )
+    INST_DESKTOP_ICON = "إنشاء اختصار على سطح المكتب"
+    INST_LAUNCH_AFTER = "تشغيل التطبيق بعد التثبيت"
+    INST_ALLOW_DIR_CHANGE = "السماح بتغيير مجلد التثبيت"
+    INST_UNINSTALL_ICON = "إضافة اختصار لإلغاء التثبيت"
+    INST_SIGN_INSTALLER = "توقيع ملف Setup.exe رقمياً"
+    INST_SIGN_TIP = "يستخدم نفس إعدادات التوقيع في تبويب النشر"
+    INST_ASSOC_LABEL = "ربط امتداد ملفات:"
+    INST_ASSOC_PLACEHOLDER = "اختياري - مثال: .myapp"
+
+    GROUP_INSTALLER_TOOLCHAIN = "🔧 مترجم Inno Setup"
+    INST_ISCC_LABEL = "مسار ISCC.exe:"
+    INST_ISCC_PLACEHOLDER = "الافتراضي: البحث التلقائي في PATH ومجلدات التثبيت"
+    BTN_DETECT_ISCC = "🔍 كشف تلقائي"
+    BTN_GENERATE_ISS = "📝 توليد ملف .iss فقط"
+    BTN_BUILD_INSTALLER = "📦 بناء المثبّت الآن"
+
+    # رسائل المثبّت
+    LOG_ISCC_FOUND = "✅ تم العثور على Inno Setup: {path}"
+    LOG_ISCC_MISSING = (
+        "⚠️ لم يتم العثور على ISCC.exe — ثبّت Inno Setup 6 أو حدّد المسار يدوياً"
+    )
+    LOG_INSTALLER_START = "📦 جاري إنشاء المثبّت..."
+    LOG_INSTALLER_OK = "✅ تم إنشاء المثبّت: {path}"
+    LOG_INSTALLER_FAIL = "❌ فشل إنشاء المثبّت: {error}"
+    LOG_INSTALLER_SKIPPED = "⏭️ تم تخطي إنشاء المثبّت: {reason}"
+    LOG_ISS_WRITTEN = "✅ تم توليد ملف Inno Setup: {path}"
+    LOG_ISS_FAIL = "❌ فشل توليد ملف .iss: {error}"
+    LOG_INSTALLER_LANG_WARN = "⚠️ لغات غير مدعومة تم تجاهلها: {langs}"
+    ERR_INSTALLER_NO_EXE = "لم يتم العثور على ملف EXE ناتج — نفّذ البناء أولاً"
+    ERR_INSTALLER_NO_NAME = "أدخل اسم التطبيق في تبويب المثبّت أولاً"
+    DIALOG_SAVE_ISS = "حفظ ملف Inno Setup"
+    DIALOG_FILTER_ISS = "Inno Setup Scripts (*.iss);;All Files (*.*)"
+    DIALOG_CHOOSE_ISCC = "اختر ISCC.exe"
+    DIALOG_FILTER_EXE = "Executables (*.exe);;All Files (*.*)"
+    DIALOG_CHOOSE_LICENSE = "اختر ملف الترخيص"
+    DIALOG_FILTER_TEXT = "Text Files (*.txt *.rtf);;All Files (*.*)"
+    DIALOG_CHOOSE_ISL = "اختر ملف Arabic.isl"
+    DIALOG_FILTER_ISL = "Inno Setup Language Files (*.isl);;All Files (*.*)"
+    MSG_INSTALLER_OK = "تم إنشاء المثبّت بنجاح:\n{path}"
+
 
 class En:
     """English strings."""
@@ -393,6 +487,8 @@ class En:
     GROUP_EXTRA_OPTS = "🔧 Extra options"
     OPT_LEVEL_LABEL = "Optimization level:"
     OPT_LEVELS = ["0 - None", "1 - Basic", "2 - Full"]
+    UPX_DIR_LABEL = "UPX directory:"
+    UPX_DIR_PLACEHOLDER = "Optional - folder containing upx.exe (default: search PATH)"
     UPX_LEVEL_LABEL = "UPX compression level:"
     UPX_LEVEL_TIP = "0 = no compression, 9 = maximum"
     UPX_USE = "Use UPX compression"
@@ -618,6 +714,99 @@ class En:
     TPL_CLICK_DESC = "Command-line tool built with the Click library"
     TPL_CUSTOM_NAME = "Custom settings"
     TPL_CUSTOM_DESC = "Fully manual configuration"
+
+    # ── Phase 7: Inno Setup installer ──────────────────────────────────
+    TAB_INSTALLER = "📦 Installer"
+    GROUP_INSTALLER = "📦 Build an installer (Inno Setup)"
+    INSTALLER_HINT = (
+        "Produce a professional Setup.exe right after the build. "
+        "Requires Inno Setup 6 to be installed on this machine."
+    )
+    INSTALLER_ENABLE = "Build the installer automatically after a successful build"
+
+    GROUP_INSTALLER_IDENTITY = "🪪 Application identity"
+    INST_APP_NAME_LABEL = "Application name:"
+    INST_APP_NAME_PLACEHOLDER = "Shown in the Start menu and Apps & features"
+    INST_VERSION_LABEL = "Version:"
+    INST_VERSION_PLACEHOLDER = "1.0.0"
+    INST_PUBLISHER_LABEL = "Publisher:"
+    INST_PUBLISHER_PLACEHOLDER = "Company or developer name"
+    INST_URL_LABEL = "Website:"
+    INST_URL_PLACEHOLDER = "https://example.com"
+    INST_APPID_LABEL = "AppId (GUID):"
+    INST_APPID_PLACEHOLDER = "Derived automatically from name + publisher"
+    INST_APPID_TIP = (
+        "A stable id makes a newer setup upgrade the existing install "
+        "instead of installing side by side"
+    )
+
+    GROUP_INSTALLER_OUTPUT = "📤 Installer output"
+    INST_OUT_DIR_LABEL = "Output directory:"
+    INST_OUT_DIR_PLACEHOLDER = "Default: next to the produced EXE"
+    INST_OUT_NAME_LABEL = "Setup file name:"
+    INST_OUT_NAME_PLACEHOLDER = "Default: <name>-<version>-setup"
+    INST_LICENSE_LABEL = "License file:"
+    INST_LICENSE_PLACEHOLDER = "Optional - shown in the wizard (.txt/.rtf)"
+    INST_README_LABEL = "README file:"
+    INST_README_PLACEHOLDER = "Optional - shown after installation"
+    INST_SETUP_ICON_LABEL = "Setup icon:"
+    INST_SETUP_ICON_PLACEHOLDER = "Optional - .ico for Setup.exe itself"
+
+    GROUP_INSTALLER_OPTIONS = "⚙️ Installation options"
+    INST_PRIVILEGES_LABEL = "Install privileges:"
+    INST_PRIV_ADMIN = "All users (requires admin)"
+    INST_PRIV_LOWEST = "Current user only (no admin)"
+    INST_ARCH_LABEL = "Architecture:"
+    INST_ARCH_X64 = "64-bit only"
+    INST_ARCH_X86 = "32-bit"
+    INST_ARCH_ANY = "Any architecture"
+    INST_COMPRESSION_LABEL = "Compression:"
+    INST_LANGUAGES_LABEL = "Installer languages:"
+    INST_ARABIC_ISL_LABEL = "Arabic.isl file:"
+    INST_ARABIC_ISL_PLACEHOLDER = "Required for Arabic (unofficial translation)"
+    INST_ARABIC_ISL_TIP = (
+        "Inno Setup does not bundle Arabic — download Arabic.isl from the "
+        "community translations and point to it here"
+    )
+    INST_DESKTOP_ICON = "Create a desktop shortcut"
+    INST_LAUNCH_AFTER = "Launch the application after installing"
+    INST_ALLOW_DIR_CHANGE = "Let the user change the install directory"
+    INST_UNINSTALL_ICON = "Add an uninstall shortcut"
+    INST_SIGN_INSTALLER = "Digitally sign Setup.exe"
+    INST_SIGN_TIP = "Reuses the signing settings from the Deploy tab"
+    INST_ASSOC_LABEL = "Associate file extension:"
+    INST_ASSOC_PLACEHOLDER = "Optional - e.g. .myapp"
+
+    GROUP_INSTALLER_TOOLCHAIN = "🔧 Inno Setup compiler"
+    INST_ISCC_LABEL = "ISCC.exe path:"
+    INST_ISCC_PLACEHOLDER = "Default: auto-detect on PATH and standard install dirs"
+    BTN_DETECT_ISCC = "🔍 Auto-detect"
+    BTN_GENERATE_ISS = "📝 Generate .iss only"
+    BTN_BUILD_INSTALLER = "📦 Build installer now"
+
+    # Installer messages
+    LOG_ISCC_FOUND = "✅ Inno Setup found: {path}"
+    LOG_ISCC_MISSING = (
+        "⚠️ ISCC.exe not found — install Inno Setup 6 or set the path manually"
+    )
+    LOG_INSTALLER_START = "📦 Building the installer..."
+    LOG_INSTALLER_OK = "✅ Installer created: {path}"
+    LOG_INSTALLER_FAIL = "❌ Installer build failed: {error}"
+    LOG_INSTALLER_SKIPPED = "⏭️ Installer step skipped: {reason}"
+    LOG_ISS_WRITTEN = "✅ Inno Setup script generated: {path}"
+    LOG_ISS_FAIL = "❌ Failed to generate the .iss file: {error}"
+    LOG_INSTALLER_LANG_WARN = "⚠️ Unsupported languages ignored: {langs}"
+    ERR_INSTALLER_NO_EXE = "No built EXE found — run the build first"
+    ERR_INSTALLER_NO_NAME = "Enter the application name in the Installer tab first"
+    DIALOG_SAVE_ISS = "Save Inno Setup script"
+    DIALOG_FILTER_ISS = "Inno Setup Scripts (*.iss);;All Files (*.*)"
+    DIALOG_CHOOSE_ISCC = "Choose ISCC.exe"
+    DIALOG_FILTER_EXE = "Executables (*.exe);;All Files (*.*)"
+    DIALOG_CHOOSE_LICENSE = "Choose the license file"
+    DIALOG_FILTER_TEXT = "Text Files (*.txt *.rtf);;All Files (*.*)"
+    DIALOG_CHOOSE_ISL = "Choose Arabic.isl"
+    DIALOG_FILTER_ISL = "Inno Setup Language Files (*.isl);;All Files (*.*)"
+    MSG_INSTALLER_OK = "Installer created successfully:\n{path}"
 
 
 # ──────────────────────────────────────────────────────────────────────────
