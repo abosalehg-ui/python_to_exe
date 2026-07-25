@@ -16,14 +16,24 @@ from PyQt5.QtWidgets import (
 from py2exe_gui.strings import S
 
 
+def _inherited_direction(parent) -> Qt.LayoutDirection:
+    """Layout direction of ``parent``, falling back to the application's."""
+    if parent is not None:
+        return parent.layoutDirection()
+    app = QApplication.instance()
+    return app.layoutDirection() if app else Qt.LeftToRight
+
+
 class AddImportDialog(QDialog):
     """نافذة لإضافة Hidden Import."""
 
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setWindowTitle(S.DIALOG_ADD_IMPORT_TITLE)
-        self.setFixedSize(400, 150)
-        self.setLayoutDirection(Qt.RightToLeft)
+        self.setMinimumSize(400, 150)
+        # Inherit the direction rather than forcing RTL: hardcoding it left
+        # the English UI with mirrored dialogs.
+        self.setLayoutDirection(_inherited_direction(parent))
 
         layout = QVBoxLayout(self)
 
@@ -49,8 +59,8 @@ class CommandPreviewDialog(QDialog):
     def __init__(self, command, parent=None):
         super().__init__(parent)
         self.setWindowTitle(S.DIALOG_PREVIEW_TITLE)
-        self.setMinimumSize(720, 360)
-        self.setLayoutDirection(Qt.RightToLeft)
+        self.setMinimumSize(640, 320)
+        self.setLayoutDirection(_inherited_direction(parent))
 
         self._command_text = " ".join(command)
 

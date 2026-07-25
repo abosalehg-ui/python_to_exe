@@ -123,3 +123,66 @@ def test_redact_password_handles_no_password():
 
 def test_redact_password_handles_empty_list():
     assert redact_password([]) == []
+
+
+# ── Certificate-store mode (keeps the password off the command line) ───────
+
+
+def test_store_mode_uses_subject_name():
+    cmd, error = build_signtool_command(
+        "app.exe",
+        SigningConfig(enabled=True, use_cert_store=True, cert_subject="Acme Ltd"),
+    )
+    assert error is None
+    assert "/n" in cmd
+    assert cmd[cmd.index("/n") + 1] == "Acme Ltd"
+
+
+def test_store_mode_never_passes_a_password():
+    cmd, _ = build_signtool_command(
+        "app.exe",
+        SigningConfig(
+            enabled=True,
+            use_cert_store=True,
+            cert_subject="Acme Ltd",
+            cert_password="hunter2",  # set but must not be used
+        ),
+    )
+    assert "/p" not in cmd
+    assert "hunter2" not in cmd
+
+
+def test_store_mode_requires_a_subject():
+    cmd, error = build_signtool_command(
+        "app.exe", SigningConfig(enabled=True, use_cert_store=True)
+    )
+    assert cmd is None
+    assert "subject" in error.lower()
+
+
+def test_store_mode_ignores_missing_cert_path():
+    """cert_path is irrelevant in store mode and must not block signing."""
+    cmd, error = build_signtool_command(
+        "app.exe",
+        SigningConfig(enabled=True, use_cert_store=True, cert_subject="Acme", cert_path=""),
+    )
+    assert error is None
+    assert cmd is not None
+
+
+def test_store_mode_still_timestamps():
+    cmd, _ = build_signtool_command(
+        "app.exe",
+        SigningConfig(enabled=True, use_cert_store=True, cert_subject="Acme"),
+    )
+    assert "/tr" in cmd
+    assert "/fd" in cmd
+
+
+def test_pfx_mode_is_still_the_default():
+    cmd, error = build_signtool_command(
+        "app.exe", SigningConfig(enabled=True, cert_path="/c.pfx", cert_password="pw")
+    )
+    assert error is None
+    assert "/f" in cmd
+    assert "/n" not in cmd

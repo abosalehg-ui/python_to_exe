@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "py2exe-gui"
-version = "1.0.0"
+version = "1.1.0"
 description = "Arabic-localized PyQt5 GUI to convert Python scripts to Windows executables via PyInstaller"
 readme = "README.md"
 requires-python = ">=3.8"
@@ -48,6 +48,10 @@ exclude = ["tests*"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 python_files = ["test_*.py"]
+markers = [
+    "slow: runs a real PyInstaller build (minutes); deselect with -m 'not slow'",
+    "gui: needs PyQt5; runs headless via QT_QPA_PLATFORM=offscreen",
+]
 
 [tool.ruff]
 line-length = 100

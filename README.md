@@ -4,10 +4,10 @@
 
 ### أداة احترافية لتحويل تطبيقات بايثون إلى ملفات تنفيذية
 
-![Version](https://img.shields.io/badge/الإصدار-1.0.0-blue?style=for-the-badge)
+![Version](https://img.shields.io/badge/الإصدار-1.1.0-blue?style=for-the-badge)
 ![Python](https://img.shields.io/badge/Python-3.8+-green?style=for-the-badge&logo=python&logoColor=white)
 ![PyQt5](https://img.shields.io/badge/PyQt5-GUI-orange?style=for-the-badge&logo=qt&logoColor=white)
-![Tests](https://img.shields.io/badge/الاختبارات-160_passing-brightgreen?style=for-the-badge)
+![Tests](https://img.shields.io/badge/الاختبارات-329_passing-brightgreen?style=for-the-badge)
 ![Languages](https://img.shields.io/badge/اللغات-عربي_+_English-purple?style=for-the-badge)
 ![License](https://img.shields.io/badge/الرخصة-All%20Rights%20Reserved-red?style=for-the-badge)
 
@@ -133,7 +133,7 @@ py2exe-gui
 |---------|---------|-------|
 | Python | 3.8+ | لغة البرمجة |
 | PyQt5 | 5.15+ | الواجهة الرسومية |
-| PyInstaller | 5.0+ | محرك التحويل (يُثبَّت تلقائياً) |
+| PyInstaller | 6.0+ | محرك التحويل (يُعرض عليك تثبيته عند الحاجة) |
 
 ---
 
@@ -213,6 +213,17 @@ py2exe-gui
 - خادم Timestamp (افتراضي: `http://timestamp.digicert.com`)
 - وصف اختياري للتوقيع
 
+### وضعان للتوقيع
+
+| الوضع | كيف يعمل | متى تستخدمه |
+|-------|----------|-------------|
+| **ملف `.pfx`** | `signtool /f <cert> /p <password>` | الأبسط، لجهاز شخصي |
+| **مخزن شهادات Windows** | `signtool /n "<اسم الموضوع>"` | **الأكثر أماناً** — لا تُمرَّر كلمة المرور في سطر الأوامر |
+
+> ⚠️ في وضع `.pfx` تُمرَّر كلمة المرور كوسيط في سطر الأوامر، ويمكن لأي عملية
+> أخرى تعمل بنفس المستخدم قراءتها من جدول العمليات. التنقيح يحمي **السجل فقط**.
+> على جهاز مشترك، فعّل "استخدام شهادة من مخزن شهادات Windows".
+
 > 💡 يستخدم `signtool.exe` المدمج مع Windows SDK. تأكد من وجوده في الـ PATH.
 
 ---
@@ -262,6 +273,37 @@ py2exe-gui
 
 ---
 
+## 🔒 ملاحظات أمنية
+
+### ملفات الإعدادات المشتركة
+
+عند تحميل ملف إعدادات (`.json`) لم تكتبه بنفسك، يفحص البرنامج حقل
+"أوامر PyInstaller إضافية" بحثاً عن أعلام تُشغِّل كوداً:
+
+`--runtime-hook` · `--additional-hooks-dir` · `--add-binary` · `--upx-dir` · `--runtime-tmpdir`
+
+إن وُجد أيٌّ منها يظهر تحذير صريح قبل التطبيق. **السبب:** `--runtime-hook`
+يحقن كوداً داخل **كل** ملف EXE تنتجه لاحقاً — بما فيها الملفات التي توقّعها
+رقمياً وتوزّعها. لا تقبل إلا إذا كنت تثق بمصدر الملف.
+
+### تثبيت PyInstaller
+
+لا يُثبَّت تلقائياً بصمت. إن لم يكن موجوداً يُعرض عليك الأمر الكامل
+(`pip install pyinstaller>=6.0,<7`) وتقرّر أنت.
+
+### أين تُحفظ الإعدادات
+
+| النظام | المسار |
+|--------|--------|
+| Windows | `%APPDATA%\py2exe_gui\` |
+| macOS | `~/Library/Application Support/py2exe_gui/` |
+| Linux | `$XDG_CONFIG_HOME/py2exe_gui/` أو `~/.config/py2exe_gui/` |
+
+الإصدارات السابقة كانت تحفظها في مجلد التشغيل الحالي؛ تُنقل تلقائياً مرة
+واحدة عند أول تشغيل.
+
+---
+
 ## 📂 هيكل المشروع
 
 ```
@@ -278,29 +320,44 @@ python_to_exe/
 ├── py2exe_gui/                 # الحزمة الرئيسية
 │   ├── app.py                  # bootstrap
 │   ├── constants.py
+│   ├── paths.py                # مسارات الإعدادات لكل مستخدم
 │   ├── strings.py              # كل النصوص (Ar + En) + locale proxy
-│   ├── styles.py               # السمات الداكنة والنهارية
+│   ├── styles.py               # السمات + ألوان السجل + مجموعات الخطوط
 │   ├── templates.py            # 11 قالب
 │   │
 │   ├── core/                   # النواة (بلا PyQt5، قابلة للاختبار)
-│   │   ├── builder.py
+│   │   ├── builder.py                # بناء أمر PyInstaller + كشف الأعلام الخطرة
 │   │   ├── config.py
 │   │   ├── dependency_analyzer.py    # AST + requirements
-│   │   ├── version_info.py           # toGetMetadata
+│   │   ├── version_info.py           # metadata الويندوز
 │   │   ├── manifest_generator.py     # XML للويندوز
-│   │   ├── code_signer.py            # signtool builder
+│   │   ├── code_signer.py            # signtool (ملف .pfx أو مخزن الشهادات)
+│   │   ├── installer.py              # توليد سكربت Inno Setup + ISCC
 │   │   ├── smoke_test.py             # post-build
 │   │   ├── build_history.py
 │   │   └── log_formatter.py
 │   │
 │   └── ui/                     # واجهة PyQt5
-│       ├── main_window.py
-│       ├── conversion_thread.py
-│       └── dialogs.py
+│       ├── main_window.py            # التنسيق فقط (~1050 سطر)
+│       ├── conversion_thread.py      # PyInstaller في خيط منفصل
+│       ├── post_build_thread.py      # التوقيع + smoke test
+│       ├── installer_thread.py       # ISCC في خيط منفصل
+│       ├── dialogs.py
+│       └── tabs/               # كل تبويب widget مستقل يملك عناصره
+│           ├── base.py
+│           ├── main_tab.py
+│           ├── advanced_tab.py
+│           ├── version_info_tab.py
+│           ├── deploy_tab.py
+│           ├── installer_tab.py
+│           ├── templates_tab.py
+│           ├── history_tab.py
+│           └── about_tab.py
 │
-├── tests/                      # 160 اختبار وحدة
+├── tests/                      # 329 اختبار (وحدة + واجهة headless + تكامل)
 └── .github/
-    ├── workflows/ci.yml        # pytest + ruff
+    ├── workflows/ci.yml        # pytest + GUI + ruff + pip-audit
+    ├── dependabot.yml
     └── ISSUE_TEMPLATE/
 ```
 

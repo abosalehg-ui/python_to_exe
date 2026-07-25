@@ -1,15 +1,63 @@
 """Qt stylesheet definitions (Catppuccin-inspired dark + light themes)."""
 
+# ── Log line colors ────────────────────────────────────────────────────────
+# Single source of truth: log_formatter imports these rather than keeping a
+# second copy. One palette per theme, because a single palette cannot clear
+# WCAG AA (4.5:1) against both a near-black and a white log background.
+#
+# Measured contrast against the QTextEdit background of each theme:
+#   dark  (on #181825): info 8.34  success 11.81  warning 13.81  error 7.58  muted 6.22
+#   light (on #ffffff): info 5.19  success  5.08  warning  4.87  error 5.36  muted 6.27
+# Keep every value above 4.5 when editing — tests/test_log_formatter.py enforces it.
 
-# Log line colors (used as inline HTML when appending to QTextEdit).
-class LogColors:
-    """Color palette for log entries — works on both themes."""
+LOG_BACKGROUND = {"dark": "#181825", "light": "#ffffff"}
 
-    INFO = "#89b4fa"
-    SUCCESS = "#40a02b"
-    WARNING = "#df8e1d"
-    ERROR = "#d20f39"
-    MUTED = "#6c7086"
+LOG_COLORS = {
+    "dark": {
+        "info": "#89b4fa",
+        "success": "#a6e3a1",
+        "warning": "#f9e2af",
+        "error": "#f38ba8",
+        "muted": "#9399b2",
+    },
+    "light": {
+        "info": "#0969da",
+        "success": "#1a7f37",
+        "warning": "#9a6700",
+        "error": "#cf222e",
+        "muted": "#5a6169",
+    },
+}
+
+DEFAULT_LOG_THEME = "dark"
+
+# ── Fonts ──────────────────────────────────────────────────────────────────
+# Segoe UI has thin Arabic coverage and falls back mid-run, which makes mixed
+# Arabic/Latin lines sit at inconsistent heights. Arabic-first locales lead
+# with faces that actually ship Arabic glyphs.
+UI_FONT_STACKS = {
+    "ar": ("Segoe UI", "Tahoma", "Dubai", "Noto Naskh Arabic", "Arial"),
+    "default": ("Segoe UI", "Arial", "Helvetica"),
+}
+
+
+def font_stack(locale: str = "default") -> tuple:
+    """Ordered font family preferences for ``locale``."""
+    return UI_FONT_STACKS.get(locale, UI_FONT_STACKS["default"])
+
+
+def font_family_css(locale: str = "default") -> str:
+    """The same stack rendered as a CSS ``font-family`` value."""
+    return ", ".join(f"'{name}'" for name in font_stack(locale)) + ", sans-serif"
+
+
+def themed_stylesheet(theme: str, locale: str = "default") -> str:
+    """Return a theme stylesheet with the locale-appropriate font stack."""
+    sheet = THEMES.get(theme) or THEMES[DEFAULT_LOG_THEME]
+    return sheet.replace(
+        "font-family: 'Segoe UI', 'Arial', sans-serif;",
+        f"font-family: {font_family_css(locale)};",
+    )
 
 
 DARK_THEME = """
@@ -18,12 +66,12 @@ QMainWindow {
 }
 QWidget {
     font-family: 'Segoe UI', 'Arial', sans-serif;
-    font-size: 12px;
+    font-size: 9pt;
     color: #cdd6f4;
 }
 QGroupBox {
     font-weight: bold;
-    font-size: 13px;
+    font-size: 10pt;
     border: 2px solid #45475a;
     border-radius: 8px;
     margin-top: 12px;
@@ -39,7 +87,8 @@ QGroupBox::title {
 QPushButton {
     background-color: #89b4fa;
     color: #1e1e2e;
-    border: none;
+    /* Transparent border keeps geometry stable when :focus adds a visible one. */
+    border: 2px solid transparent;
     padding: 5px 12px;
     border-radius: 6px;
     font-weight: bold;
@@ -50,6 +99,10 @@ QPushButton:hover {
 }
 QPushButton:pressed {
     background-color: #74c7ec;
+}
+/* Keyboard users could not tell which button had focus. */
+QPushButton:focus {
+    border: 2px solid #f5e0dc;
 }
 QPushButton:disabled {
     background-color: #45475a;
@@ -83,7 +136,7 @@ QTextEdit {
     border-radius: 8px;
     padding: 10px;
     font-family: 'Consolas', 'Courier New', monospace;
-    font-size: 11px;
+    font-size: 8pt;
     color: #a6e3a1;
 }
 QListWidget {
@@ -146,13 +199,38 @@ QStatusBar {
     color: #6c7086;
 }
 QLabel#titleLabel {
-    font-size: 24px;
+    font-size: 18pt;
     font-weight: bold;
     color: #89b4fa;
 }
 QLabel#subtitleLabel {
-    font-size: 12px;
+    font-size: 9pt;
     color: #6c7086;
+}
+/* About tab. Previously these colours were inline in the HTML, so the tab
+   stayed dark-themed (and unreadable) after switching to the light theme. */
+QLabel#aboutHeading {
+    font-size: 16pt;
+    font-weight: bold;
+    color: #89b4fa;
+}
+QLabel#aboutSubheading {
+    font-size: 11pt;
+    font-weight: bold;
+    color: #a6e3a1;
+}
+QLabel#aboutBody {
+    font-size: 10pt;
+    color: #cdd6f4;
+}
+QLabel#aboutMuted {
+    font-size: 9pt;
+    color: #9399b2;
+}
+QFrame#aboutSeparator {
+    background-color: #45475a;
+    max-height: 1px;
+    border: none;
 }
 """
 
@@ -163,12 +241,12 @@ QMainWindow {
 }
 QWidget {
     font-family: 'Segoe UI', 'Arial', sans-serif;
-    font-size: 12px;
+    font-size: 9pt;
     color: #4c4f69;
 }
 QGroupBox {
     font-weight: bold;
-    font-size: 13px;
+    font-size: 10pt;
     border: 2px solid #ccd0da;
     border-radius: 8px;
     margin-top: 12px;
@@ -184,7 +262,7 @@ QGroupBox::title {
 QPushButton {
     background-color: #1e66f5;
     color: #eff1f5;
-    border: none;
+    border: 2px solid transparent;
     padding: 5px 12px;
     border-radius: 6px;
     font-weight: bold;
@@ -195,6 +273,9 @@ QPushButton:hover {
 }
 QPushButton:pressed {
     background-color: #04a5e5;
+}
+QPushButton:focus {
+    border: 2px solid #11111b;
 }
 QPushButton:disabled {
     background-color: #ccd0da;
@@ -229,7 +310,7 @@ QTextEdit {
     border-radius: 8px;
     padding: 10px;
     font-family: 'Consolas', 'Courier New', monospace;
-    font-size: 11px;
+    font-size: 8pt;
     color: #4c4f69;
 }
 QListWidget {
@@ -293,13 +374,36 @@ QStatusBar {
     color: #6c6f85;
 }
 QLabel#titleLabel {
-    font-size: 24px;
+    font-size: 18pt;
     font-weight: bold;
     color: #1e66f5;
 }
 QLabel#subtitleLabel {
-    font-size: 12px;
+    font-size: 9pt;
     color: #6c6f85;
+}
+QLabel#aboutHeading {
+    font-size: 16pt;
+    font-weight: bold;
+    color: #1e66f5;
+}
+QLabel#aboutSubheading {
+    font-size: 11pt;
+    font-weight: bold;
+    color: #1a7f37;
+}
+QLabel#aboutBody {
+    font-size: 10pt;
+    color: #4c4f69;
+}
+QLabel#aboutMuted {
+    font-size: 9pt;
+    color: #5a6169;
+}
+QFrame#aboutSeparator {
+    background-color: #ccd0da;
+    max-height: 1px;
+    border: none;
 }
 """
 

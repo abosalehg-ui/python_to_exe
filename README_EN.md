@@ -19,14 +19,14 @@ signing, version metadata, build history, and a Windows manifest editor.
 | **Installer** | Full Inno Setup pipeline: generated `.iss`, stable upgrade-safe AppId, 13 languages, shortcuts, file association, signed `Setup.exe` |
 | **Metadata** | Embed company name, product/file version, description, copyright, etc. in the EXE properties |
 | **UX** | Drag & drop, command preview (dry-run), real-time colored log with search/export, dark/light theme, 10+ keyboard shortcuts |
-| **i18n** | Full Arabic (RTL) and English (LTR) translations with on-the-fly locale switching |
+| **i18n** | Full Arabic (RTL) and English (LTR) translations, switchable live without a restart |
 | **History** | Persistent log of last 20 builds with one-click restore |
 
 ## Requirements
 
 - Python 3.8+
 - PyQt5 >= 5.15
-- PyInstaller >= 5.0 (auto-installed on first build)
+- PyInstaller >= 6.0 (offered for install on first build, with consent)
 
 ## Installation
 
@@ -153,7 +153,48 @@ Required:
 - Timestamp URL (default: `http://timestamp.digicert.com`)
 
 The signing command is built by `core/code_signer.py` and includes
-`/fd sha256 /td sha256 /tr <url>`. Password is redacted before display.
+`/fd sha256 /td sha256 /tr <url>`. The password is redacted before display.
+
+### Two signing modes
+
+| Mode | How it works | When to use |
+|---|---|---|
+| `.pfx` file | `signtool /f <cert> /p <password>` | Simplest, personal machine |
+| Windows certificate store | `signtool /n "<subject name>"` | **More secure** — no password on the command line |
+
+> ⚠️ In `.pfx` mode the password is passed as a command-line argument, and on
+> Windows any process running as the same user can read another process's
+> command line. Redaction protects the *log*, not the process table. On a
+> shared machine, enable "Use a certificate from the Windows certificate store".
+
+## Security notes
+
+### Shared settings files
+
+When you load a `.json` settings file you did not write yourself, the app
+inspects the extra-arguments field for flags that execute code:
+
+`--runtime-hook` · `--additional-hooks-dir` · `--add-binary` · `--upx-dir` · `--runtime-tmpdir`
+
+If any are present you get an explicit warning before it is applied.
+`--runtime-hook` injects code into **every** EXE you subsequently produce —
+including ones you sign and distribute. Only accept it from a source you trust.
+
+### PyInstaller installation
+
+Never installed silently. If it is missing you are shown the exact command
+(`pip install pyinstaller>=6.0,<7`) and decide for yourself.
+
+### Where settings live
+
+| OS | Path |
+|---|---|
+| Windows | `%APPDATA%\py2exe_gui\` |
+| macOS | `~/Library/Application Support/py2exe_gui/` |
+| Linux | `$XDG_CONFIG_HOME/py2exe_gui/` or `~/.config/py2exe_gui/` |
+
+Earlier versions wrote these into the current working directory; they are
+migrated once on first run.
 
 ## Development
 
