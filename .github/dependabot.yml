@@ -1,0 +1,23 @@
+version: 2
+
+updates:
+  # Keeps GitHub Actions current. Preferred over hand-pinning SHAs: the tags
+  # stay readable and Dependabot opens a PR when an action moves.
+  - package-ecosystem: github-actions
+    directory: "/"
+    schedule:
+      interval: weekly
+    commit-message:
+      prefix: "ci"
+
+  - package-ecosystem: pip
+    directory: "/"
+    schedule:
+      interval: weekly
+    commit-message:
+      prefix: "deps"
+    groups:
+      dev-dependencies:
+        patterns:
+          - "pytest*"
+          - "ruff"

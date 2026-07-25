@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "py2exe-gui"
-version = "1.0.0"
+version = "1.1.0"
 description = "Arabic-localized PyQt5 GUI to convert Python scripts to Windows executables via PyInstaller"
 readme = "README.md"
 requires-python = ">=3.8"

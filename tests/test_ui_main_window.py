@@ -67,7 +67,7 @@ def test_all_tabs_are_present(window):
 
 
 def test_log_receives_startup_messages(window):
-    assert window.log_output.toPlainText().strip()
+    assert window.main_tab.log_output.toPlainText().strip()
 
 
 # ── Accessibility ──────────────────────────────────────────────────────────
@@ -95,9 +95,9 @@ def test_stylesheet_defines_a_focus_indicator_for_buttons(window):
 
 
 def test_current_config_reads_the_form(window, project):
-    window.source_input.setText(project["source"])
-    window.output_name.setText("demo")
-    window.onefile_check.setChecked(True)
+    window.main_tab.source_input.setText(project["source"])
+    window.main_tab.output_name.setText("demo")
+    window.main_tab.onefile_check.setChecked(True)
     cfg = window._current_config()
     assert cfg.source == project["source"]
     assert cfg.output_name == "demo"
@@ -130,9 +130,9 @@ def test_apply_config_round_trips(window, project):
 
 
 def test_source_change_autofills_name_and_dir(window, project):
-    window.source_input.setText(project["source"])
-    assert window.output_name.text() == "app"
-    assert window.output_dir.text() == project["root"]
+    window.main_tab.source_input.setText(project["source"])
+    assert window.main_tab.output_name.text() == "app"
+    assert window.main_tab.output_dir.text() == project["root"]
 
 
 # ── Drag & drop routing ────────────────────────────────────────────────────
@@ -140,21 +140,21 @@ def test_source_change_autofills_name_and_dir(window, project):
 
 def test_dropped_python_file_becomes_the_source(window, project):
     window._handle_dropped_path(project["source"])
-    assert window.source_input.text() == project["source"]
+    assert window.main_tab.source_input.text() == project["source"]
 
 
 def test_dropped_icon_goes_to_the_icon_field(window, tmp_path):
     icon = tmp_path / "a.ico"
     icon.write_bytes(b"\x00")
     window._handle_dropped_path(str(icon))
-    assert window.icon_input.text() == str(icon)
+    assert window.main_tab.icon_input.text() == str(icon)
 
 
 def test_dropped_other_file_becomes_an_extra(window, tmp_path):
     data = tmp_path / "data.csv"
     data.write_text("x")
     window._handle_dropped_path(str(data))
-    assert window.extra_files_list.count() == 1
+    assert window.advanced_tab.extra_files_list.count() == 1
 
 
 # ── Destructive actions ask first ──────────────────────────────────────────
@@ -215,7 +215,7 @@ def test_loading_a_config_with_a_runtime_hook_warns(window, tmp_path, monkeypatc
     window.load_saved_settings()
 
     assert warned["value"], "a code-executing flag must be surfaced before applying"
-    assert window.extra_args.text() == "", "declining must not apply the config"
+    assert window.advanced_tab.extra_args.text() == "", "declining must not apply the config"
 
 
 def test_loading_a_clean_config_does_not_warn(window, tmp_path, monkeypatch):
@@ -239,7 +239,7 @@ def test_loading_a_clean_config_does_not_warn(window, tmp_path, monkeypatch):
     window.load_saved_settings()
 
     assert not asked["value"]
-    assert window.extra_args.text() == "--debug all"
+    assert window.advanced_tab.extra_args.text() == "--debug all"
 
 
 # ── Theme ──────────────────────────────────────────────────────────────────
@@ -257,14 +257,14 @@ def test_log_colors_follow_the_theme(window):
 
     window.current_theme = "light"
     window._append_log("❌ failure")
-    assert level_color("error", "light") in window.log_output.toHtml()
+    assert level_color("error", "light") in window.main_tab.log_output.toHtml()
 
 
 # ── Temp file lifecycle ────────────────────────────────────────────────────
 
 
 def test_version_file_is_cleaned_up(window):
-    window.vi_company_name.setText("Acme")
+    window.version_info_tab.vi_company_name.setText("Acme")
     path = window._materialize_version_file()
     assert path and os.path.exists(path)
     window._cleanup_temp_version_file()
@@ -272,7 +272,7 @@ def test_version_file_is_cleaned_up(window):
 
 
 def test_materializing_twice_does_not_leak_the_first_file(window):
-    window.vi_company_name.setText("Acme")
+    window.version_info_tab.vi_company_name.setText("Acme")
     first = window._materialize_version_file()
     second = window._materialize_version_file()
     assert first != second
@@ -288,17 +288,17 @@ def test_empty_version_form_produces_no_file(window):
 
 
 def test_installer_config_falls_back_to_the_output_name(window, project):
-    window.source_input.setText(project["source"])
-    window.output_name.setText("MyApp")
+    window.main_tab.source_input.setText(project["source"])
+    window.main_tab.output_name.setText("MyApp")
     cfg = window._current_installer_config()
     assert cfg.app_name == "MyApp"
 
 
 def test_iss_generation_writes_a_script(window, project):
-    window.source_input.setText(project["source"])
-    window.output_dir.setText(project["root"])
-    window.output_name.setText("MyApp")
-    window.inst_app_name.setText("My App")
+    window.main_tab.source_input.setText(project["source"])
+    window.main_tab.output_dir.setText(project["root"])
+    window.main_tab.output_name.setText("MyApp")
+    window.installer_tab.inst_app_name.setText("My App")
     cfg = window._current_installer_config()
     cfg.enabled = True
 
@@ -313,9 +313,9 @@ def test_iss_generation_writes_a_script(window, project):
 def test_iss_generation_reports_a_missing_exe(window, tmp_path):
     src = tmp_path / "app.py"
     src.write_text("x")
-    window.source_input.setText(str(src))
-    window.output_dir.setText(str(tmp_path))
-    window.inst_app_name.setText("My App")
+    window.main_tab.source_input.setText(str(src))
+    window.main_tab.output_dir.setText(str(tmp_path))
+    window.installer_tab.inst_app_name.setText("My App")
     cfg = window._current_installer_config()
     cfg.enabled = True
 
@@ -357,3 +357,126 @@ def test_dialogs_follow_the_locale_not_a_hardcoded_direction(qapp):
     dialog = AddImportDialog()
     assert dialog.layoutDirection() == Qt.LeftToRight
     dialog.close()
+
+
+# ── Tab decomposition ──────────────────────────────────────────────────────
+
+
+def test_each_tab_is_its_own_widget(window):
+    """main_window used to build all eight tabs inline and own every widget."""
+    from py2exe_gui.ui.tabs import (
+        AboutTab,
+        AdvancedTab,
+        DeployTab,
+        HistoryTab,
+        InstallerTab,
+        MainTab,
+        TemplatesTab,
+        VersionInfoTab,
+    )
+
+    assert isinstance(window.main_tab, MainTab)
+    assert isinstance(window.advanced_tab, AdvancedTab)
+    assert isinstance(window.version_info_tab, VersionInfoTab)
+    assert isinstance(window.deploy_tab, DeployTab)
+    assert isinstance(window.installer_tab, InstallerTab)
+    assert isinstance(window.templates_tab, TemplatesTab)
+    assert isinstance(window.history_tab, HistoryTab)
+    assert isinstance(window.about_tab, AboutTab)
+
+
+def test_tabs_can_be_built_standalone(qapp):
+    """A tab must not need the window to construct — that is the point."""
+    from py2exe_gui.ui.tabs import AdvancedTab
+
+    tab = AdvancedTab()
+    assert tab.hidden_imports() == []
+    tab.hidden_imports_list.addItem("numpy")
+    assert tab.hidden_imports() == ["numpy"]
+    tab.close()
+
+
+def test_merge_hidden_imports_skips_duplicates(qapp):
+    from py2exe_gui.ui.tabs import AdvancedTab
+
+    tab = AdvancedTab()
+    assert tab.merge_hidden_imports(["numpy", "pandas"]) == ["numpy", "pandas"]
+    assert tab.merge_hidden_imports(["numpy", "flask"]) == ["flask"]
+    assert sorted(tab.hidden_imports()) == ["flask", "numpy", "pandas"]
+    tab.close()
+
+
+def test_deploy_tab_builds_its_own_signing_config(qapp):
+    from py2exe_gui.ui.tabs import DeployTab
+
+    tab = DeployTab()
+    tab.signing_enable.setChecked(True)
+    tab.signing_cert.setText("/c.pfx")
+    cfg = tab.signing_config()
+    assert cfg.enabled is True
+    assert cfg.cert_path == "/c.pfx"
+    tab.close()
+
+
+def test_signing_mode_toggle_swaps_the_enabled_fields(window):
+    deploy = window.deploy_tab
+    deploy.signing_use_store.setChecked(True)
+    assert deploy.signing_subject.isEnabled()
+    assert not deploy.signing_password.isEnabled()
+
+    deploy.signing_use_store.setChecked(False)
+    assert not deploy.signing_subject.isEnabled()
+    assert deploy.signing_password.isEnabled()
+
+
+# ── Live language switching ────────────────────────────────────────────────
+
+
+def test_retranslate_switches_locale_without_restart(window):
+    """Regression: changing language used to require restarting the app."""
+    from py2exe_gui.strings import En, current_locale
+
+    set_locale("ar")
+    window.retranslate("en")
+    assert current_locale() == "en"
+    assert window.tabs.tabText(0) == En.TAB_MAIN
+    assert window.layoutDirection() == Qt.LeftToRight
+
+
+def test_retranslate_preserves_the_form(window, project):
+    window.main_tab.source_input.setText(project["source"])
+    window.main_tab.output_name.setText("demo")
+    window.advanced_tab.hidden_imports_list.addItem("numpy")
+    window.advanced_tab.extra_args.setText("--debug all")
+    window.version_info_tab.vi_company_name.setText("Acme")
+
+    window.retranslate("en")
+
+    assert window.main_tab.output_name.text() == "demo"
+    assert window.advanced_tab.hidden_imports() == ["numpy"]
+    assert window.advanced_tab.extra_args.text() == "--debug all"
+    assert window.version_info_tab.vi_company_name.text() == "Acme"
+
+
+def test_retranslate_preserves_the_log(window):
+    window._append_log("a distinctive log line")
+    window.retranslate("en")
+    assert "a distinctive log line" in window.main_tab.log_output.toPlainText()
+
+
+def test_retranslate_does_not_stack_duplicate_shortcuts(window):
+    before = len(window._shortcuts)
+    window.retranslate("en")
+    window.retranslate("ar")
+    assert len(window._shortcuts) == before
+
+
+def test_retranslate_rebinds_shortcuts_to_the_new_widgets(window):
+    """Stale shortcuts would point at widgets destroyed by the rebuild."""
+    window.retranslate("en")
+    targets = [s.parent() for s in window._shortcuts]
+    assert all(t is window for t in targets)
+    # Ctrl+L clears the *current* log widget.
+    window._append_log("something")
+    window.main_tab.log_output.clear()
+    assert window.main_tab.log_output.toPlainText() == ""

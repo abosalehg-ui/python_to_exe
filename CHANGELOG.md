@@ -5,6 +5,87 @@ follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Phase 8 — Priority fix plan (review items 3-30)
+
+Implements the prioritised fix plan from the full repository review. Items 1,
+2, 4, 5 and 12 shipped in Phase 7; this covers the rest.
+
+#### Fixed — critical
+- **Silent dependency install** (`main_window.py`): `pip install pyinstaller`
+  ran unattended on the first build — no consent, no version pin, from
+  whatever index the environment pointed at. The user now sees the exact
+  command and must approve it, and the requirement is pinned to `>=6.0,<7`.
+
+#### Fixed — important
+- **UI froze during post-build steps**: signing waits on a timestamp server
+  (up to 120s) and the smoke test waits on the new EXE; both ran inline on the
+  UI thread. Moved to `PostBuildThread`, which chains into the installer step.
+- **Untrusted settings files**: loading a config containing `--runtime-hook`,
+  `--additional-hooks-dir`, `--add-binary`, `--upx-dir` or `--runtime-tmpdir`
+  now warns and requires confirmation. Such a file injects code into every EXE
+  produced — including ones the user then signs. Also applied when restoring
+  from build history.
+- **Window did not fit a 1366x768 laptop**: the 1080x800 minimum was a hard
+  floor. Now 900x600 minimum with 1080x800 as the default size.
+- **Accessibility**: every icon-only browse button gained a tooltip and an
+  accessible name (five identical "📂" buttons previously announced nothing);
+  buttons gained a visible focus ring.
+- **About tab was unreadable in the light theme**: it was one HTML blob with
+  dark-theme colours and `direction: rtl` baked in. Rebuilt from themed
+  widgets driven by the stylesheet, so it follows both theme and locale.
+- **Dialogs forced RTL** regardless of locale; they now inherit direction.
+- **Clearing build history** asks first — 20 records, no undo.
+- **Standard-library list** held 11 names, so auto-detect suggested `typing`,
+  `collections`, `logging` and friends as hidden imports. Now uses
+  `sys.stdlib_module_names` (~300 names) with a fallback for Python < 3.10.
+- **Certificate password on the command line**: signtool can now select a
+  certificate from the Windows store by subject (`/n`), so no password is
+  passed as an argument at all.
+
+#### Fixed — polish
+- Log colours: one palette per theme. The single shared palette failed WCAG AA
+  on 3/5 levels against the light background and 2/5 against the dark one.
+  Measured ratios are documented and enforced by a test.
+- `styles.py` is the only colour source; the duplicate table in
+  `log_formatter.py` is gone, as is the unused `LogColors` class and the dead
+  `version_info._PathBundle`.
+- Temp version/manifest files are cleaned on every exit path and before being
+  re-created (one path leaked into `%TEMP%`).
+- `version_info` escaping now covers newline, carriage return, tab and control
+  characters — a pasted multi-line value used to break out of the generated
+  Python literal. Non-ASCII is left verbatim so Arabic stays readable.
+- `BuildRecord.from_dict` ignores unknown keys, and one malformed entry no
+  longer discards the entire history file.
+- `except Exception: pass` replaced with typed handling that reports the
+  reason via `last_error` and the build log.
+- Settings and history moved from the working directory to the per-user config
+  directory, with a one-time migration of any legacy file.
+- Log search is debounced (it re-searched on every keystroke); the stylesheet
+  uses point sizes so system font scaling applies; Arabic locales get a font
+  stack that actually ships Arabic glyphs.
+
+#### Changed
+- **`main_window.py` split into tab widgets** (1,886 -> 1,050 lines). Each tab
+  lives in `py2exe_gui/ui/tabs/` and owns its own controls and handlers; the
+  window keeps orchestration. Tabs construct standalone, so they can be tested
+  in isolation.
+- **Language switching no longer requires a restart.** `retranslate()`
+  snapshots the form, rebuilds the central widget under the new locale and
+  restores state, including the log and keyboard shortcuts.
+
+#### Added
+- `tests/test_pyinstaller_flags_integration.py` — asks PyInstaller `--help`
+  which options exist and asserts every flag the builder emits is real. This
+  is the check that was missing when `-O2` and `--upx-level` shipped. Includes
+  a `slow`-marked end-to-end build that runs the produced executable.
+- Headless GUI suite for `MainWindow`, previously at 0% coverage.
+- `pip-audit` and Dependabot (pip + github-actions); the CI test job enforces
+  `--cov-fail-under=90` on `py2exe_gui.core` and a separate job runs the GUI
+  tests offscreen.
+
+160 -> 329 tests.
+
+
 ### Phase 7 — Full installer pipeline (PyInstaller → Inno Setup)
 
 #### Added
