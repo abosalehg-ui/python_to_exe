@@ -83,3 +83,60 @@ def test_generate_file_uses_provided_language_id():
     info = VersionInfo(product_name="X", language_id="040704B0")
     out = generate_version_file(info)
     assert "040704B0" in out
+
+
+# ── Literal escaping (PyInstaller evals the generated file) ────────────────
+
+
+def _company_line(value: str) -> str:
+    out = generate_version_file(VersionInfo(company_name=value))
+    return next(ln for ln in out.splitlines() if "CompanyName" in ln)
+
+
+def test_newline_cannot_break_out_of_the_literal():
+    """Regression: a raw newline used to produce an unparseable file."""
+    line = _company_line("Acme\nInc")
+    assert "\\n" in line
+    assert line.count("u'") == 2  # name + value, both still on one line
+
+
+def test_carriage_return_is_escaped():
+    assert "\\r" in _company_line("Acme\rInc")
+
+
+def test_tab_is_escaped():
+    assert "\\t" in _company_line("Acme\tInc")
+
+
+def test_quote_is_escaped():
+    assert "\\'" in _company_line("Acme's")
+
+
+def test_backslash_is_escaped():
+    assert "\\\\" in _company_line("Acme\\Inc")
+
+
+def test_control_characters_are_dropped():
+    assert "\x07" not in _company_line("Acme\x07Inc")
+
+
+def test_non_ascii_is_preserved_verbatim():
+    """Arabic and symbols stay readable — the file is written as UTF-8."""
+    assert "شركة الاختبار" in _company_line("شركة الاختبار")
+    assert "©" in _company_line("© 2026")
+
+
+def test_escaped_output_is_valid_python():
+    """The real contract: PyInstaller must be able to eval the result."""
+    import ast
+
+    nasty = "Acme\n'; import os; os.system('calc')  #\\"
+    out = generate_version_file(VersionInfo(company_name=nasty, file_version="1.0.0.0"))
+    tree = ast.parse(out, mode="eval")  # raises SyntaxError if we broke out
+    assert tree is not None
+
+
+def test_injection_attempt_stays_inside_the_string():
+    out = generate_version_file(VersionInfo(company_name="x'), StringStruct(u'Evil"))
+    # The payload must remain part of the CompanyName value, not a new call.
+    assert out.count("StringStruct(u'CompanyName'") == 1

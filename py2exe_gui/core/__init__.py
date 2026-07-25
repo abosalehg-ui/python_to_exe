@@ -1,7 +1,12 @@
 """Core (UI-independent) modules: build logic, dependency analysis, config."""
 
 from py2exe_gui.core.build_history import BuildHistory, BuildRecord, make_record
-from py2exe_gui.core.builder import build_pyinstaller_command, split_extra_args
+from py2exe_gui.core.builder import (
+    DANGEROUS_FLAGS,
+    build_pyinstaller_command,
+    find_dangerous_args,
+    split_extra_args,
+)
 from py2exe_gui.core.code_signer import (
     SigningConfig,
     build_signtool_command,
@@ -26,7 +31,7 @@ from py2exe_gui.core.installer import (
     installer_output_path,
     resolve_languages,
 )
-from py2exe_gui.core.log_formatter import classify_line, format_html
+from py2exe_gui.core.log_formatter import classify_line, format_html, level_color
 from py2exe_gui.core.manifest_generator import ManifestConfig, generate_manifest
 from py2exe_gui.core.smoke_test import (
     SmokeResult,
@@ -38,6 +43,7 @@ from py2exe_gui.core.version_info import VersionInfo, generate_version_file
 __all__ = [
     "ARCH_CHOICES",
     "COMPRESSION_CHOICES",
+    "DANGEROUS_FLAGS",
     "LANGUAGE_LABELS",
     "PRIVILEGE_CHOICES",
     "BuildConfig",
@@ -55,8 +61,10 @@ __all__ = [
     "derive_app_id",
     "detect_imports",
     "filter_non_stdlib",
+    "find_dangerous_args",
     "find_iscc",
     "format_html",
+    "level_color",
     "generate_iss_script",
     "generate_manifest",
     "generate_version_file",

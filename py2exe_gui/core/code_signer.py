@@ -10,11 +10,24 @@ from typing import List, Optional, Tuple
 
 @dataclass
 class SigningConfig:
-    """Parameters needed to sign a Windows executable."""
+    """Parameters needed to sign a Windows executable.
+
+    Two modes are supported:
+
+    ``pfx``   — a ``.pfx`` file plus its password. Simple, but signtool takes
+                the password as ``/p`` on the command line, and on Windows any
+                process running as the same user can read another process's
+                command line. Redaction protects the log, not the process table.
+    ``store`` — the certificate is installed in the Windows certificate store
+                and selected by subject name (``/n``). **No password is ever
+                passed as an argument.** Prefer this on shared machines.
+    """
 
     enabled: bool = False
-    cert_path: str = ""
-    cert_password: str = ""
+    use_cert_store: bool = False
+    cert_subject: str = ""  # store mode: certificate subject name for /n
+    cert_path: str = ""     # pfx mode
+    cert_password: str = ""  # pfx mode
     timestamp_url: str = "http://timestamp.digicert.com"
     digest_algorithm: str = "sha256"
     description: str = ""
@@ -35,14 +48,21 @@ def build_signtool_command(
         return None, "Signing is disabled"
     if not exe_path:
         return None, "Executable path is required"
-    if not config.cert_path:
-        return None, "Certificate path is required"
 
     cmd: List[str] = [config.signtool_path, "sign"]
-    cmd.extend(["/f", config.cert_path])
 
-    if config.cert_password:
-        cmd.extend(["/p", config.cert_password])
+    if config.use_cert_store:
+        if not config.cert_subject:
+            return None, "Certificate subject name is required for store signing"
+        # /n selects by subject from the user's certificate store — the private
+        # key never leaves it and no password is placed on the command line.
+        cmd.extend(["/n", config.cert_subject])
+    else:
+        if not config.cert_path:
+            return None, "Certificate path is required"
+        cmd.extend(["/f", config.cert_path])
+        if config.cert_password:
+            cmd.extend(["/p", config.cert_password])
 
     if config.timestamp_url:
         cmd.extend(["/tr", config.timestamp_url])

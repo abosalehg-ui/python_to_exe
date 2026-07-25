@@ -31,6 +31,33 @@ def split_extra_args(raw: str, platform: Optional[str] = None) -> List[str]:
     return shlex.split(raw)
 
 
+# PyInstaller options that cause code supplied by the config file to run —
+# either during the build or inside every EXE the build produces. A settings
+# JSON shared by someone else is untrusted input, so these are surfaced to the
+# user for confirmation instead of being passed through silently.
+DANGEROUS_FLAGS = frozenset({
+    "--runtime-hook",      # code injected into every produced EXE
+    "--additional-hooks-dir",  # arbitrary hook modules imported at build time
+    "--add-binary",        # ships an arbitrary binary inside the bundle
+    "--upx-dir",           # runs an executable from a caller-chosen directory
+    "--runtime-tmpdir",    # redirects the onefile extraction directory
+})
+
+
+def find_dangerous_args(extra_args: str, platform: Optional[str] = None) -> List[str]:
+    """Return the code-executing flags present in ``extra_args``.
+
+    Matches both ``--flag value`` and ``--flag=value`` spellings. Used to warn
+    before applying a settings file the user did not write themselves.
+    """
+    found = []
+    for token in split_extra_args(extra_args, platform):
+        name = token.split("=", 1)[0]
+        if name in DANGEROUS_FLAGS and name not in found:
+            found.append(name)
+    return found
+
+
 def build_pyinstaller_command(
     config: BuildConfig,
     python_executable: Optional[str] = None,

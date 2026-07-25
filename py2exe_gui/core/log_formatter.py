@@ -1,40 +1,51 @@
 """Classify and format log lines for display (color + HTML)."""
 
 from html import escape
-from typing import Literal
+from typing import Literal, Optional
+
+from py2exe_gui.styles import DEFAULT_LOG_THEME, LOG_COLORS
 
 LogLevel = Literal["info", "success", "warning", "error", "muted"]
+
+# Tokens are matched case-insensitively, so "error:", "Error" and "ERROR" all
+# classify the same way. The Arabic tokens are caseless, which is harmless.
+_ERROR_TOKENS = ("❌", "error", "traceback", "فشل", "خطأ")
+_WARNING_TOKENS = ("⚠️", "warning", "تنبيه")
+_SUCCESS_TOKENS = ("✅", "بنجاح", "successfully", "completed")
 
 
 def classify_line(line: str) -> LogLevel:
     """Heuristically determine the severity of a log line."""
     lowered = line.lower()
-    # Order matters: success markers before generic info, errors before warnings.
-    if any(token in line for token in ("❌", "ERROR", "Traceback", "فشل", "خطأ")):
+    # Order matters: errors before warnings, success markers before info.
+    if any(token in lowered for token in _ERROR_TOKENS):
         return "error"
-    if any(token in line for token in ("⚠️", "WARNING", "تنبيه")):
+    if any(token in lowered for token in _WARNING_TOKENS):
         return "warning"
-    if any(token in line for token in ("✅", "بنجاح", "Successfully", "completed")):
+    if any(token in lowered for token in _SUCCESS_TOKENS):
         return "success"
     if line.startswith("─") or line.startswith("═"):
         return "muted"
-    if "info" in lowered or line.startswith("INFO"):
-        return "info"
     return "info"
 
 
-_LEVEL_COLORS = {
-    "info": "#89b4fa",
-    "success": "#40a02b",
-    "warning": "#df8e1d",
-    "error": "#d20f39",
-    "muted": "#6c7086",
-}
+def level_color(level: LogLevel, theme: str = DEFAULT_LOG_THEME) -> str:
+    """Return the hex colour for ``level`` under ``theme``.
+
+    Falls back to the default theme when the name is unknown, so a corrupt
+    persisted preference can never crash the log.
+    """
+    palette = LOG_COLORS.get(theme) or LOG_COLORS[DEFAULT_LOG_THEME]
+    return palette[level]
 
 
-def format_html(line: str, level: LogLevel = None) -> str:
+def format_html(
+    line: str,
+    level: Optional[LogLevel] = None,
+    theme: str = DEFAULT_LOG_THEME,
+) -> str:
     """Wrap ``line`` in a coloured <span> for QTextEdit.append()."""
     lvl = level or classify_line(line)
-    color = _LEVEL_COLORS[lvl]
+    color = level_color(lvl, theme)
     safe = escape(line).replace(" ", "&nbsp;") if line.startswith(" ") else escape(line)
     return f'<span style="color: {color};">{safe}</span>'

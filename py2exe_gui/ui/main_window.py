@@ -7,7 +7,7 @@ import sys
 import tempfile
 import time
 
-from PyQt5.QtCore import Qt
+from PyQt5.QtCore import Qt, QTimer
 from PyQt5.QtGui import QFont, QKeySequence
 from PyQt5.QtWidgets import (
     QCheckBox,
@@ -41,6 +41,7 @@ from py2exe_gui.constants import (
     DEVELOPER,
     EMAIL,
     HISTORY_FILE,
+    PYINSTALLER_REQUIREMENT,
     SETTINGS_FILE,
 )
 from py2exe_gui.core import (
@@ -54,6 +55,7 @@ from py2exe_gui.core import (
     build_pyinstaller_command,
     build_signtool_command,
     detect_imports,
+    find_dangerous_args,
     find_iscc,
     format_html,
     generate_iss_script,
@@ -65,7 +67,6 @@ from py2exe_gui.core import (
     parse_requirements,
     redact_password,
     resolve_languages,
-    run_smoke_test,
 )
 from py2exe_gui.core.dependency_analyzer import filter_non_stdlib
 from py2exe_gui.core.installer import (
@@ -81,11 +82,26 @@ from py2exe_gui.strings import (
     available_locales,
     current_locale,
 )
-from py2exe_gui.styles import THEMES
+from py2exe_gui.styles import themed_stylesheet
 from py2exe_gui.templates import TEMPLATES, template_description, template_name
 from py2exe_gui.ui.conversion_thread import ConversionThread
 from py2exe_gui.ui.dialogs import AddImportDialog, CommandPreviewDialog
 from py2exe_gui.ui.installer_thread import InstallerThread
+from py2exe_gui.ui.post_build_thread import PostBuildThread
+
+
+def _browse_button(label: str, handler) -> QPushButton:
+    """A '📂' button that screen readers and tooltips can actually describe.
+
+    Five identical emoji-only buttons previously exposed no name at all, so
+    keyboard and screen-reader users had no way to tell them apart.
+    """
+    button = QPushButton("📂")
+    button.setToolTip(label)
+    button.setAccessibleName(label)
+    button.setAccessibleDescription(label)
+    button.clicked.connect(handler)
+    return button
 
 
 class MainWindow(QMainWindow):
@@ -95,6 +111,7 @@ class MainWindow(QMainWindow):
         super().__init__()
         self.conversion_thread = None
         self.installer_thread = None
+        self.post_build_thread = None
         self.settings = {}
         self.current_theme = "dark"
         self._build_start_time = 0.0
@@ -113,14 +130,17 @@ class MainWindow(QMainWindow):
 
     def init_ui(self):
         self.setWindowTitle(S.WINDOW_TITLE_FMT.format(name=APP_NAME, version=APP_VERSION))
-        self.setMinimumSize(1080, 800)
+        # A hard 800px minimum did not fit a 1366x768 laptop. Keep the
+        # comfortable size as the *default*, not as a floor.
+        self.setMinimumSize(900, 600)
+        self.resize(1080, 800)
         direction = (
             Qt.RightToLeft
             if LOCALE_LAYOUT.get(current_locale(), "rtl") == "rtl"
             else Qt.LeftToRight
         )
         self.setLayoutDirection(direction)
-        self.setStyleSheet(THEMES.get(self.current_theme, THEMES["dark"]))
+        self.setStyleSheet(themed_stylesheet(self.current_theme, current_locale()))
 
         central_widget = QWidget()
         self.setCentralWidget(central_widget)
@@ -130,7 +150,7 @@ class MainWindow(QMainWindow):
 
         main_layout.addWidget(self._create_header())
 
-        tabs = QTabWidget()
+        tabs = self.tabs = QTabWidget()
         tabs.addTab(self._create_main_tab(), S.TAB_MAIN)
         tabs.addTab(self._create_advanced_tab(), S.TAB_ADVANCED)
         tabs.addTab(self._create_version_info_tab(), S.TAB_VERSION_INFO)
@@ -211,8 +231,7 @@ class MainWindow(QMainWindow):
         self.source_input = QLineEdit()
         self.source_input.setPlaceholderText(S.SOURCE_PLACEHOLDER)
         self.source_input.textChanged.connect(self.on_source_changed)
-        source_btn = QPushButton("📂")
-        source_btn.clicked.connect(self.browse_source)
+        source_btn = _browse_button(S.DIALOG_CHOOSE_PY, self.browse_source)
         source_layout.addWidget(self.source_input, stretch=4)
         source_layout.addWidget(source_btn, stretch=1)
         layout.addWidget(source_group)
@@ -228,16 +247,14 @@ class MainWindow(QMainWindow):
         output_layout.addWidget(QLabel(S.OUTPUT_DIR_LABEL), 1, 0)
         self.output_dir = QLineEdit()
         self.output_dir.setPlaceholderText(S.OUTPUT_DIR_PLACEHOLDER)
-        output_dir_btn = QPushButton("📂")
-        output_dir_btn.clicked.connect(self.browse_output_dir)
+        output_dir_btn = _browse_button(S.DIALOG_CHOOSE_OUT_DIR, self.browse_output_dir)
         output_layout.addWidget(self.output_dir, 1, 1)
         output_layout.addWidget(output_dir_btn, 1, 2)
 
         output_layout.addWidget(QLabel(S.ICON_LABEL), 2, 0)
         self.icon_input = QLineEdit()
         self.icon_input.setPlaceholderText(S.ICON_PLACEHOLDER)
-        icon_btn = QPushButton("📂")
-        icon_btn.clicked.connect(self.browse_icon)
+        icon_btn = _browse_button(S.DIALOG_CHOOSE_ICON, self.browse_icon)
         output_layout.addWidget(self.icon_input, 2, 1)
         output_layout.addWidget(icon_btn, 2, 2)
 
@@ -286,7 +303,12 @@ class MainWindow(QMainWindow):
         self.log_search = QLineEdit()
         self.log_search.setPlaceholderText(S.LOG_SEARCH_PLACEHOLDER)
         self.log_search.returnPressed.connect(self._search_log_next)
-        self.log_search.textChanged.connect(self._search_log_next)
+        # Debounced: searching on every keystroke made the cursor jump around.
+        self._log_search_timer = QTimer(self)
+        self._log_search_timer.setSingleShot(True)
+        self._log_search_timer.setInterval(300)
+        self._log_search_timer.timeout.connect(self._search_log_next)
+        self.log_search.textChanged.connect(self._log_search_timer.start)
         search_row.addWidget(self.log_search)
 
         log_btn_row = QHBoxLayout()
@@ -359,10 +381,7 @@ class MainWindow(QMainWindow):
         extra_layout.addWidget(QLabel(S.UPX_DIR_LABEL), 1, 0)
         self.upx_dir = QLineEdit()
         self.upx_dir.setPlaceholderText(S.UPX_DIR_PLACEHOLDER)
-        upx_dir_btn = QPushButton("📂")
-        upx_dir_btn.setToolTip(S.UPX_DIR_LABEL)
-        upx_dir_btn.setAccessibleName(S.UPX_DIR_LABEL)
-        upx_dir_btn.clicked.connect(self.browse_upx_dir)
+        upx_dir_btn = _browse_button(S.UPX_DIR_LABEL, self.browse_upx_dir)
         extra_layout.addWidget(self.upx_dir, 1, 1)
         extra_layout.addWidget(upx_dir_btn, 1, 2)
 
@@ -485,8 +504,7 @@ class MainWindow(QMainWindow):
         splash_layout.addWidget(QLabel(S.SPLASH_LABEL))
         self.splash_input = QLineEdit()
         self.splash_input.setPlaceholderText(S.SPLASH_PLACEHOLDER)
-        splash_btn = QPushButton("📂")
-        splash_btn.clicked.connect(self.browse_splash_image)
+        splash_btn = _browse_button(S.DIALOG_CHOOSE_SPLASH, self.browse_splash_image)
         splash_layout.addWidget(self.splash_input, stretch=4)
         splash_layout.addWidget(splash_btn, stretch=1)
         layout.addWidget(splash_group)
@@ -530,11 +548,23 @@ class MainWindow(QMainWindow):
         self.signing_enable = QCheckBox(S.SIGNING_ENABLE)
         signing_layout.addWidget(self.signing_enable, 1, 0, 1, 3)
 
+        # Store mode keeps the certificate password off the command line,
+        # where any process running as the same user could read it.
+        self.signing_use_store = QCheckBox(S.SIGNING_USE_STORE)
+        self.signing_use_store.setToolTip(S.SIGNING_USE_STORE_TIP)
+        self.signing_use_store.toggled.connect(self._on_signing_mode_changed)
+        signing_layout.addWidget(self.signing_use_store, 6, 0, 1, 3)
+
+        self.signing_subject_label = QLabel(S.SIGNING_SUBJECT_LABEL)
+        self.signing_subject = QLineEdit()
+        self.signing_subject.setPlaceholderText(S.SIGNING_SUBJECT_PLACEHOLDER)
+        signing_layout.addWidget(self.signing_subject_label, 7, 0)
+        signing_layout.addWidget(self.signing_subject, 7, 1, 1, 2)
+
         signing_layout.addWidget(QLabel(S.SIGNING_CERT_LABEL), 2, 0)
         self.signing_cert = QLineEdit()
         self.signing_cert.setPlaceholderText(S.SIGNING_CERT_PLACEHOLDER)
-        cert_btn = QPushButton("📂")
-        cert_btn.clicked.connect(self.browse_signing_cert)
+        cert_btn = _browse_button(S.DIALOG_CHOOSE_CERT, self.browse_signing_cert)
         signing_layout.addWidget(self.signing_cert, 2, 1)
         signing_layout.addWidget(cert_btn, 2, 2)
 
@@ -639,10 +669,7 @@ class MainWindow(QMainWindow):
             output_grid.addWidget(QLabel(label), row, 0)
             output_grid.addWidget(widget, row, 1)
             if handler is not None:
-                btn = QPushButton("📂")
-                btn.setToolTip(label)
-                btn.setAccessibleName(label)
-                btn.clicked.connect(handler)
+                btn = _browse_button(label, handler)
                 output_grid.addWidget(btn, row, 2)
         layout.addWidget(output)
 
@@ -687,10 +714,7 @@ class MainWindow(QMainWindow):
         self.inst_arabic_isl = QLineEdit()
         self.inst_arabic_isl.setPlaceholderText(S.INST_ARABIC_ISL_PLACEHOLDER)
         self.inst_arabic_isl.setToolTip(S.INST_ARABIC_ISL_TIP)
-        isl_btn = QPushButton("📂")
-        isl_btn.setToolTip(S.INST_ARABIC_ISL_LABEL)
-        isl_btn.setAccessibleName(S.INST_ARABIC_ISL_LABEL)
-        isl_btn.clicked.connect(self.browse_arabic_isl)
+        isl_btn = _browse_button(S.INST_ARABIC_ISL_LABEL, self.browse_arabic_isl)
         options_grid.addWidget(self.inst_arabic_isl, 4, 1)
         options_grid.addWidget(isl_btn, 4, 2)
 
@@ -728,10 +752,7 @@ class MainWindow(QMainWindow):
         self.inst_iscc_path = QLineEdit()
         self.inst_iscc_path.setPlaceholderText(S.INST_ISCC_PLACEHOLDER)
         toolchain_layout.addWidget(self.inst_iscc_path, 0, 1)
-        iscc_btn = QPushButton("📂")
-        iscc_btn.setToolTip(S.INST_ISCC_LABEL)
-        iscc_btn.setAccessibleName(S.INST_ISCC_LABEL)
-        iscc_btn.clicked.connect(self.browse_iscc_path)
+        iscc_btn = _browse_button(S.INST_ISCC_LABEL, self.browse_iscc_path)
         toolchain_layout.addWidget(iscc_btn, 0, 2)
 
         detect_btn = QPushButton(S.BTN_DETECT_ISCC)
@@ -782,33 +803,64 @@ class MainWindow(QMainWindow):
         return tab
 
     def _create_about_tab(self):
-        tab = QWidget()
-        layout = QVBoxLayout(tab)
-        layout.setAlignment(Qt.AlignCenter)
+        """About page built from themed widgets.
 
-        features_html = "".join(f"<li>{f}</li>" for f in S.ABOUT_FEATURES)
-        about_text = f"""
-        <div style='text-align: center; direction: rtl;'>
-            <h1 style='color: #89b4fa;'>🐍 {APP_NAME}</h1>
-            <h3 style='color: #a6e3a1;'>{S.ABOUT_VERSION_FMT.format(version=APP_VERSION)}</h3>
-            <hr style='border: 1px solid #45475a; margin: 20px 0;'>
-            <p style='font-size: 14px; color: #cdd6f4;'>{S.ABOUT_DESC}</p>
-            <hr style='border: 1px solid #45475a; margin: 20px 0;'>
-            <h3 style='color: #f9e2af;'>{S.ABOUT_DEVELOPER_LABEL}</h3>
-            <p style='font-size: 16px; color: #cdd6f4; font-weight: bold;'>{DEVELOPER}</p>
-            <p style='color: #89b4fa;'>📧 {EMAIL}</p>
-            <hr style='border: 1px solid #45475a; margin: 20px 0;'>
-            <p style='color: #6c7086; font-size: 12px;'>{COPYRIGHT}</p>
-            <hr style='border: 1px solid #45475a; margin: 20px 0;'>
-            <h4 style='color: #cba6f7;'>{S.ABOUT_FEATURES_LABEL}</h4>
-            <ul style='text-align: right; color: #cdd6f4;'>{features_html}</ul>
-        </div>
+        The previous version was one HTML blob with dark-theme colours and
+        ``direction: rtl`` baked in, so the whole tab became unreadable in the
+        light theme and stayed mirrored in English. Styling now lives in the
+        stylesheet (``#aboutHeading`` and friends) and direction is inherited.
         """
-        about_label = QLabel(about_text)
-        about_label.setWordWrap(True)
-        about_label.setAlignment(Qt.AlignCenter)
-        layout.addWidget(about_label)
-        return tab
+        inner = QWidget()
+        layout = QVBoxLayout(inner)
+        layout.setAlignment(Qt.AlignTop)
+        layout.setSpacing(8)
+
+        def add_label(text, object_name, *, bold=False):
+            label = QLabel(text)
+            label.setObjectName(object_name)
+            label.setWordWrap(True)
+            label.setAlignment(Qt.AlignCenter)
+            label.setTextInteractionFlags(Qt.TextSelectableByMouse)
+            if bold:
+                font = label.font()
+                font.setBold(True)
+                label.setFont(font)
+            layout.addWidget(label)
+            return label
+
+        def add_separator():
+            line = QFrame()
+            line.setObjectName("aboutSeparator")
+            line.setFrameShape(QFrame.HLine)
+            line.setFrameShadow(QFrame.Plain)
+            layout.addWidget(line)
+
+        add_label(f"🐍 {APP_NAME}", "aboutHeading")
+        add_label(S.ABOUT_VERSION_FMT.format(version=APP_VERSION), "aboutSubheading")
+        add_separator()
+        add_label(S.ABOUT_DESC_PLAIN, "aboutBody")
+        add_separator()
+        add_label(S.ABOUT_DEVELOPER_LABEL, "aboutSubheading")
+        add_label(DEVELOPER, "aboutBody", bold=True)
+        add_label(f"📧 {EMAIL}", "aboutBody")
+        add_separator()
+        add_label(COPYRIGHT, "aboutMuted")
+        add_separator()
+        add_label(S.ABOUT_FEATURES_LABEL, "aboutSubheading")
+
+        features = QLabel("\n".join(f"•  {f}" for f in S.ABOUT_FEATURES))
+        features.setObjectName("aboutBody")
+        features.setWordWrap(True)
+        # Feature bullets read as a block; centring a list looks wrong in both
+        # directions, so follow the inherited layout direction instead.
+        features.setAlignment(Qt.AlignLeft | Qt.AlignTop)
+        layout.addWidget(features)
+        layout.addStretch()
+
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        scroll.setWidget(inner)
+        return scroll
 
     # ─── Actions ────────────────────────────────────────────────────────
 
@@ -1045,26 +1097,105 @@ class MainWindow(QMainWindow):
         try:
             with open(file_path, encoding="utf-8") as f:
                 data = json.load(f)
-            self._apply_config(BuildConfig.from_dict(data))
-            self._append_log(S.LOG_SETTINGS_LOADED.format(path=file_path))
-            QMessageBox.information(self, S.MSG_SUCCESS, S.MSG_LOADED_OK)
-        except Exception as e:
+            if not isinstance(data, dict):
+                raise ValueError("settings file must contain a JSON object")
+            config = BuildConfig.from_dict(data)
+        except (OSError, ValueError, TypeError) as e:
             QMessageBox.critical(self, S.MSG_ERROR, S.ERR_LOAD_FAIL.format(error=str(e)))
+            return
+
+        if not self._confirm_untrusted_config(config):
+            self._append_log(S.LOG_SETTINGS_REJECTED.format(path=file_path))
+            return
+
+        self._apply_config(config)
+        self._append_log(S.LOG_SETTINGS_LOADED.format(path=file_path))
+        QMessageBox.information(self, S.MSG_SUCCESS, S.MSG_LOADED_OK)
+
+    def _confirm_untrusted_config(self, config: BuildConfig) -> bool:
+        """Ask before applying a config that would make PyInstaller run code.
+
+        A settings file is shareable, and flags like ``--runtime-hook`` inject
+        code into every EXE the build produces. The user needs to see that
+        before it silently becomes part of a signed binary.
+        """
+        flags = find_dangerous_args(config.extra_args)
+        if not flags:
+            return True
+        reply = QMessageBox.question(
+            self,
+            S.MSG_CONFIRM,
+            S.MSG_DANGEROUS_ARGS_CONFIRM.format(
+                flags="\n".join(f"  • {f}" for f in flags),
+                args=config.extra_args,
+            ),
+            QMessageBox.Yes | QMessageBox.No,
+            QMessageBox.No,
+        )
+        return reply == QMessageBox.Yes
 
     def load_settings(self):
         if os.path.exists(SETTINGS_FILE):
             try:
                 with open(SETTINGS_FILE, encoding="utf-8") as f:
-                    self.settings = json.load(f)
-            except Exception:
+                    data = json.load(f)
+                self.settings = data if isinstance(data, dict) else {}
+            except (OSError, ValueError):
                 self.settings = {}
 
-    def save_settings(self):
+    def save_settings(self) -> bool:
+        """Persist preferences. Reports failure instead of swallowing it."""
         try:
+            directory = os.path.dirname(SETTINGS_FILE)
+            if directory:
+                os.makedirs(directory, exist_ok=True)
             with open(SETTINGS_FILE, "w", encoding="utf-8") as f:
                 json.dump(self.settings, f, ensure_ascii=False, indent=2)
-        except Exception:
+        except (OSError, TypeError) as e:
+            self._append_log(S.LOG_SETTINGS_SAVE_FAIL.format(error=str(e)))
+            return False
+        return True
+
+    def _ensure_pyinstaller(self) -> bool:
+        """Check for PyInstaller, offering to install it with explicit consent.
+
+        The previous version ran ``pip install pyinstaller`` silently on the
+        first build: an unattended network install, unpinned, from whatever
+        index the environment happened to point at.
+        """
+        try:
+            subprocess.run(
+                [sys.executable, "-m", "PyInstaller", "--version"],
+                capture_output=True,
+                check=True,
+            )
+            return True
+        except (OSError, subprocess.CalledProcessError):
             pass
+
+        install_cmd = [sys.executable, "-m", "pip", "install", PYINSTALLER_REQUIREMENT]
+        reply = QMessageBox.question(
+            self,
+            S.MSG_CONFIRM,
+            S.MSG_INSTALL_PYINSTALLER_CONFIRM.format(cmd=" ".join(install_cmd)),
+            QMessageBox.Yes | QMessageBox.No,
+            QMessageBox.No,
+        )
+        if reply != QMessageBox.Yes:
+            self._append_log(S.LOG_INSTALL_PYINSTALLER_DECLINED)
+            return False
+
+        self._append_log(S.LOG_INSTALL_PYINSTALLER)
+        self._append_log(" ".join(install_cmd))
+        try:
+            subprocess.run(install_cmd, capture_output=True, check=True, timeout=600)
+        except (OSError, subprocess.SubprocessError) as e:
+            QMessageBox.critical(
+                self, S.MSG_ERROR, S.ERR_INSTALL_PYINSTALLER_FAIL.format(error=str(e))
+            )
+            return False
+        self._append_log(S.LOG_INSTALL_PYINSTALLER_OK)
+        return True
 
     def start_conversion(self):
         config = self._current_config()
@@ -1074,35 +1205,21 @@ class MainWindow(QMainWindow):
         manifest_path = self._materialize_manifest_file()
         if manifest_path:
             config.manifest_file = manifest_path
+
+        # Every early return below must clean up the temp files created above;
+        # one path used to skip that and leak into %TEMP%.
         cmd, error = build_pyinstaller_command(config)
         if error:
-            self._cleanup_temp_version_file()
-            self._cleanup_temp_manifest_file()
+            self._cleanup_temp_files()
             QMessageBox.warning(self, S.MSG_WARNING, error)
             return
+
+        if not self._ensure_pyinstaller():
+            self._cleanup_temp_files()
+            return
+
         self._build_start_time = time.monotonic()
         self._build_config_snapshot = config.to_dict()
-
-        try:
-            subprocess.run(
-                [sys.executable, "-m", "PyInstaller", "--version"],
-                capture_output=True,
-                check=True,
-            )
-        except Exception:
-            self._append_log(S.LOG_INSTALL_PYINSTALLER)
-            try:
-                subprocess.run(
-                    [sys.executable, "-m", "pip", "install", "pyinstaller"],
-                    capture_output=True,
-                    check=True,
-                )
-                self._append_log(S.LOG_INSTALL_PYINSTALLER_OK)
-            except Exception as e:
-                QMessageBox.critical(
-                    self, S.MSG_ERROR, S.ERR_INSTALL_PYINSTALLER_FAIL.format(error=str(e))
-                )
-                return
 
         work_dir = self.output_dir.text() or os.path.dirname(self.source_input.text())
 
@@ -1144,8 +1261,7 @@ class MainWindow(QMainWindow):
             except Exception as e:
                 self._append_log(S.LOG_SIGNING_FAIL.format(error=str(e)))
         self._build_config_snapshot = {}
-        self._cleanup_temp_version_file()
-        self._cleanup_temp_manifest_file()
+        self._cleanup_temp_files()
         if success:
             self.progress_bar.setFormat(S.PROGRESS_DONE)
             QMessageBox.information(self, S.MSG_SUCCESS, message)
@@ -1183,7 +1299,7 @@ class MainWindow(QMainWindow):
         if text.strip() == "":
             self.log_output.append("")
             return
-        self.log_output.append(format_html(text))
+        self.log_output.append(format_html(text, theme=self.current_theme))
 
     def _search_log_next(self):
         """Find the next occurrence of the search query in the log."""
@@ -1229,7 +1345,7 @@ class MainWindow(QMainWindow):
     def toggle_theme(self):
         """Swap between dark and light themes and persist the choice."""
         self.current_theme = "light" if self.current_theme == "dark" else "dark"
-        self.setStyleSheet(THEMES[self.current_theme])
+        self.setStyleSheet(themed_stylesheet(self.current_theme, current_locale()))
         self.settings["theme"] = self.current_theme
 
     def _on_language_changed(self, index):
@@ -1284,8 +1400,16 @@ class MainWindow(QMainWindow):
             product_version=self.vi_product_version.text().strip(),
         )
 
+    def _cleanup_temp_files(self):
+        """Remove every temp file created for the current build."""
+        self._cleanup_temp_version_file()
+        self._cleanup_temp_manifest_file()
+
     def _materialize_version_file(self) -> str:
         """If the version-info form has data, write a temp version.txt and return its path."""
+        # Drop any file from a previous attempt first — overwriting the
+        # attribute used to orphan it in %TEMP%.
+        self._cleanup_temp_version_file()
         info = self._current_version_info()
         if info.is_empty():
             return ""
@@ -1336,7 +1460,20 @@ class MainWindow(QMainWindow):
         self._append_log(S.LOG_RESTORED.format(time=label_time))
 
     def clear_history(self):
-        self.history.clear()
+        """Wipe the build log — after confirming, since there is no undo."""
+        if len(self.history) == 0:
+            return
+        reply = QMessageBox.question(
+            self,
+            S.MSG_CONFIRM,
+            S.MSG_CLEAR_HISTORY_CONFIRM.format(count=len(self.history)),
+            QMessageBox.Yes | QMessageBox.No,
+            QMessageBox.No,
+        )
+        if reply != QMessageBox.Yes:
+            return
+        if not self.history.clear():
+            self._append_log(S.LOG_HISTORY_SAVE_FAIL.format(error=self.history.last_error))
         self._refresh_history_list()
         self._append_log(S.HISTORY_CLEARED)
 
@@ -1361,6 +1498,7 @@ class MainWindow(QMainWindow):
 
     def _materialize_manifest_file(self) -> str:
         """If manifest generation is on, write a temp manifest.xml and return its path."""
+        self._cleanup_temp_manifest_file()
         if not self.manifest_enable.isChecked():
             return ""
         config = ManifestConfig(
@@ -1391,9 +1529,18 @@ class MainWindow(QMainWindow):
                 pass
         self._temp_manifest_file = ""
 
+    def _on_signing_mode_changed(self, use_store: bool):
+        """Show only the fields relevant to the selected signing mode."""
+        self.signing_subject.setEnabled(use_store)
+        self.signing_subject_label.setEnabled(use_store)
+        self.signing_cert.setEnabled(not use_store)
+        self.signing_password.setEnabled(not use_store)
+
     def _current_signing_config(self) -> SigningConfig:
         return SigningConfig(
             enabled=self.signing_enable.isChecked(),
+            use_cert_store=self.signing_use_store.isChecked(),
+            cert_subject=self.signing_subject.text().strip(),
             cert_path=self.signing_cert.text().strip(),
             cert_password=self.signing_password.text(),
             timestamp_url=self.signing_timestamp.text().strip()
@@ -1419,52 +1566,32 @@ class MainWindow(QMainWindow):
             return
         self._last_built_exe = exe_path
 
-        # Signing
         sign_cfg = self._current_signing_config()
-        if sign_cfg.enabled:
-            self._sign_executable(exe_path, sign_cfg)
+        smoke_enabled = self.smoke_enable.isChecked()
 
-        # Smoke test
-        if self.smoke_enable.isChecked():
-            self._smoke_test_executable(exe_path)
+        if not sign_cfg.enabled and not smoke_enabled:
+            self._start_installer_step(config)
+            return
 
-        # Installer (runs asynchronously; it is the slowest post-build step)
+        # Signing waits on a timestamp server and the smoke test waits on the
+        # new EXE: both used to run inline and froze the window for minutes.
+        self.post_build_thread = PostBuildThread(
+            exe_path,
+            signing_config=sign_cfg,
+            smoke_enabled=smoke_enabled,
+            smoke_timeout=float(self.smoke_timeout.value()),
+        )
+        self.post_build_thread.log_signal.connect(self._append_log)
+        self.post_build_thread.finished_signal.connect(
+            lambda *_: self._start_installer_step(config)
+        )
+        self.post_build_thread.start()
+
+    def _start_installer_step(self, config: BuildConfig):
+        """Chain the installer build after signing/smoke-testing has finished."""
         inst_cfg = self._current_installer_config()
         if inst_cfg.enabled:
             self._run_installer(inst_cfg, config)
-
-    def _sign_executable(self, exe_path: str, sign_cfg: SigningConfig):
-        cmd, error = build_signtool_command(exe_path, sign_cfg)
-        if error or cmd is None:
-            self._append_log(S.LOG_SIGNING_SKIPPED.format(reason=error or "unknown"))
-            return
-        self._append_log(S.LOG_SIGNING_START)
-        # Log a redacted copy of the command so the password never lands in the log.
-        self._append_log(" ".join(redact_password(cmd)))
-        try:
-            result = subprocess.run(cmd, capture_output=True, text=True, timeout=120)
-        except FileNotFoundError:
-            self._append_log(S.LOG_SIGNING_FAIL.format(error="signtool not found on PATH"))
-            return
-        except subprocess.TimeoutExpired:
-            self._append_log(S.LOG_SIGNING_FAIL.format(error="timed out"))
-            return
-        if result.returncode == 0:
-            self._append_log(S.LOG_SIGNING_OK)
-        else:
-            msg = (result.stderr or result.stdout or "").strip()[:300]
-            self._append_log(S.LOG_SIGNING_FAIL.format(error=msg))
-
-    def _smoke_test_executable(self, exe_path: str):
-        self._append_log(S.LOG_SMOKE_START)
-        timeout = float(self.smoke_timeout.value())
-        result = run_smoke_test(exe_path, timeout=timeout)
-        if result.passed:
-            self._append_log(S.LOG_SMOKE_OK)
-        else:
-            self._append_log(
-                S.LOG_SMOKE_FAIL.format(error=result.error or f"exit={result.returncode}")
-            )
 
     # ─── Phase 7: Inno Setup installer ──────────────────────────────────
 

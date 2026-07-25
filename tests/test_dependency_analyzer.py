@@ -78,3 +78,31 @@ def test_filter_non_stdlib_removes_existing():
 def test_filter_non_stdlib_custom_stdlib():
     result = filter_non_stdlib({"foo", "bar"}, stdlib={"foo"})
     assert result == {"bar"}
+
+
+# ── Standard-library filtering (the old list held only 11 names) ───────────
+
+
+def test_common_stdlib_modules_are_filtered_out():
+    noisy = {"typing", "collections", "dataclasses", "logging", "itertools", "functools"}
+    assert filter_non_stdlib(noisy) == set()
+
+
+def test_third_party_modules_survive_filtering():
+    assert filter_non_stdlib({"numpy", "requests", "flask"}) == {
+        "numpy",
+        "requests",
+        "flask",
+    }
+
+
+def test_stdlib_list_is_substantial():
+    """A short list is what made the detector suggest stdlib as hidden imports."""
+    from py2exe_gui.constants import STDLIB_MODULES
+
+    assert len(STDLIB_MODULES) > 100
+
+
+def test_detected_imports_of_a_stdlib_only_script_yield_nothing():
+    source = "import os\nimport json\nfrom typing import List\nimport dataclasses\n"
+    assert filter_non_stdlib(detect_imports(source)) == set()

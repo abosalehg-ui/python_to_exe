@@ -1,6 +1,6 @@
 """Generate a PyInstaller --version-file payload from a metadata dataclass."""
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Tuple
 
 
@@ -50,9 +50,36 @@ def parse_version_tuple(version: str) -> Tuple[int, int, int, int]:
     return tuple(nums[:4])  # type: ignore[return-value]
 
 
+# Characters that would terminate or corrupt a single-quoted Python literal.
+_LITERAL_ESCAPES = (
+    ("\\", "\\\\"),  # must come first
+    ("'", "\\'"),
+    ("\n", "\\n"),
+    ("\r", "\\r"),
+    ("\t", "\\t"),
+)
+
+
 def _escape(value: str) -> str:
-    """Escape user-provided strings for inclusion in the version-info Python literal."""
-    return value.replace("\\", "\\\\").replace("'", "\\'")
+    """Escape a user string for a single-quoted Python literal.
+
+    PyInstaller ``eval``s the generated file, so anything able to terminate
+    the literal early must be neutralised. The previous version escaped only
+    the backslash and the quote, so a pasted multi-line value broke out of the
+    string and produced an unparseable file.
+
+    Non-ASCII text is deliberately left as-is rather than run through
+    ``unicode_escape``: the file is written as UTF-8 and PyInstaller reads it
+    as UTF-8, so an Arabic company name stays readable in the generated file
+    instead of becoming a wall of ``\\uXXXX``.
+    """
+    if not value:
+        return ""
+    for char, replacement in _LITERAL_ESCAPES:
+        value = value.replace(char, replacement)
+    # Drop any remaining C0 control characters, which have no legitimate use
+    # in file metadata and would otherwise land raw inside the literal.
+    return "".join(ch for ch in value if ch >= " " or ch == "\\")
 
 
 def generate_version_file(info: VersionInfo) -> str:
@@ -99,11 +126,3 @@ def generate_version_file(info: VersionInfo) -> str:
         "  ]\n"
         ")\n"
     )
-
-
-@dataclass
-class _PathBundle:
-    """Group of optional metadata-related paths (used by MainWindow)."""
-
-    version_file: str = ""
-    paths_added: list = field(default_factory=list)

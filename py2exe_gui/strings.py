@@ -170,6 +170,37 @@ class Ar:
     MSG_TEMPLATE_OK_FMT = "تم تطبيق قالب: {name}"
     MSG_CLOSE_CONFIRM = "هناك عملية تحويل جارية. هل تريد الإلغاء والخروج؟"
 
+    # ── Phase 8: تأكيدات وأمان ──────────────────────────────────────────
+    MSG_INSTALL_PYINSTALLER_CONFIRM = (
+        "PyInstaller غير مثبّت. هل تسمح بتثبيته الآن من PyPI؟\n\n"
+        "الأمر الذي سيُنفَّذ:\n{cmd}\n\n"
+        "سيتم تنزيل حزم من الإنترنت."
+    )
+    LOG_INSTALL_PYINSTALLER_DECLINED = "⚠️ تم رفض تثبيت PyInstaller — أُلغي البناء"
+    MSG_DANGEROUS_ARGS_CONFIRM = (
+        "⚠️ ملف الإعدادات هذا يحتوي على أوامر تُشغِّل كوداً أثناء البناء:\n\n"
+        "{flags}\n\n"
+        "الأوامر الكاملة:\n{args}\n\n"
+        "أمر مثل ‎--runtime-hook‎ يحقن كوداً داخل كل ملف EXE تنتجه. "
+        "لا تقبل إلا إذا كنت تثق بمصدر هذا الملف.\n\n"
+        "هل تريد المتابعة؟"
+    )
+    LOG_SETTINGS_REJECTED = "⚠️ تم رفض ملف الإعدادات: {path}"
+    MSG_CLEAR_HISTORY_CONFIRM = (
+        "سيتم حذف {count} عملية بناء من السجل نهائياً.\n"
+        "لا يمكن التراجع عن هذا الإجراء.\n\nهل تريد المتابعة؟"
+    )
+    LOG_SETTINGS_SAVE_FAIL = "⚠️ فشل حفظ الإعدادات: {error}"
+    LOG_HISTORY_SAVE_FAIL = "⚠️ فشل حفظ السجل: {error}"
+    SIGNING_USE_STORE = "استخدام شهادة من مخزن شهادات Windows"
+    SIGNING_USE_STORE_TIP = (
+        "أكثر أماناً: لا تُمرَّر كلمة المرور في سطر الأوامر حيث يمكن "
+        "لأي عملية أخرى قراءتها"
+    )
+    SIGNING_SUBJECT_LABEL = "اسم موضوع الشهادة:"
+    SIGNING_SUBJECT_PLACEHOLDER = "مثال: Acme Ltd"
+
+
     # Template description
     TEMPLATE_DESC_FMT = (
         "<b>القالب:</b> {name}<br>"
@@ -186,6 +217,10 @@ class Ar:
     ABOUT_VERSION_FMT = "الإصدار {version}"
     ABOUT_DESC = (
         "أداة احترافية لتحويل تطبيقات بايثون إلى ملفات تنفيذية EXE<br>"
+        "باستخدام PyInstaller مع واجهة رسومية سهلة الاستخدام"
+    )
+    ABOUT_DESC_PLAIN = (
+        "أداة احترافية لتحويل تطبيقات بايثون إلى ملفات تنفيذية EXE "
         "باستخدام PyInstaller مع واجهة رسومية سهلة الاستخدام"
     )
     ABOUT_DEVELOPER_LABEL = "👨‍💻 المطور"
@@ -574,6 +609,37 @@ class En:
     MSG_TEMPLATE_OK_FMT = "Template applied: {name}"
     MSG_CLOSE_CONFIRM = "A build is in progress. Cancel and exit?"
 
+    # ── Phase 8: confirmations and security ────────────────────────────
+    MSG_INSTALL_PYINSTALLER_CONFIRM = (
+        "PyInstaller is not installed. Install it now from PyPI?\n\n"
+        "Command to run:\n{cmd}\n\n"
+        "This downloads packages from the internet."
+    )
+    LOG_INSTALL_PYINSTALLER_DECLINED = "⚠️ PyInstaller install declined — build cancelled"
+    MSG_DANGEROUS_ARGS_CONFIRM = (
+        "⚠️ This settings file contains arguments that execute code during the build:\n\n"
+        "{flags}\n\n"
+        "Full arguments:\n{args}\n\n"
+        "A flag such as --runtime-hook injects code into every EXE you produce. "
+        "Only accept this if you trust where the file came from.\n\n"
+        "Continue?"
+    )
+    LOG_SETTINGS_REJECTED = "⚠️ Settings file rejected: {path}"
+    MSG_CLEAR_HISTORY_CONFIRM = (
+        "This permanently deletes {count} build(s) from the history.\n"
+        "The action cannot be undone.\n\nContinue?"
+    )
+    LOG_SETTINGS_SAVE_FAIL = "⚠️ Failed to save settings: {error}"
+    LOG_HISTORY_SAVE_FAIL = "⚠️ Failed to save history: {error}"
+    SIGNING_USE_STORE = "Use a certificate from the Windows certificate store"
+    SIGNING_USE_STORE_TIP = (
+        "More secure: no password is placed on the command line, where any "
+        "other process could read it"
+    )
+    SIGNING_SUBJECT_LABEL = "Certificate subject name:"
+    SIGNING_SUBJECT_PLACEHOLDER = "e.g. Acme Ltd"
+
+
     # Template description
     TEMPLATE_DESC_FMT = (
         "<b>Template:</b> {name}<br>"
@@ -591,6 +657,10 @@ class En:
     ABOUT_DESC = (
         "Professional tool for converting Python apps to .exe<br>"
         "using PyInstaller with an easy graphical interface"
+    )
+    ABOUT_DESC_PLAIN = (
+        "A professional tool for converting Python applications into EXE files "
+        "using PyInstaller, with an easy-to-use graphical interface"
     )
     ABOUT_DEVELOPER_LABEL = "👨‍💻 Developer"
     ABOUT_FEATURES_LABEL = "✨ Features"
