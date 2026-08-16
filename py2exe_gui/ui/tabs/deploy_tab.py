@@ -12,8 +12,9 @@ from PyQt5.QtWidgets import (
 )
 
 from py2exe_gui.core import SigningConfig
+from py2exe_gui.core.platform_support import CODE_SIGNING, MANIFEST
 from py2exe_gui.strings import S
-from py2exe_gui.ui.tabs.base import BaseTab, browse_button
+from py2exe_gui.ui.tabs.base import BaseTab, browse_button, platform_notice
 
 
 class DeployTab(BaseTab):
@@ -21,6 +22,12 @@ class DeployTab(BaseTab):
 
     def _build(self):
         layout = QVBoxLayout(self)
+
+        # Signing needs signtool.exe and a manifest is a Windows PE resource;
+        # off Windows both silently do nothing, so say so before the build.
+        notice = platform_notice(CODE_SIGNING, MANIFEST)
+        if notice is not None:
+            layout.addWidget(notice)
 
         # ── Splash ──
         splash_group = QGroupBox(S.GROUP_SPLASH)

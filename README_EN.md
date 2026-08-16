@@ -3,8 +3,9 @@
 > Convert Python scripts to Windows executables with a professional bilingual GUI.
 
 A PyQt5 wrapper around PyInstaller that turns one-click .py → .exe into a
-real workflow: 11 built-in templates, full Arabic and English UIs, code
-signing, version metadata, build history, and a Windows manifest editor.
+real workflow: a beginner-friendly simple mode, batch conversion, 4 accessible
+themes, 11 built-in templates, full Arabic and English UIs, code signing,
+version metadata, build history, and a Windows manifest editor.
 
 > 🇸🇦 العربية: راجع [README.md](README.md)
 
@@ -18,9 +19,14 @@ signing, version metadata, build history, and a Windows manifest editor.
 | **Deployment** | Splash screen, Windows manifest (DPI, UAC, supported OS), Authenticode code signing, post-build smoke test |
 | **Installer** | Full Inno Setup pipeline: generated `.iss`, stable upgrade-safe AppId, 13 languages, shortcuts, file association, signed `Setup.exe` |
 | **Metadata** | Embed company name, product/file version, description, copyright, etc. in the EXE properties |
-| **UX** | Drag & drop, command preview (dry-run), real-time colored log with search/export, dark/light theme, 10+ keyboard shortcuts |
+| **UX** | Simple/advanced modes, drag & drop, command preview (dry-run), real-time colored log with search + severity filter + export, icon preview at 4 sizes, 15+ keyboard shortcuts |
+| **Themes** | Dark, Light, Nord, High-contrast, plus `auto` following the OS. Every palette clears WCAG AA 4.5:1, enforced by tests. Font zoom to 200% |
+| **Batch** | Queue many `.py` files and build them all with one configuration, sequentially, with a per-file report |
+| **Presets** | Save the current configuration under a name; export/import to share |
+| **Progress** | Progress bar follows the phase PyInstaller announces, and names it; desktop notification when a build finishes |
 | **i18n** | Full Arabic (RTL) and English (LTR) translations, switchable live without a restart |
 | **History** | Persistent log of last 20 builds with one-click restore |
+| **Updates** | Optional, off by default: reports a newer GitHub release. Never downloads or runs anything |
 
 ## Requirements
 
@@ -65,13 +71,32 @@ py2exe-gui
 | `Ctrl+S` | Save settings |
 | `Ctrl+T` | Toggle theme (dark/light) |
 | `Ctrl+F` | Focus log search |
+| `Ctrl+M` | Toggle simple/advanced mode |
+| `Ctrl` `+` | Increase font size |
+| `Ctrl` `-` | Decrease font size |
+| `Ctrl+0` | Reset font size |
 | `F5` | Auto-detect imports |
+
+## Simple and Advanced Modes
+
+A first run shows three tabs — Main, Templates, About — because nine tabs of
+PyInstaller options is a lot to meet when all you want is one `.exe`. The mode
+button (or `Ctrl+M`) reveals the rest, and the choice is remembered. Hidden
+tabs keep their contents: switching modes mid-setup loses nothing.
 
 ## Tabs Overview
 
 ### ⚙️ Main Settings
-File pickers for source, output directory, icon. Core PyInstaller flags
-(`--onefile`, `--windowed`, `--clean`, `--noconfirm`, `--strip`).
+File pickers for source, output directory, icon (with a live preview at
+16/32/48/64px — the sizes Windows requests, where a PNG renamed to `.ico`
+gives itself away). Core PyInstaller flags (`--onefile`, `--windowed`,
+`--clean`, `--noconfirm`, `--strip`), plus the build log with text search and
+a severity filter.
+
+### 📚 Batch
+Queue several `.py` files and build them all with the current settings. Runs
+strictly sequentially: PyInstaller shares `build/` and `dist/`, so concurrent
+runs sharing an output directory corrupt each other's intermediate files.
 
 ### 🔧 Advanced
 Extra data files, hidden imports (with auto-detect and requirements.txt
@@ -83,6 +108,10 @@ FileVersion, ProductVersion, etc.). When any field is filled, a temp
 `version.txt` is generated and passed via `--version-file`.
 
 ### 🚀 Deploy
+> On Linux and macOS this tab shows a banner naming what will not take effect:
+> signing needs `signtool.exe` and a manifest is a Windows PE resource. The
+> controls stay visible — the builder itself is cross-platform.
+
 - **Splash:** image path → `--splash`
 - **Manifest:** DPI awareness, UAC level, supported Windows versions → XML → `--manifest`
 - **Code signing:** post-build `signtool.exe` invocation with timestamp URL
@@ -249,7 +278,14 @@ See [IDEAS.md](IDEAS.md) for the full roadmap. Currently:
 - ✅ **Phase 4:** Pro features (AST analyzer, version info, history)
 - ✅ **Phase 5:** Deployment (splash, manifest, signing, smoke test)
 - ✅ **Phase 6:** Extra templates + English docs
-- ⏳ **Phase 7:** Auto-updater, PyQt6 upgrade, dashboard
+- ✅ **Phase 7:** Full Inno Setup installer pipeline
+- ✅ **Phase 8:** Repository-review fixes, tab split, per-user config paths
+- ✅ **Phase 9:** Simple mode, 4 themes + auto, font zoom, tray notifications,
+  log filtering, real stage-based progress, batch conversion, presets,
+  opt-in update check
+- ⏳ **Next:** venv management, multi-file projects, Linux/macOS installers,
+  `.spec` editor, VirusTotal, PySide6 migration —
+  see [UI_IMPROVEMENT_PLAN.md](UI_IMPROVEMENT_PLAN.md)
 
 ## Contributing
 

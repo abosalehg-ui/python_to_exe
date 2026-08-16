@@ -44,6 +44,9 @@ def main() -> int:
 
     window = MainWindow()
     window.show()
+    # Blocking work (first-run dialog, opt-in update check) runs once the
+    # window is actually on screen, not during construction.
+    window.run_startup_tasks()
 
     return app.exec_()
 

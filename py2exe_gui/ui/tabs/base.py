@@ -8,11 +8,24 @@ window keeps orchestration (threads, the build pipeline, shortcuts).
 
 from PyQt5.QtWidgets import (
     QFileDialog,
+    QLabel,
     QPushButton,
     QScrollArea,
     QVBoxLayout,
     QWidget,
 )
+
+from py2exe_gui.core.platform_support import platform_label, unsupported_features
+from py2exe_gui.strings import S
+
+# Feature key → the locale attribute naming it. Kept beside the banner helper
+# because that is the only place the mapping is needed.
+_FEATURE_LABELS = {
+    "code_signing": "FEATURE_CODE_SIGNING",
+    "manifest": "FEATURE_MANIFEST",
+    "version_info": "FEATURE_VERSION_INFO",
+    "installer": "FEATURE_INSTALLER",
+}
 
 
 def browse_button(label: str, handler) -> QPushButton:
@@ -74,6 +87,31 @@ class BaseTab(QWidget):
 
     def _choose_dir(self, title: str, start_dir: str = "") -> str:
         return QFileDialog.getExistingDirectory(self, title, start_dir)
+
+
+def platform_notice(*features, platform=None):
+    """A banner naming the given features when they do nothing on this OS.
+
+    Returns None on Windows (or when every listed feature works here), so the
+    caller can simply skip adding it. The tabs stay visible either way — the
+    build itself is cross-platform, and hiding the controls would only make
+    the eventual "signtool not found" harder to understand.
+    """
+    unsupported = set(unsupported_features(platform))
+    affected = [f for f in features if f in unsupported]
+    if not affected:
+        return None
+
+    names = S.LIST_SEPARATOR.join(getattr(S, _FEATURE_LABELS[f]) for f in affected)
+    label = QLabel(
+        S.PLATFORM_WINDOWS_ONLY_FMT.format(
+            platform=platform_label(platform), features=names
+        )
+    )
+    label.setObjectName("warningNotice")
+    label.setWordWrap(True)
+    label.setAccessibleName(label.text())
+    return label
 
 
 def scrollable(widget: QWidget) -> QScrollArea:

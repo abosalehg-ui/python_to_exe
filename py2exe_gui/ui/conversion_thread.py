@@ -5,6 +5,7 @@ from datetime import datetime
 
 from PyQt5.QtCore import QThread, pyqtSignal
 
+from py2exe_gui.core.build_stages import BuildStageTracker
 from py2exe_gui.strings import S
 
 
@@ -13,6 +14,8 @@ class ConversionThread(QThread):
 
     log_signal = pyqtSignal(str)
     progress_signal = pyqtSignal(int)
+    # Stage key from build_stages, so the window can label the progress bar.
+    stage_signal = pyqtSignal(str)
     finished_signal = pyqtSignal(bool, str)
 
     def __init__(self, command, output_dir):
@@ -21,6 +24,7 @@ class ConversionThread(QThread):
         self.output_dir = output_dir
         self.process = None
         self.is_cancelled = False
+        self.stages = BuildStageTracker()
 
     def run(self):
         try:
@@ -32,8 +36,6 @@ class ConversionThread(QThread):
             self.log_signal.emit(S.CONV_COMMAND.format(cmd=" ".join(self.command)))
             self.log_signal.emit("─" * 60)
 
-            self.progress_signal.emit(10)
-
             self.process = subprocess.Popen(
                 self.command,
                 stdout=subprocess.PIPE,
@@ -44,9 +46,9 @@ class ConversionThread(QThread):
                 cwd=self.output_dir,
             )
 
-            self.progress_signal.emit(20)
-
-            progress = 20
+            # Progress now follows the phase PyInstaller announces rather than
+            # counting how many lines it happened to print. See build_stages.
+            last_stage = self.stages.stage
             for line in self.process.stdout:
                 if self.is_cancelled:
                     self.process.terminate()
@@ -55,16 +57,11 @@ class ConversionThread(QThread):
 
                 self.log_signal.emit(line.strip())
 
-                if "Analyzing" in line:
-                    progress = min(progress + 5, 50)
-                elif "Processing" in line:
-                    progress = min(progress + 2, 70)
-                elif "Building" in line:
-                    progress = min(progress + 5, 85)
-                elif "Copying" in line:
-                    progress = min(progress + 2, 95)
-
-                self.progress_signal.emit(progress)
+                if self.stages.feed(line):
+                    self.progress_signal.emit(self.stages.percent)
+                    if self.stages.stage != last_stage:
+                        last_stage = self.stages.stage
+                        self.stage_signal.emit(last_stage)
 
             self.process.wait()
 

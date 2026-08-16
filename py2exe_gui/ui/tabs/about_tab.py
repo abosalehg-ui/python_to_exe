@@ -2,8 +2,10 @@
 
 from PyQt5.QtCore import Qt
 from PyQt5.QtWidgets import (
+    QCheckBox,
     QFrame,
     QLabel,
+    QPushButton,
     QScrollArea,
     QVBoxLayout,
     QWidget,
@@ -45,6 +47,23 @@ class AboutTab(BaseTab):
 
         add_label(f"🐍 {APP_NAME}", "aboutHeading")
         add_label(S.ABOUT_VERSION_FMT.format(version=APP_VERSION), "aboutSubheading")
+
+        # Update check: report-only, and opt-in for the automatic one. Nothing
+        # is ever downloaded or run on the user's behalf.
+        self.update_btn = QPushButton(S.BTN_CHECK_UPDATES)
+        self.update_btn.setAccessibleName(S.BTN_CHECK_UPDATES)
+        self.update_btn.clicked.connect(self.window_action("check_for_updates"))
+        layout.addWidget(self.update_btn)
+
+        self.update_on_start = QCheckBox(S.UPDATE_CHECK_ON_START)
+        self.update_on_start.setAccessibleName(S.UPDATE_CHECK_ON_START)
+        if self.window is not None:
+            self.update_on_start.setChecked(
+                bool(self.window.settings.get("check_updates_on_start", False))
+            )
+        self.update_on_start.toggled.connect(self._on_update_pref_changed)
+        layout.addWidget(self.update_on_start)
+
         add_separator()
         add_label(S.ABOUT_DESC_PLAIN, "aboutBody")
         add_separator()
@@ -72,3 +91,7 @@ class AboutTab(BaseTab):
         outer = QVBoxLayout(self)
         outer.setContentsMargins(0, 0, 0, 0)
         outer.addWidget(scroll)
+
+    def _on_update_pref_changed(self, enabled: bool):
+        if self.window is not None:
+            self.window.settings["check_updates_on_start"] = bool(enabled)

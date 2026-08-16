@@ -2,9 +2,11 @@
 
 import os
 
-from PyQt5.QtCore import QTimer
+from PyQt5.QtCore import QSize, Qt, QTimer
+from PyQt5.QtGui import QIcon
 from PyQt5.QtWidgets import (
     QCheckBox,
+    QComboBox,
     QFileDialog,
     QGridLayout,
     QGroupBox,
@@ -17,9 +19,13 @@ from PyQt5.QtWidgets import (
     QVBoxLayout,
 )
 
-from py2exe_gui.core import format_html
+from py2exe_gui.core import classify_line, format_html
 from py2exe_gui.strings import S
 from py2exe_gui.ui.tabs.base import BaseTab, browse_button
+
+# The sizes Windows actually pulls out of a multi-resolution .ico. Showing all
+# four is how a PNG renamed to .ico gives itself away: it has only one.
+ICON_PREVIEW_SIZES = (16, 32, 48, 64)
 
 
 class MainTab(BaseTab):
@@ -56,9 +62,28 @@ class MainTab(BaseTab):
         output_layout.addWidget(QLabel(S.ICON_LABEL), 2, 0)
         self.icon_input = QLineEdit()
         self.icon_input.setPlaceholderText(S.ICON_PLACEHOLDER)
+        self.icon_input.textChanged.connect(self.refresh_icon_preview)
         icon_btn = browse_button(S.DIALOG_CHOOSE_ICON, self.browse_icon)
         output_layout.addWidget(self.icon_input, 2, 1)
         output_layout.addWidget(icon_btn, 2, 2)
+
+        # Icon preview: a bad .ico is one of the documented failure modes, and
+        # the path alone gives no clue which sizes the file actually contains.
+        output_layout.addWidget(QLabel(S.ICON_PREVIEW_LABEL), 3, 0)
+        preview_row = QHBoxLayout()
+        self.icon_previews = []
+        for size in ICON_PREVIEW_SIZES:
+            slot = QLabel()
+            slot.setFixedSize(QSize(size, size))
+            slot.setAlignment(Qt.AlignCenter)
+            slot.setAccessibleName(f"{S.ICON_PREVIEW_LABEL} {size}px")
+            preview_row.addWidget(slot)
+            self.icon_previews.append((size, slot))
+        self.icon_status = QLabel(S.ICON_PREVIEW_NONE)
+        self.icon_status.setObjectName("aboutMuted")
+        self.icon_status.setWordWrap(True)
+        preview_row.addWidget(self.icon_status, stretch=1)
+        output_layout.addLayout(preview_row, 3, 1, 1, 2)
 
         layout.addWidget(output_group)
 
@@ -104,6 +129,7 @@ class MainTab(BaseTab):
         search_row = QHBoxLayout()
         self.log_search = QLineEdit()
         self.log_search.setPlaceholderText(S.LOG_SEARCH_PLACEHOLDER)
+        self.log_search.setAccessibleName(S.LOG_SEARCH_PLACEHOLDER)
         self.log_search.returnPressed.connect(self._search_log_next)
         # Debounced: searching on every keystroke made the cursor jump around.
         self._log_search_timer = QTimer(self)
@@ -111,12 +137,29 @@ class MainTab(BaseTab):
         self._log_search_timer.setInterval(300)
         self._log_search_timer.timeout.connect(self._search_log_next)
         self.log_search.textChanged.connect(self._log_search_timer.start)
-        search_row.addWidget(self.log_search)
+        search_row.addWidget(self.log_search, stretch=3)
+
+        # Severity filter. Text search alone could not answer "just show me
+        # the errors" — the word "error" does not appear in every failure.
+        search_row.addWidget(QLabel(S.LOG_FILTER_LABEL))
+        self.log_filter = QComboBox()
+        self.log_filter.setAccessibleName(S.LOG_FILTER_LABEL)
+        for label, level in (
+            (S.LOG_FILTER_ALL, ""),
+            (S.LOG_FILTER_ERRORS, "error"),
+            (S.LOG_FILTER_WARNINGS, "warning"),
+            (S.LOG_FILTER_SUCCESS, "success"),
+        ):
+            self.log_filter.addItem(label, level)
+        self.log_filter.currentIndexChanged.connect(self._apply_log_filter)
+        search_row.addWidget(self.log_filter, stretch=1)
 
         log_btn_row = QHBoxLayout()
         clear_log_btn = QPushButton(S.CLEAR_LOG)
-        clear_log_btn.clicked.connect(self.log_output.clear)
+        clear_log_btn.setAccessibleName(S.CLEAR_LOG)
+        clear_log_btn.clicked.connect(self.clear_log)
         export_log_btn = QPushButton(S.BTN_EXPORT_LOG)
+        export_log_btn.setAccessibleName(S.BTN_EXPORT_LOG)
         export_log_btn.clicked.connect(self.export_log)
         log_btn_row.addWidget(clear_log_btn)
         log_btn_row.addWidget(export_log_btn)
@@ -125,6 +168,11 @@ class MainTab(BaseTab):
         log_layout.addWidget(self.log_output)
         log_layout.addLayout(log_btn_row)
         layout.addWidget(log_group)
+
+        # Every line ever appended, with its severity. The filter re-renders
+        # from this rather than trying to un-hide text already in the widget.
+        self._log_lines = []
+        self._log_theme = "dark"
 
 
     # ── Browsing ───────────────────────────────────────────────────────────
@@ -152,6 +200,44 @@ class MainTab(BaseTab):
         if path:
             self.icon_input.setText(path)
 
+    # ── Icon preview ───────────────────────────────────────────────────────
+
+    def refresh_icon_preview(self, path: str = None):
+        """Render the chosen icon at each size Windows will ask it for.
+
+        A PNG renamed to .ico loads as a single bitmap and looks blurry in the
+        small slots, which is the failure the troubleshooting section of the
+        README describes. Seeing it here beats seeing it in the taskbar.
+        """
+        target = self.icon_input.text().strip() if path is None else str(path).strip()
+
+        for _size, slot in self.icon_previews:
+            slot.clear()
+
+        if not target:
+            self.icon_status.setText(S.ICON_PREVIEW_NONE)
+            return
+
+        if not os.path.isfile(target):
+            self.icon_status.setText(S.ICON_PREVIEW_INVALID)
+            return
+
+        # QIcon.isNull() only reports whether an engine was created, not
+        # whether the file decoded — a text file renamed to .ico passes it.
+        # Rendering is what actually tells us, so check the pixmaps.
+        icon = QIcon(target)
+        rendered = []
+        for size, slot in self.icon_previews:
+            pixmap = icon.pixmap(QSize(size, size))
+            if not pixmap.isNull():
+                slot.setPixmap(pixmap)
+                rendered.append(size)
+
+        if not rendered:
+            self.icon_status.setText(S.ICON_PREVIEW_INVALID)
+            return
+        self.icon_status.setText(os.path.basename(target))
+
     def on_source_changed(self, text):
         """Prefill the output name and directory from the chosen script."""
         if text and os.path.isfile(text):
@@ -168,10 +254,68 @@ class MainTab(BaseTab):
         if line is None:
             return
         text = str(line)
+        self._log_theme = theme
+
         if text.strip() == "":
-            self.log_output.append("")
+            self._log_lines.append((text, None))
+            if not self.active_log_filter():
+                self.log_output.append("")
             return
-        self.log_output.append(format_html(text, theme=theme))
+
+        level = classify_line(text)
+        self._log_lines.append((text, level))
+        if self._passes_filter(level):
+            self.log_output.append(format_html(text, level=level, theme=theme))
+
+    def active_log_filter(self) -> str:
+        """The severity currently selected, or '' for no filtering."""
+        return self.log_filter.currentData() or ""
+
+    def _passes_filter(self, level) -> bool:
+        active = self.active_log_filter()
+        return not active or level == active
+
+    def _apply_log_filter(self, _index=None):
+        """Re-render the log from the buffer under the current filter."""
+        self.log_output.clear()
+        active = self.active_log_filter()
+        shown = 0
+        for text, level in self._log_lines:
+            if level is None:
+                if not active:
+                    self.log_output.append("")
+                continue
+            if self._passes_filter(level):
+                self.log_output.append(
+                    format_html(text, level=level, theme=self._log_theme)
+                )
+                shown += 1
+        if active and shown == 0:
+            self.log_output.append(
+                format_html(S.LOG_FILTER_EMPTY, level="muted", theme=self._log_theme)
+            )
+
+    def clear_log(self):
+        """Clear the widget and the buffer behind it."""
+        self._log_lines = []
+        self.log_output.clear()
+
+    def log_text(self) -> str:
+        """The full log as plain text, filter or no filter.
+
+        Exporting has to write everything: exporting only the lines that
+        happened to be on screen would silently drop the rest.
+        """
+        return "\n".join(text for text, _level in self._log_lines)
+
+    def restore_log(self, lines):
+        """Repopulate the buffer after the UI is rebuilt for a new locale."""
+        self._log_lines = list(lines)
+        self._apply_log_filter()
+
+    def log_lines(self):
+        """The buffer, for snapshotting across a rebuild."""
+        return list(self._log_lines)
 
     def _search_log_next(self):
         """Find the next occurrence of the search query in the log."""
@@ -185,8 +329,9 @@ class MainTab(BaseTab):
             self.log_output.find(query)
 
     def export_log(self):
-        """Save the current log contents to a text file."""
-        if not self.log_output.toPlainText().strip():
+        """Save the whole log to a text file — not just what the filter shows."""
+        contents = self.log_text()
+        if not contents.strip():
             return
         path, _ = QFileDialog.getSaveFileName(
             self, S.DIALOG_EXPORT_LOG, "py2exe_log.txt", S.DIALOG_FILTER_LOG
@@ -195,7 +340,7 @@ class MainTab(BaseTab):
             return
         try:
             with open(path, "w", encoding="utf-8") as f:
-                f.write(self.log_output.toPlainText())
+                f.write(contents)
         except OSError as e:
             QMessageBox.critical(self, S.MSG_ERROR, S.LOG_EXPORT_FAIL.format(error=str(e)))
             return
