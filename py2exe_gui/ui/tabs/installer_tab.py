@@ -15,8 +15,9 @@ from PyQt5.QtWidgets import (
 
 from py2exe_gui.core import InstallerConfig
 from py2exe_gui.core.installer import COMPRESSION_CHOICES, LANGUAGE_LABELS
+from py2exe_gui.core.platform_support import INSTALLER
 from py2exe_gui.strings import S
-from py2exe_gui.ui.tabs.base import BaseTab, browse_button
+from py2exe_gui.ui.tabs.base import BaseTab, browse_button, platform_notice
 
 
 class InstallerTab(BaseTab):
@@ -25,6 +26,11 @@ class InstallerTab(BaseTab):
     def _build(self):
         inner = QWidget()
         layout = QVBoxLayout(inner)
+
+        # ISCC.exe produces a Windows Setup.exe and only runs on Windows.
+        notice = platform_notice(INSTALLER)
+        if notice is not None:
+            layout.addWidget(notice)
 
         header = QGroupBox(S.GROUP_INSTALLER)
         header_layout = QVBoxLayout(header)

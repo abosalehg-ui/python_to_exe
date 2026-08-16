@@ -4,16 +4,16 @@
 
 ### أداة احترافية لتحويل تطبيقات بايثون إلى ملفات تنفيذية
 
-![Version](https://img.shields.io/badge/الإصدار-1.1.0-blue?style=for-the-badge)
+![Version](https://img.shields.io/badge/الإصدار-1.2.0-blue?style=for-the-badge)
 ![Python](https://img.shields.io/badge/Python-3.8+-green?style=for-the-badge&logo=python&logoColor=white)
 ![PyQt5](https://img.shields.io/badge/PyQt5-GUI-orange?style=for-the-badge&logo=qt&logoColor=white)
-![Tests](https://img.shields.io/badge/الاختبارات-329_passing-brightgreen?style=for-the-badge)
+![Tests](https://img.shields.io/badge/الاختبارات-666_passing-brightgreen?style=for-the-badge)
 ![Languages](https://img.shields.io/badge/اللغات-عربي_+_English-purple?style=for-the-badge)
 ![License](https://img.shields.io/badge/الرخصة-All%20Rights%20Reserved-red?style=for-the-badge)
 
 <br>
 
-**حوّل أي ملف Python إلى ملف EXE بضغطة زر — بواجهة عربية كاملة، 11 قالب جاهز، توقيع رقمي، ومحرر metadata.**
+**حوّل أي ملف Python إلى ملف EXE بضغطة زر — بواجهة عربية كاملة، وضع مبسّط للمبتدئين، تحويل دفعي، 4 سمات، 11 قالب جاهز، توقيع رقمي، ومحرر metadata.**
 
 [الميزات](#-الميزات) •
 [التثبيت](#-التثبيت) •
@@ -44,11 +44,14 @@
 
 ### 🎨 الواجهة والتجربة
 - ✅ واجهة عربية (RTL) + إنجليزية (LTR)
-- ✅ سمة داكنة + سمة نهارية
+- ✅ **وضع مبسّط للمبتدئين** + وضع متقدم
+- ✅ **4 سمات**: داكنة، نهارية، Nord، تباين عالٍ + تلقائي حسب النظام
+- ✅ **تكبير/تصغير الخط** (Ctrl + / -)
 - ✅ السحب والإفلات (Drag & Drop)
 - ✅ معاينة الأمر قبل التنفيذ (Dry-run)
-- ✅ تلوين السجل + بحث + تصدير
-- ✅ 10+ اختصارات لوحة مفاتيح
+- ✅ تلوين السجل + بحث + **تصفية حسب النوع** + تصدير
+- ✅ **معاينة الأيقونة** بأربعة أحجام
+- ✅ 15+ اختصار لوحة مفاتيح
 
 </td>
 <td width="50%">
@@ -79,25 +82,29 @@
 - ✅ توقيع رقمي (signtool.exe)
 - ✅ اختبار ما بعد البناء
 - ✅ **مثبّت كامل (Inno Setup)** — من `.py` إلى `Setup.exe`
+- ✅ **تنبيه واضح للميزات الخاصة بـ Windows** على Linux/macOS
 
 </td>
 </tr>
 <tr>
 <td width="50%">
 
-### 🕓 سجل البناءات
+### 🕓 سجل البناءات والإعدادات
 - ✅ آخر 20 عملية بناء محفوظة
 - ✅ استعادة الإعدادات بنقرة واحدة
-- ✅ مدة كل بناء + نجاح/فشل
+- ✅ **إعدادات محفوظة بأسماء (Presets)**
+- ✅ تصدير/استيراد الإعدادات للمشاركة
 
 </td>
 <td width="50%">
 
-### 📦 PyInstaller Options
-- ✅ ملف واحد أو مجلد
-- ✅ مع/بدون Console
+### 📦 البناء والإنتاجية
+- ✅ ملف واحد أو مجلد، مع/بدون Console
 - ✅ أيقونة (.ico) + ملفات إضافية
 - ✅ Hidden Imports + UPX + Optimize
+- ✅ **تحويل دفعي** لعدة ملفات دفعة واحدة
+- ✅ **شريط تقدم حقيقي** يتبع مراحل PyInstaller
+- ✅ **إشعارات نظام** عند انتهاء البناء
 
 </td>
 </tr>
@@ -167,6 +174,10 @@ py2exe-gui
 | `Ctrl+S` | حفظ الإعدادات |
 | `Ctrl+T` | تبديل السمة (داكن/نهاري) |
 | `Ctrl+F` | تركيز على بحث السجل |
+| `Ctrl+M` | تبديل الوضع (مبسّط/متقدم) |
+| `Ctrl` + `+` | تكبير الخط |
+| `Ctrl` + `-` | تصغير الخط |
+| `Ctrl+0` | إعادة حجم الخط |
 | `F5` | كشف المكتبات تلقائياً |
 
 ---
@@ -175,12 +186,13 @@ py2exe-gui
 
 | التبويب | المحتوى |
 |--------|---------|
-| **⚙️ الإعدادات الرئيسية** | ملف المصدر، الإخراج، الأيقونة، الخيارات الأساسية |
+| **⚙️ الإعدادات الرئيسية** | ملف المصدر، الإخراج، الأيقونة + معاينتها، الخيارات، السجل |
 | **🔧 إعدادات متقدمة** | ملفات إضافية، Hidden Imports، استيراد من requirements، UPX، أوامر مخصصة |
 | **📝 معلومات الإصدار** | CompanyName، FileDescription، FileVersion، ProductVersion، Copyright، إلخ |
 | **🚀 النشر** | Splash، Manifest (DPI/UAC/OS)، التوقيع الرقمي، Smoke Test |
 | **📦 المثبِّت** | إنشاء `Setup.exe` عبر Inno Setup: الهوية، اللغات، الاختصارات، ربط الامتدادات |
-| **📋 القوالب** | 11 قالب جاهز + حفظ/تحميل الإعدادات + محدد اللغة |
+| **📚 تحويل دفعي** | طابور ملفات `.py` تُبنى بنفس الإعدادات + تقرير لكل ملف |
+| **📋 القوالب** | 11 قالب جاهز + الإعدادات المحفوظة + السمة + محدد اللغة |
 | **🕓 سجل البناءات** | آخر 20 عملية مع استعادة الإعدادات |
 | **ℹ️ حول البرنامج** | معلومات المطوّر والميزات |
 
@@ -327,6 +339,11 @@ python_to_exe/
 │   │
 │   ├── core/                   # النواة (بلا PyQt5، قابلة للاختبار)
 │   │   ├── builder.py                # بناء أمر PyInstaller + كشف الأعلام الخطرة
+│   │   ├── build_stages.py           # قراءة مراحل PyInstaller من مخرجاتها
+│   │   ├── batch_runner.py           # طابور التحويل الدفعي
+│   │   ├── presets.py                # الإعدادات المحفوظة بأسماء
+│   │   ├── platform_support.py       # أي ميزة تعمل على أي نظام
+│   │   ├── update_checker.py         # فحص الإصدارات (تقرير فقط)
 │   │   ├── config.py
 │   │   ├── dependency_analyzer.py    # AST + requirements
 │   │   ├── version_info.py           # metadata الويندوز
@@ -340,8 +357,10 @@ python_to_exe/
 │   └── ui/                     # واجهة PyQt5
 │       ├── main_window.py            # التنسيق فقط (~1050 سطر)
 │       ├── conversion_thread.py      # PyInstaller في خيط منفصل
+│       ├── batch_thread.py           # التحويل الدفعي (تسلسلي)
 │       ├── post_build_thread.py      # التوقيع + smoke test
 │       ├── installer_thread.py       # ISCC في خيط منفصل
+│       ├── tray.py                   # أيقونة شريط النظام + الإشعارات
 │       ├── dialogs.py
 │       └── tabs/               # كل تبويب widget مستقل يملك عناصره
 │           ├── base.py
@@ -350,11 +369,12 @@ python_to_exe/
 │           ├── version_info_tab.py
 │           ├── deploy_tab.py
 │           ├── installer_tab.py
+│           ├── batch_tab.py
 │           ├── templates_tab.py
 │           ├── history_tab.py
 │           └── about_tab.py
 │
-├── tests/                      # 329 اختبار (وحدة + واجهة headless + تكامل)
+├── tests/                      # 666 اختبار (وحدة + واجهة headless + تكامل)
 └── .github/
     ├── workflows/ci.yml        # pytest + GUI + ruff + pip-audit
     ├── dependabot.yml
@@ -367,7 +387,7 @@ python_to_exe/
 
 ```bash
 pip install -r requirements-dev.txt
-pytest tests/                              # 160 اختبار
+pytest tests/                              # 666 اختبار
 ruff check py2exe_gui/ tests/             # فحص الكود
 pytest --cov=py2exe_gui.core --cov-report=term
 ```
@@ -379,8 +399,12 @@ pytest --cov=py2exe_gui.core --cov-report=term
 ## 🌐 اللغات والسمات
 
 - **اللغات:** العربية (RTL، افتراضي) + الإنجليزية (LTR). التبديل من تبويب القوالب → اللغة.
-- **السمات:** داكنة (Catppuccin Mocha) + نهارية (Catppuccin Latte). التبديل بـ Ctrl+T.
-- **الإضافة:** انظر [CONTRIBUTING.md](CONTRIBUTING.md) لإضافة لغة أو سمة جديدة.
+- **السمات:** داكنة (Catppuccin Mocha)، نهارية (Catppuccin Latte)، ❄️ Nord، 🔲 تباين عالٍ،
+  و🖥️ **تلقائي** يتبع سمة نظام التشغيل. التبديل السريع بـ Ctrl+T، والاختيار الكامل من تبويب القوالب.
+- **إمكانية الوصول:** كل الألوان في السمات الأربع تتجاوز WCAG AA (4.5:1)، ومُثبَّت باختبارات.
+  حجم الخط قابل للتكبير حتى 200%.
+- **الإضافة:** سمة جديدة = قاموس ألوان واحد في `styles.py` (لا CSS مكرر).
+  انظر [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ---
 
@@ -447,7 +471,13 @@ else:
 - ✅ **المرحلة 4:** محلل تبعيات AST + Version Info + Build History
 - ✅ **المرحلة 5:** Splash + Manifest + Code Signing + Smoke Test
 - ✅ **المرحلة 6:** 5 قوالب جديدة + وثائق إنجليزية
-- ⏳ **المرحلة 7 (مستقبلية):** التحديث الذاتي، Dashboard، PyQt6، VirusTotal
+- ✅ **المرحلة 7:** مثبّت Inno Setup كامل
+- ✅ **المرحلة 8:** إصلاحات المراجعة الشاملة + تقسيم التبويبات
+- ✅ **المرحلة 9:** وضع مبسّط، 4 سمات، تكبير الخط، إشعارات، تصفية السجل،
+  شريط تقدم حقيقي، تحويل دفعي، Presets، فحص التحديثات
+- ⏳ **المستقبل:** إدارة venv، مشاريع متعددة الملفات، مثبّتات Linux/macOS،
+  محرر `.spec`، VirusTotal، الانتقال إلى PySide6 —
+  التفاصيل في [UI_IMPROVEMENT_PLAN.md](UI_IMPROVEMENT_PLAN.md)
 
 ---
 
@@ -470,6 +500,7 @@ else:
 - 🤝 [CONTRIBUTING.md](CONTRIBUTING.md) — دليل المساهمة (Ar/En)
 - 📋 [CHANGELOG.md](CHANGELOG.md) — تاريخ التغييرات لكل مرحلة
 - 💡 [IDEAS.md](IDEAS.md) — خارطة الطريق الشاملة والأفكار المستقبلية
+- 🗺️ [UI_IMPROVEMENT_PLAN.md](UI_IMPROVEMENT_PLAN.md) — خطة تحسين الواجهة والميزات
 
 ---
 

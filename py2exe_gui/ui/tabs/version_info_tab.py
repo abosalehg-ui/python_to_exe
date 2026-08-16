@@ -9,8 +9,9 @@ from PyQt5.QtWidgets import (
 )
 
 from py2exe_gui.core import VersionInfo
+from py2exe_gui.core.platform_support import VERSION_INFO
 from py2exe_gui.strings import S
-from py2exe_gui.ui.tabs.base import BaseTab
+from py2exe_gui.ui.tabs.base import BaseTab, platform_notice
 
 
 class VersionInfoTab(BaseTab):
@@ -18,6 +19,13 @@ class VersionInfoTab(BaseTab):
 
     def _build(self):
         layout = QVBoxLayout(self)
+
+        # These fields become a Windows PE version resource. PyInstaller
+        # accepts --version-file anywhere, but an ELF/Mach-O binary has
+        # nowhere to put them.
+        notice = platform_notice(VERSION_INFO)
+        if notice is not None:
+            layout.addWidget(notice)
 
         group = QGroupBox(S.GROUP_VERSION_INFO)
         grid = QGridLayout(group)

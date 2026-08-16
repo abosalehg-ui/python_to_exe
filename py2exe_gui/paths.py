@@ -59,6 +59,10 @@ def history_path() -> str:
     return os.path.join(config_dir(), "history.json")
 
 
+def presets_path() -> str:
+    return os.path.join(config_dir(), "presets.json")
+
+
 def legacy_path(name: str) -> str:
     """Path of an old CWD-relative file, for one-time migration."""
     return os.path.abspath(name)

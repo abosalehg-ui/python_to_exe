@@ -87,3 +87,79 @@ class CommandPreviewDialog(QDialog):
         QApplication.clipboard().setText(self._command_text)
         # Brief visual feedback in window title.
         self.setWindowTitle(f"{S.DIALOG_PREVIEW_TITLE} — {S.MSG_COPIED}")
+
+
+class WelcomeDialog(QDialog):
+    """First-run mode picker.
+
+    Eight tabs of PyInstaller options is a lot to meet at once when all you
+    wanted was to turn one script into an .exe. This asks, once, which of the
+    two tab sets to show, and the answer is remembered.
+    """
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle(S.WELCOME_TITLE)
+        self.setMinimumWidth(480)
+        self.setLayoutDirection(_inherited_direction(parent))
+        # Records the choice; simple mode is the default if the dialog is
+        # dismissed with the window close button.
+        self.simple_mode = True
+
+        layout = QVBoxLayout(self)
+
+        heading = QLabel(S.WELCOME_TITLE)
+        heading.setObjectName("aboutHeading")
+        layout.addWidget(heading)
+
+        body = QLabel(S.WELCOME_BODY)
+        body.setObjectName("aboutBody")
+        body.setWordWrap(True)
+        layout.addWidget(body)
+
+        btn_row = QHBoxLayout()
+        simple_btn = QPushButton(S.WELCOME_CHOOSE_SIMPLE)
+        simple_btn.setObjectName("successBtn")
+        simple_btn.setAccessibleName(S.WELCOME_CHOOSE_SIMPLE)
+        simple_btn.clicked.connect(self._choose_simple)
+
+        advanced_btn = QPushButton(S.WELCOME_CHOOSE_ADVANCED)
+        advanced_btn.setAccessibleName(S.WELCOME_CHOOSE_ADVANCED)
+        advanced_btn.clicked.connect(self._choose_advanced)
+
+        btn_row.addWidget(simple_btn)
+        btn_row.addWidget(advanced_btn)
+        layout.addLayout(btn_row)
+
+    def _choose_simple(self):
+        self.simple_mode = True
+        self.accept()
+
+    def _choose_advanced(self):
+        self.simple_mode = False
+        self.accept()
+
+
+class PresetNameDialog(QDialog):
+    """Ask for a name to store the current settings under."""
+
+    def __init__(self, parent=None, initial: str = ""):
+        super().__init__(parent)
+        self.setWindowTitle(S.BTN_PRESET_SAVE)
+        self.setMinimumWidth(400)
+        self.setLayoutDirection(_inherited_direction(parent))
+
+        layout = QVBoxLayout(self)
+        layout.addWidget(QLabel(S.PRESET_NAME_PROMPT))
+
+        self.input = QLineEdit(initial)
+        self.input.setAccessibleName(S.PRESET_NAME_PROMPT)
+        layout.addWidget(self.input)
+
+        buttons = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
+        buttons.accepted.connect(self.accept)
+        buttons.rejected.connect(self.reject)
+        layout.addWidget(buttons)
+
+    def get_value(self) -> str:
+        return self.input.text().strip()

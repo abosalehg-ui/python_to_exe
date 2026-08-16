@@ -160,6 +160,7 @@ class Ar:
     MSG_ERROR = "خطأ"
     MSG_SUCCESS = "نجاح"
     MSG_CONFIRM = "تأكيد"
+    MSG_INFO_TITLE = "معلومة"
     ERR_NO_SOURCE = "اختر ملف المصدر أولاً!"
     ERR_INSTALL_PYINSTALLER_FAIL = "فشل تثبيت PyInstaller:\n{error}"
     ERR_OUTPUT_MISSING = "مجلد الإخراج غير موجود!"
@@ -443,6 +444,153 @@ class Ar:
     DIALOG_FILTER_ISL = "Inno Setup Language Files (*.isl);;All Files (*.*)"
     MSG_INSTALLER_OK = "تم إنشاء المثبّت بنجاح:\n{path}"
 
+    # ── Phase 9: simplified mode ──
+    WELCOME_TITLE = "أهلاً بك 👋"
+    WELCOME_BODY = (
+        "يمكنك استخدام البرنامج بوضعين:\n\n"
+        "• الوضع المبسّط: ثلاث خطوات فقط — اختر الملف، اختر النوع، ابنِ.\n"
+        "• الوضع المتقدم: كل التبويبات (النشر، المثبّت، معلومات الإصدار...).\n\n"
+        "يمكنك التبديل بينهما في أي وقت من زر الوضع أسفل النافذة."
+    )
+    WELCOME_CHOOSE_SIMPLE = "ابدأ بالوضع المبسّط"
+    WELCOME_CHOOSE_ADVANCED = "ابدأ بالوضع المتقدم"
+    BTN_MODE_TO_ADVANCED = "🔧 الوضع المتقدم"
+    BTN_MODE_TO_SIMPLE = "🌱 الوضع المبسّط"
+    MODE_SIMPLE_TIP = "إظهار التبويبات الأساسية فقط"
+    MODE_ADVANCED_TIP = "إظهار كل التبويبات"
+    LOG_MODE_SIMPLE = "🌱 تم التبديل إلى الوضع المبسّط"
+    LOG_MODE_ADVANCED = "🔧 تم التبديل إلى الوضع المتقدم"
+
+    # ── Phase 9: platform support ──
+    # Arabic uses its own comma; kept as a string so joins stay locale-correct.
+    LIST_SEPARATOR = "، "
+    PLATFORM_WINDOWS_ONLY_FMT = (
+        "⚠️ أنت تشغّل البرنامج على {platform}. الميزات التالية تعمل عند "
+        "البناء على Windows فقط ولن يكون لها أثر هنا: {features}"
+    )
+    FEATURE_CODE_SIGNING = "التوقيع الرقمي"
+    FEATURE_MANIFEST = "Windows Manifest"
+    FEATURE_VERSION_INFO = "معلومات الإصدار"
+    FEATURE_INSTALLER = "مثبّت Inno Setup"
+
+    # ── Phase 9: themes ──
+    THEME_SELECT_LABEL = "السمة:"
+    THEME_LABEL_AUTO = "🖥️ تلقائي (حسب النظام)"
+    THEME_LABEL_DARK = "🌙 داكنة"
+    THEME_LABEL_LIGHT = "☀️ نهارية"
+    THEME_LABEL_NORD = "❄️ Nord"
+    THEME_LABEL_HIGH_CONTRAST = "🔲 تباين عالٍ"
+    LOG_THEME_CHANGED = "🎨 تم تغيير السمة: {theme}"
+
+    # ── Phase 9: font zoom ──
+    LOG_ZOOM_FMT = "🔍 حجم الخط: {percent}%"
+    ZOOM_IN_TIP = "تكبير الخط (Ctrl++)"
+    ZOOM_OUT_TIP = "تصغير الخط (Ctrl+-)"
+    ZOOM_RESET_TIP = "إعادة حجم الخط (Ctrl+0)"
+
+    # ── Phase 9: system tray ──
+    TRAY_TOOLTIP = "Python to EXE Converter"
+    TRAY_SHOW = "إظهار النافذة"
+    TRAY_CANCEL = "إلغاء البناء"
+    TRAY_QUIT = "خروج"
+    TRAY_BUILD_OK_TITLE = "اكتمل البناء ✅"
+    TRAY_BUILD_OK_BODY = "تم إنشاء {name} بنجاح"
+    TRAY_BUILD_FAIL_TITLE = "فشل البناء ❌"
+    TRAY_BUILD_FAIL_BODY = "راجع السجل لمعرفة السبب"
+
+    # ── Phase 9: real build stages ──
+    STAGE_STARTING = "التحضير"
+    STAGE_ANALYZING = "تحليل الاستيرادات"
+    STAGE_HOOKS = "معالجة الـ hooks"
+    STAGE_DEPENDENCIES = "جمع المكتبات"
+    STAGE_PYZ = "بناء أرشيف PYZ"
+    STAGE_PKG = "تجميع الحزمة"
+    STAGE_EXE = "بناء الملف التنفيذي"
+    STAGE_COLLECT = "نسخ الملفات"
+    PROGRESS_STAGE_FMT = "{stage} — %p%"
+
+    # ── Phase 9: icon preview ──
+    ICON_PREVIEW_LABEL = "معاينة:"
+    ICON_PREVIEW_NONE = "لا توجد أيقونة"
+    ICON_PREVIEW_INVALID = "⚠️ تعذّرت قراءة الأيقونة — تأكد أنه ملف .ico صالح"
+
+    # ── Phase 9: log filters ──
+    LOG_FILTER_LABEL = "تصفية:"
+    LOG_FILTER_ALL = "الكل"
+    LOG_FILTER_ERRORS = "❌ أخطاء"
+    LOG_FILTER_WARNINGS = "⚠️ تحذيرات"
+    LOG_FILTER_SUCCESS = "✅ نجاح"
+    LOG_FILTER_EMPTY = "لا توجد أسطر مطابقة لهذه التصفية."
+
+    # ── Phase 10: batch conversion ──
+    TAB_BATCH = "📚 تحويل دفعي"
+    GROUP_BATCH_FILES = "📚 قائمة الملفات"
+    BATCH_HINT = (
+        "حوّل عدة ملفات بنفس الإعدادات. تُنفَّذ واحداً تلو الآخر — "
+        "لأن PyInstaller يكتب في نفس مجلدي build/ و dist/."
+    )
+    BTN_BATCH_ADD = "➕ إضافة ملفات"
+    BTN_BATCH_REMOVE = "🗑️ حذف المحدد"
+    BTN_BATCH_CLEAR = "🧹 تفريغ القائمة"
+    BTN_BATCH_START = "🚀 بدء التحويل الدفعي"
+    BTN_BATCH_CANCEL = "⏹️ إلغاء"
+    GROUP_BATCH_RESULT = "📊 النتيجة"
+    BATCH_EMPTY = "القائمة فارغة — أضف ملفات .py للبدء."
+    BATCH_SUMMARY_FMT = (
+        "الإجمالي: {total} | ✅ نجح: {succeeded} | ❌ فشل: {failed} | "
+        "⊘ ملغى: {cancelled} | المدة: {duration} ثانية"
+    )
+    BATCH_FAILURES_FMT = "الملفات الفاشلة: {names}"
+    LOG_BATCH_START = "📚 بدء التحويل الدفعي لـ {count} ملف..."
+    LOG_BATCH_JOB_START = "▶ ({index}/{total}) {name}"
+    LOG_BATCH_JOB_OK = "✅ ({index}/{total}) {name} — تم في {duration} ثانية"
+    LOG_BATCH_JOB_FAIL = "❌ ({index}/{total}) {name} — فشل"
+    LOG_BATCH_DONE = "📚 انتهى التحويل الدفعي."
+    LOG_BATCH_CANCELLED = "⚠️ تم إلغاء التحويل الدفعي."
+    ERR_BATCH_NO_FILES = "أضف ملفاً واحداً على الأقل إلى قائمة التحويل الدفعي"
+    ERR_BATCH_BUSY = "هناك عملية بناء قيد التنفيذ بالفعل"
+    MSG_BATCH_CANCEL_CONFIRM = "إلغاء التحويل الدفعي؟ الملفات المتبقية لن تُبنى."
+    DIALOG_CHOOSE_BATCH_FILES = "اختر ملفات .py للتحويل الدفعي"
+
+    # ── Phase 10: update check ──
+    BTN_CHECK_UPDATES = "🔄 التحقق من التحديثات"
+    UPDATE_CHECK_ON_START = "التحقق من التحديثات عند بدء التشغيل"
+    UPDATE_AVAILABLE_FMT = (
+        "يتوفر إصدار جديد: {version} (الحالي {current}).\n\n"
+        "لن يُنزَّل شيء تلقائياً — افتح صفحة الإصدارات للاطلاع والتنزيل يدوياً."
+    )
+    BTN_OPEN_RELEASES = "فتح صفحة الإصدارات"
+    UPDATE_NONE = "أنت على أحدث إصدار ✅"
+    LOG_UPDATE_CHECKING = "🔄 جاري التحقق من وجود تحديث..."
+    LOG_UPDATE_AVAILABLE = "🎉 يتوفر إصدار جديد: {version} — {url}"
+    LOG_UPDATE_NONE = "✅ لا يوجد تحديث — أنت على أحدث إصدار ({version})"
+    LOG_UPDATE_FAILED = "⚠️ تعذّر التحقق من التحديثات (تحقق من الاتصال)"
+
+    # ── Phase 10: presets ──
+    GROUP_PRESETS = "⭐ الإعدادات المحفوظة (Presets)"
+    PRESETS_HINT = (
+        "احفظ الإعدادات الحالية باسم لاستعادتها لاحقاً بنقرة واحدة، "
+        "بدل البحث عن ملف JSON في كل مرة."
+    )
+    PRESET_NONE = "— لا توجد إعدادات محفوظة —"
+    BTN_PRESET_SAVE = "💾 حفظ باسم"
+    BTN_PRESET_APPLY = "📥 تطبيق"
+    BTN_PRESET_DELETE = "🗑️ حذف"
+    BTN_PRESET_EXPORT = "📤 تصدير الكل"
+    BTN_PRESET_IMPORT = "📥 استيراد"
+    PRESET_NAME_PROMPT = "اسم الإعداد:"
+    PRESET_SAVED_FMT = "⭐ تم حفظ الإعداد: {name}"
+    PRESET_APPLIED_FMT = "📥 تم تطبيق الإعداد: {name}"
+    PRESET_DELETED_FMT = "🗑️ تم حذف الإعداد: {name}"
+    PRESET_OVERWRITE_CONFIRM = "يوجد إعداد بنفس الاسم «{name}». هل تريد استبداله؟"
+    MSG_PRESET_DELETE_CONFIRM = "حذف الإعداد «{name}»؟ لا يمكن التراجع."
+    ERR_PRESET_NAME = "أدخل اسماً صالحاً للإعداد"
+    ERR_PRESET_SAVE_FAIL = "تعذّر حفظ الإعداد: {error}"
+    LOG_PRESET_IMPORTED_FMT = "📥 تم استيراد {count} إعداد"
+    LOG_PRESET_IMPORT_NONE = "لم يُستورد أي إعداد جديد (الأسماء موجودة مسبقاً)"
+    DIALOG_EXPORT_PRESETS = "تصدير الإعدادات المحفوظة"
+    DIALOG_IMPORT_PRESETS = "استيراد إعدادات محفوظة"
+
 
 class En:
     """English strings."""
@@ -599,6 +747,7 @@ class En:
     MSG_ERROR = "Error"
     MSG_SUCCESS = "Success"
     MSG_CONFIRM = "Confirm"
+    MSG_INFO_TITLE = "Information"
     ERR_NO_SOURCE = "Choose a source file first!"
     ERR_INSTALL_PYINSTALLER_FAIL = "Failed to install PyInstaller:\n{error}"
     ERR_OUTPUT_MISSING = "Output folder does not exist!"
@@ -877,6 +1026,153 @@ class En:
     DIALOG_CHOOSE_ISL = "Choose Arabic.isl"
     DIALOG_FILTER_ISL = "Inno Setup Language Files (*.isl);;All Files (*.*)"
     MSG_INSTALLER_OK = "Installer created successfully:\n{path}"
+
+    # ── Phase 9: simplified mode ──
+    WELCOME_TITLE = "Welcome 👋"
+    WELCOME_BODY = (
+        "There are two ways to use this app:\n\n"
+        "• Simple mode: three steps — pick the file, pick the type, build.\n"
+        "• Advanced mode: every tab (Deploy, Installer, Version Info...).\n\n"
+        "You can switch between them at any time with the mode button."
+    )
+    WELCOME_CHOOSE_SIMPLE = "Start in simple mode"
+    WELCOME_CHOOSE_ADVANCED = "Start in advanced mode"
+    BTN_MODE_TO_ADVANCED = "🔧 Advanced mode"
+    BTN_MODE_TO_SIMPLE = "🌱 Simple mode"
+    MODE_SIMPLE_TIP = "Show only the essential tabs"
+    MODE_ADVANCED_TIP = "Show every tab"
+    LOG_MODE_SIMPLE = "🌱 Switched to simple mode"
+    LOG_MODE_ADVANCED = "🔧 Switched to advanced mode"
+
+    # ── Phase 9: platform support ──
+    LIST_SEPARATOR = ", "
+    PLATFORM_WINDOWS_ONLY_FMT = (
+        "⚠️ You are running on {platform}. The following features only take "
+        "effect when building on Windows and will do nothing here: {features}"
+    )
+    FEATURE_CODE_SIGNING = "code signing"
+    FEATURE_MANIFEST = "Windows manifest"
+    FEATURE_VERSION_INFO = "version info"
+    FEATURE_INSTALLER = "Inno Setup installer"
+
+    # ── Phase 9: themes ──
+    THEME_SELECT_LABEL = "Theme:"
+    THEME_LABEL_AUTO = "🖥️ Automatic (follow system)"
+    THEME_LABEL_DARK = "🌙 Dark"
+    THEME_LABEL_LIGHT = "☀️ Light"
+    THEME_LABEL_NORD = "❄️ Nord"
+    THEME_LABEL_HIGH_CONTRAST = "🔲 High contrast"
+    LOG_THEME_CHANGED = "🎨 Theme changed: {theme}"
+
+    # ── Phase 9: font zoom ──
+    LOG_ZOOM_FMT = "🔍 Font size: {percent}%"
+    ZOOM_IN_TIP = "Increase font size (Ctrl++)"
+    ZOOM_OUT_TIP = "Decrease font size (Ctrl+-)"
+    ZOOM_RESET_TIP = "Reset font size (Ctrl+0)"
+
+    # ── Phase 9: system tray ──
+    TRAY_TOOLTIP = "Python to EXE Converter"
+    TRAY_SHOW = "Show window"
+    TRAY_CANCEL = "Cancel build"
+    TRAY_QUIT = "Quit"
+    TRAY_BUILD_OK_TITLE = "Build finished ✅"
+    TRAY_BUILD_OK_BODY = "{name} was created successfully"
+    TRAY_BUILD_FAIL_TITLE = "Build failed ❌"
+    TRAY_BUILD_FAIL_BODY = "Check the log for the reason"
+
+    # ── Phase 9: real build stages ──
+    STAGE_STARTING = "Starting"
+    STAGE_ANALYZING = "Analyzing imports"
+    STAGE_HOOKS = "Processing hooks"
+    STAGE_DEPENDENCIES = "Collecting libraries"
+    STAGE_PYZ = "Building PYZ archive"
+    STAGE_PKG = "Assembling package"
+    STAGE_EXE = "Building executable"
+    STAGE_COLLECT = "Copying files"
+    PROGRESS_STAGE_FMT = "{stage} — %p%"
+
+    # ── Phase 9: icon preview ──
+    ICON_PREVIEW_LABEL = "Preview:"
+    ICON_PREVIEW_NONE = "No icon"
+    ICON_PREVIEW_INVALID = "⚠️ Could not read the icon — make sure it is a valid .ico"
+
+    # ── Phase 9: log filters ──
+    LOG_FILTER_LABEL = "Filter:"
+    LOG_FILTER_ALL = "All"
+    LOG_FILTER_ERRORS = "❌ Errors"
+    LOG_FILTER_WARNINGS = "⚠️ Warnings"
+    LOG_FILTER_SUCCESS = "✅ Success"
+    LOG_FILTER_EMPTY = "No lines match this filter."
+
+    # ── Phase 10: batch conversion ──
+    TAB_BATCH = "📚 Batch"
+    GROUP_BATCH_FILES = "📚 File queue"
+    BATCH_HINT = (
+        "Convert several files with the same settings. They run one after "
+        "another — PyInstaller writes into the same build/ and dist/ folders."
+    )
+    BTN_BATCH_ADD = "➕ Add files"
+    BTN_BATCH_REMOVE = "🗑️ Remove selected"
+    BTN_BATCH_CLEAR = "🧹 Clear queue"
+    BTN_BATCH_START = "🚀 Start batch"
+    BTN_BATCH_CANCEL = "⏹️ Cancel"
+    GROUP_BATCH_RESULT = "📊 Result"
+    BATCH_EMPTY = "The queue is empty — add .py files to begin."
+    BATCH_SUMMARY_FMT = (
+        "Total: {total} | ✅ ok: {succeeded} | ❌ failed: {failed} | "
+        "⊘ cancelled: {cancelled} | duration: {duration}s"
+    )
+    BATCH_FAILURES_FMT = "Failed files: {names}"
+    LOG_BATCH_START = "📚 Starting batch conversion of {count} file(s)..."
+    LOG_BATCH_JOB_START = "▶ ({index}/{total}) {name}"
+    LOG_BATCH_JOB_OK = "✅ ({index}/{total}) {name} — done in {duration}s"
+    LOG_BATCH_JOB_FAIL = "❌ ({index}/{total}) {name} — failed"
+    LOG_BATCH_DONE = "📚 Batch conversion finished."
+    LOG_BATCH_CANCELLED = "⚠️ Batch conversion cancelled."
+    ERR_BATCH_NO_FILES = "Add at least one file to the batch queue"
+    ERR_BATCH_BUSY = "A build is already running"
+    MSG_BATCH_CANCEL_CONFIRM = "Cancel the batch? The remaining files will not be built."
+    DIALOG_CHOOSE_BATCH_FILES = "Choose .py files for batch conversion"
+
+    # ── Phase 10: update check ──
+    BTN_CHECK_UPDATES = "🔄 Check for updates"
+    UPDATE_CHECK_ON_START = "Check for updates on startup"
+    UPDATE_AVAILABLE_FMT = (
+        "A new version is available: {version} (you have {current}).\n\n"
+        "Nothing is downloaded automatically — open the releases page to "
+        "review and download it yourself."
+    )
+    BTN_OPEN_RELEASES = "Open releases page"
+    UPDATE_NONE = "You are on the latest version ✅"
+    LOG_UPDATE_CHECKING = "🔄 Checking for updates..."
+    LOG_UPDATE_AVAILABLE = "🎉 A new version is available: {version} — {url}"
+    LOG_UPDATE_NONE = "✅ No update — you are on the latest version ({version})"
+    LOG_UPDATE_FAILED = "⚠️ Could not check for updates (check your connection)"
+
+    # ── Phase 10: presets ──
+    GROUP_PRESETS = "⭐ Saved presets"
+    PRESETS_HINT = (
+        "Save the current settings under a name and restore them later with "
+        "one click, instead of hunting for a JSON file each time."
+    )
+    PRESET_NONE = "— no saved presets —"
+    BTN_PRESET_SAVE = "💾 Save as"
+    BTN_PRESET_APPLY = "📥 Apply"
+    BTN_PRESET_DELETE = "🗑️ Delete"
+    BTN_PRESET_EXPORT = "📤 Export all"
+    BTN_PRESET_IMPORT = "📥 Import"
+    PRESET_NAME_PROMPT = "Preset name:"
+    PRESET_SAVED_FMT = "⭐ Preset saved: {name}"
+    PRESET_APPLIED_FMT = "📥 Preset applied: {name}"
+    PRESET_DELETED_FMT = "🗑️ Preset deleted: {name}"
+    PRESET_OVERWRITE_CONFIRM = "A preset named '{name}' already exists. Replace it?"
+    MSG_PRESET_DELETE_CONFIRM = "Delete the preset '{name}'? This cannot be undone."
+    ERR_PRESET_NAME = "Enter a valid preset name"
+    ERR_PRESET_SAVE_FAIL = "Could not save the preset: {error}"
+    LOG_PRESET_IMPORTED_FMT = "📥 Imported {count} preset(s)"
+    LOG_PRESET_IMPORT_NONE = "No new presets imported (the names already exist)"
+    DIALOG_EXPORT_PRESETS = "Export saved presets"
+    DIALOG_IMPORT_PRESETS = "Import saved presets"
 
 
 # ──────────────────────────────────────────────────────────────────────────

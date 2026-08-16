@@ -6,12 +6,13 @@ from py2exe_gui.paths import (
     LEGACY_HISTORY_NAME,
     LEGACY_SETTINGS_NAME,
     history_path,
+    presets_path,
     resolve_with_migration,
     settings_path,
 )
 
 APP_NAME = "Python to EXE Converter"
-APP_VERSION = "1.1.0"
+APP_VERSION = "1.2.0"
 DEVELOPER = "عبدالكريم العبود"
 EMAIL = "abo.saleh.g@gmail.com"
 COPYRIGHT = "© 2025 [Python to EXE] - All Rights Reserved"
@@ -24,6 +25,8 @@ PYINSTALLER_REQUIREMENT = "pyinstaller>=6.0,<7"
 # Per-user config paths, migrating any pre-1.1 file left in the CWD.
 SETTINGS_FILE = resolve_with_migration(settings_path(), LEGACY_SETTINGS_NAME)
 HISTORY_FILE = resolve_with_migration(history_path(), LEGACY_HISTORY_NAME)
+# Presets are new in 1.2, so there is no legacy location to migrate from.
+PRESETS_FILE = presets_path()
 
 # Fallback for Python < 3.10, which lacks sys.stdlib_module_names. Not
 # exhaustive, but it covers what a typical script imports; 3.10+ uses the

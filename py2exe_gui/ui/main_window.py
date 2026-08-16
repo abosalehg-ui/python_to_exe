@@ -12,6 +12,7 @@ import subprocess
 import sys
 import tempfile
 import time
+import webbrowser
 
 from PyQt5.QtCore import Qt
 from PyQt5.QtGui import QFont, QKeySequence
@@ -37,17 +38,21 @@ from py2exe_gui.constants import (
     COPYRIGHT,
     DEVELOPER,
     HISTORY_FILE,
+    PRESETS_FILE,
     PYINSTALLER_REQUIREMENT,
     SETTINGS_FILE,
 )
 from py2exe_gui.core import (
+    RELEASES_PAGE_URL,
     BuildConfig,
     BuildHistory,
     InstallerConfig,
     ManifestConfig,
+    PresetLibrary,
     build_iscc_command,
     build_pyinstaller_command,
     build_signtool_command,
+    check_for_update,
     detect_imports,
     filter_non_stdlib,
     find_dangerous_args,
@@ -61,6 +66,7 @@ from py2exe_gui.core import (
     parse_requirements,
     redact_password,
     resolve_languages,
+    summarize,
 )
 from py2exe_gui.core.installer import validate as validate_installer
 from py2exe_gui.strings import (
@@ -69,15 +75,23 @@ from py2exe_gui.strings import (
     current_locale,
     set_locale,
 )
-from py2exe_gui.styles import themed_stylesheet
+from py2exe_gui.styles import (
+    DEFAULT_FONT_SCALE,
+    FONT_SCALE_STEP,
+    clamp_scale,
+    resolve_theme,
+    themed_stylesheet,
+)
 from py2exe_gui.templates import TEMPLATES, template_name
+from py2exe_gui.ui.batch_thread import BatchThread
 from py2exe_gui.ui.conversion_thread import ConversionThread
-from py2exe_gui.ui.dialogs import CommandPreviewDialog
+from py2exe_gui.ui.dialogs import CommandPreviewDialog, PresetNameDialog, WelcomeDialog
 from py2exe_gui.ui.installer_thread import InstallerThread
 from py2exe_gui.ui.post_build_thread import PostBuildThread
 from py2exe_gui.ui.tabs import (
     AboutTab,
     AdvancedTab,
+    BatchTab,
     DeployTab,
     HistoryTab,
     InstallerTab,
@@ -85,6 +99,11 @@ from py2exe_gui.ui.tabs import (
     TemplatesTab,
     VersionInfoTab,
 )
+from py2exe_gui.ui.tray import BuildTray
+
+# Tabs shown in simple mode. Eight tabs at once is a lot to meet when all you
+# want is one .exe; the rest stay one button away.
+SIMPLE_MODE_TABS = ("main", "templates", "about")
 
 
 class MainWindow(QMainWindow):
@@ -95,22 +114,35 @@ class MainWindow(QMainWindow):
         self.conversion_thread = None
         self.installer_thread = None
         self.post_build_thread = None
+        self.batch_thread = None
         self.settings = {}
         self.current_theme = "dark"
+        self.font_scale = DEFAULT_FONT_SCALE
+        self.simple_mode = True
         self._build_start_time = 0.0
         self._build_config_snapshot = {}
         self._temp_version_file = ""
         self._temp_manifest_file = ""
         self._last_built_exe = ""
         self._shortcuts = []
+        self._batch_jobs = []
         self.history = BuildHistory(HISTORY_FILE)
+        self.presets = PresetLibrary(PRESETS_FILE)
         self.load_settings()
         self.current_theme = self.settings.get("theme", "dark")
+        self.font_scale = clamp_scale(self.settings.get("font_scale", DEFAULT_FONT_SCALE))
+        self.simple_mode = bool(self.settings.get("simple_mode", True))
         self.init_ui()
         self._register_shortcuts()
         self.setAcceptDrops(True)
+        self.tray = BuildTray(self, self.windowIcon())
         self.check_dependencies()
         self._refresh_history_list()
+        self._refresh_presets_list()
+        # The first-run dialog and the update check are NOT started here:
+        # both are modal or blocking, and a constructor that blocks cannot be
+        # instantiated by a test (or shown before it finishes). ``app.main``
+        # calls run_startup_tasks() once the window is on screen.
 
     # ─── Construction ───────────────────────────────────────────────────
 
@@ -121,9 +153,15 @@ class MainWindow(QMainWindow):
         self.setMinimumSize(900, 600)
         self.resize(1080, 800)
         self._apply_layout_direction()
-        self.setStyleSheet(themed_stylesheet(self.current_theme, current_locale()))
+        self._apply_stylesheet()
         self.setCentralWidget(self._build_central_widget())
         self.statusBar().showMessage(f"{COPYRIGHT} | {DEVELOPER}")
+
+    def _apply_stylesheet(self):
+        """Repaint the window for the active theme, locale and font scale."""
+        self.setStyleSheet(
+            themed_stylesheet(self.current_theme, current_locale(), self.font_scale)
+        )
 
     def _apply_layout_direction(self):
         self.setLayoutDirection(
@@ -145,27 +183,45 @@ class MainWindow(QMainWindow):
         self.version_info_tab = VersionInfoTab(self)
         self.deploy_tab = DeployTab(self)
         self.installer_tab = InstallerTab(self)
+        self.batch_tab = BatchTab(self)
         self.templates_tab = TemplatesTab(self)
         self.history_tab = HistoryTab(self)
         self.about_tab = AboutTab(self)
 
+        # Keyed so simple mode can pick a subset by name rather than by index.
+        self._all_tabs = (
+            ("main", self.main_tab, S.TAB_MAIN),
+            ("advanced", self.advanced_tab, S.TAB_ADVANCED),
+            ("version_info", self.version_info_tab, S.TAB_VERSION_INFO),
+            ("deploy", self.deploy_tab, S.TAB_DEPLOY),
+            ("installer", self.installer_tab, S.TAB_INSTALLER),
+            ("batch", self.batch_tab, S.TAB_BATCH),
+            ("templates", self.templates_tab, S.TAB_TEMPLATES),
+            ("history", self.history_tab, S.TAB_HISTORY),
+            ("about", self.about_tab, S.TAB_ABOUT),
+        )
+
         self.tabs = QTabWidget()
-        for widget, title in (
-            (self.main_tab, S.TAB_MAIN),
-            (self.advanced_tab, S.TAB_ADVANCED),
-            (self.version_info_tab, S.TAB_VERSION_INFO),
-            (self.deploy_tab, S.TAB_DEPLOY),
-            (self.installer_tab, S.TAB_INSTALLER),
-            (self.templates_tab, S.TAB_TEMPLATES),
-            (self.history_tab, S.TAB_HISTORY),
-            (self.about_tab, S.TAB_ABOUT),
-        ):
-            self.tabs.addTab(widget, title)
+        self._populate_tabs()
         layout.addWidget(self.tabs)
+
+        self.templates_tab.set_theme(self.settings.get("theme", "dark"))
 
         layout.addWidget(self._create_progress_group())
         layout.addLayout(self._create_action_buttons())
         return central
+
+    def _populate_tabs(self):
+        """Fill the tab bar with the set the current mode calls for.
+
+        Tabs not shown are only detached from the bar, never destroyed — their
+        widgets still hold state, so switching modes mid-setup loses nothing.
+        """
+        self.tabs.clear()
+        for key, widget, title in self._all_tabs:
+            if self.simple_mode and key not in SIMPLE_MODE_TABS:
+                continue
+            self.tabs.addTab(widget, title)
 
     def _create_header(self):
         header = QFrame()
@@ -218,7 +274,15 @@ class MainWindow(QMainWindow):
         self.preview_btn = action(S.BTN_PREVIEW_CMD, self.preview_command)
         self.open_folder_btn = action(S.BTN_OPEN_FOLDER, self.open_output_folder)
         self.theme_btn = action(S.BTN_TOGGLE_THEME, self.toggle_theme)
+        self.mode_btn = action(self._mode_button_label(), self.toggle_mode)
+        self.mode_btn.setToolTip(
+            S.MODE_ADVANCED_TIP if self.simple_mode else S.MODE_SIMPLE_TIP
+        )
         return row
+
+    def _mode_button_label(self) -> str:
+        """The button offers the *other* mode, so its label is the target."""
+        return S.BTN_MODE_TO_ADVANCED if self.simple_mode else S.BTN_MODE_TO_SIMPLE
 
     # ─── Startup checks ─────────────────────────────────────────────────
 
@@ -423,6 +487,187 @@ class MainWindow(QMainWindow):
         )
         return reply == QMessageBox.Yes
 
+    # ─── Presets ────────────────────────────────────────────────────────
+
+    def _refresh_presets_list(self):
+        if hasattr(self, "templates_tab"):
+            self.templates_tab.refresh_presets(self.presets)
+
+    def save_current_preset(self):
+        """Store the current form under a name the user chooses."""
+        dialog = PresetNameDialog(self, initial=self.main_tab.output_name.text().strip())
+        if not dialog.exec_():
+            return
+        name = dialog.get_value()
+        if not name:
+            QMessageBox.warning(self, S.MSG_WARNING, S.ERR_PRESET_NAME)
+            return
+
+        if self.presets.has(name):
+            reply = QMessageBox.question(
+                self,
+                S.MSG_CONFIRM,
+                S.PRESET_OVERWRITE_CONFIRM.format(name=name),
+                QMessageBox.Yes | QMessageBox.No,
+                QMessageBox.No,
+            )
+            if reply != QMessageBox.Yes:
+                return
+
+        if not self.presets.put(name, self._current_config().to_dict()):
+            QMessageBox.critical(
+                self, S.MSG_ERROR, S.ERR_PRESET_SAVE_FAIL.format(error=self.presets.last_error)
+            )
+            return
+        self._refresh_presets_list()
+        self._append_log(S.PRESET_SAVED_FMT.format(name=name))
+
+    def apply_selected_preset(self):
+        """Load the selected preset back into the form."""
+        name = self.templates_tab.selected_preset()
+        if not name:
+            return
+        data = self.presets.get(name)
+        if data is None:
+            return
+        config = BuildConfig.from_dict(data)
+        # A preset can be imported from elsewhere, so it gets the same
+        # dangerous-flag check as a settings file.
+        if not self._confirm_untrusted_config(config):
+            return
+        self._apply_config(config)
+        self._append_log(S.PRESET_APPLIED_FMT.format(name=name))
+
+    def delete_selected_preset(self):
+        name = self.templates_tab.selected_preset()
+        if not name:
+            return
+        reply = QMessageBox.question(
+            self,
+            S.MSG_CONFIRM,
+            S.MSG_PRESET_DELETE_CONFIRM.format(name=name),
+            QMessageBox.Yes | QMessageBox.No,
+            QMessageBox.No,
+        )
+        if reply != QMessageBox.Yes:
+            return
+        if self.presets.delete(name):
+            self._refresh_presets_list()
+            self._append_log(S.PRESET_DELETED_FMT.format(name=name))
+
+    def export_presets(self):
+        if len(self.presets) == 0:
+            return
+        file_path, _ = QFileDialog.getSaveFileName(
+            self, S.DIALOG_EXPORT_PRESETS, "py2exe_presets.json", S.DIALOG_FILTER_JSON
+        )
+        if not file_path:
+            return
+        try:
+            with open(file_path, "w", encoding="utf-8") as f:
+                json.dump(self.presets.export_all(), f, ensure_ascii=False, indent=2)
+        except (OSError, TypeError) as e:
+            QMessageBox.critical(self, S.MSG_ERROR, S.ERR_SAVE_FAIL.format(error=str(e)))
+            return
+        self._append_log(S.LOG_SETTINGS_SAVED.format(path=file_path))
+
+    def import_presets(self):
+        """Merge a shared preset file, without overwriting the user's own."""
+        file_path, _ = QFileDialog.getOpenFileName(
+            self, S.DIALOG_IMPORT_PRESETS, "", S.DIALOG_FILTER_JSON
+        )
+        if not file_path:
+            return
+        try:
+            with open(file_path, encoding="utf-8") as f:
+                data = json.load(f)
+        except (OSError, ValueError) as e:
+            QMessageBox.critical(self, S.MSG_ERROR, S.ERR_LOAD_FAIL.format(error=str(e)))
+            return
+
+        added = self.presets.import_all(data)
+        self._refresh_presets_list()
+        if added:
+            self._append_log(S.LOG_PRESET_IMPORTED_FMT.format(count=len(added)))
+        else:
+            self._append_log(S.LOG_PRESET_IMPORT_NONE)
+
+    # ─── Batch conversion ───────────────────────────────────────────────
+
+    def start_batch_conversion(self):
+        """Build every queued file in turn with the current settings."""
+        if self._build_in_progress():
+            QMessageBox.warning(self, S.MSG_WARNING, S.ERR_BATCH_BUSY)
+            return
+
+        jobs = self.batch_tab.jobs()
+        if not jobs:
+            QMessageBox.warning(self, S.MSG_WARNING, S.ERR_BATCH_NO_FILES)
+            return
+
+        if not self._ensure_pyinstaller():
+            return
+
+        self._batch_jobs = jobs
+        self.batch_tab.set_running(True)
+        self.convert_btn.setEnabled(False)
+        self.progress_bar.setValue(0)
+        self.progress_bar.setFormat(S.PROGRESS_CONVERTING)
+
+        self.batch_thread = BatchThread(jobs, self._current_config())
+        self.batch_thread.log_signal.connect(self._append_log)
+        self.batch_thread.progress_signal.connect(self.progress_bar.setValue)
+        self.batch_thread.job_signal.connect(self._on_batch_job_update)
+        self.batch_thread.finished_signal.connect(self._on_batch_finished)
+        self.batch_thread.start()
+
+    def cancel_batch_conversion(self):
+        if not (self.batch_thread and self.batch_thread.isRunning()):
+            return
+        reply = QMessageBox.question(
+            self,
+            S.MSG_CONFIRM,
+            S.MSG_BATCH_CANCEL_CONFIRM,
+            QMessageBox.Yes | QMessageBox.No,
+            QMessageBox.No,
+        )
+        if reply == QMessageBox.Yes:
+            self.batch_thread.cancel()
+
+    def _on_batch_job_update(self, index, _total, _status):
+        if 0 <= index < len(self._batch_jobs):
+            self.batch_tab.update_row(index, self._batch_jobs[index])
+
+    def _on_batch_finished(self, completed):
+        self.batch_tab.set_running(False)
+        self.convert_btn.setEnabled(True)
+        self.progress_bar.setFormat(S.PROGRESS_DONE if completed else S.PROGRESS_FAILED)
+        self.batch_tab.show_summary(self._batch_jobs)
+
+        # Every batch job is a real build, so each belongs in the history.
+        for job in self._batch_jobs:
+            record = make_record(
+                source=job.source,
+                output_name=job.output_name,
+                success=job.status == "success",
+                duration_seconds=job.duration_seconds,
+                config=self._current_config().to_dict(),
+            )
+            self.history.add(record)
+        self._refresh_history_list()
+
+        summary = summarize(self._batch_jobs)
+        self._notify_build_result(
+            summary.failed == 0 and summary.cancelled == 0,
+            f"{summary.succeeded}/{summary.total}",
+        )
+
+    def _build_in_progress(self) -> bool:
+        for thread in (self.conversion_thread, self.batch_thread):
+            if thread and thread.isRunning():
+                return True
+        return False
+
     # ─── Preferences ────────────────────────────────────────────────────
 
     def load_settings(self):
@@ -526,8 +771,30 @@ class MainWindow(QMainWindow):
         self.conversion_thread = ConversionThread(cmd, work_dir)
         self.conversion_thread.log_signal.connect(self._append_log)
         self.conversion_thread.progress_signal.connect(self.progress_bar.setValue)
+        self.conversion_thread.stage_signal.connect(self._on_stage_changed)
         self.conversion_thread.finished_signal.connect(self.on_conversion_finished)
         self.conversion_thread.start()
+
+        # A build runs for minutes; make sure it can report from the tray even
+        # if the window ends up minimised or behind something else.
+        self.tray.show()
+
+    def _on_stage_changed(self, stage_key: str):
+        """Name the phase PyInstaller has reached on the progress bar."""
+        label = getattr(S, f"STAGE_{stage_key.upper()}", "")
+        if label:
+            self.progress_bar.setFormat(S.PROGRESS_STAGE_FMT.format(stage=label))
+
+    def _notify_build_result(self, success: bool, name: str):
+        """Raise a desktop notification, unless the window is already focused."""
+        if self.isActiveWindow():
+            return
+        if success:
+            self.tray.notify(
+                S.TRAY_BUILD_OK_TITLE, S.TRAY_BUILD_OK_BODY.format(name=name), True
+            )
+        else:
+            self.tray.notify(S.TRAY_BUILD_FAIL_TITLE, S.TRAY_BUILD_FAIL_BODY, False)
 
     def cancel_conversion(self):
         if self.conversion_thread and self.conversion_thread.isRunning():
@@ -560,8 +827,14 @@ class MainWindow(QMainWindow):
             except (OSError, ValueError) as e:
                 self._append_log(S.LOG_SIGNING_FAIL.format(error=str(e)))
 
+        output_name = snapshot.get("output_name", "") if snapshot else ""
         self._build_config_snapshot = {}
         self._cleanup_temp_files()
+
+        # Notify before the modal box: the dialog blocks until acknowledged,
+        # and the whole point is to reach a user who is looking elsewhere.
+        self._notify_build_result(success, output_name)
+
         if success:
             self.progress_bar.setFormat(S.PROGRESS_DONE)
             QMessageBox.information(self, S.MSG_SUCCESS, message)
@@ -608,10 +881,131 @@ class MainWindow(QMainWindow):
         self.main_tab.export_log()
 
     def toggle_theme(self):
-        """Swap between dark and light themes and persist the choice."""
-        self.current_theme = "light" if self.current_theme == "dark" else "dark"
-        self.setStyleSheet(themed_stylesheet(self.current_theme, current_locale()))
-        self.settings["theme"] = self.current_theme
+        """Ctrl+T: flip between dark and light, the two most-used themes.
+
+        The full list (including ``auto``, Nord and high contrast) lives in
+        the Templates tab; this stays a two-way switch because that is what a
+        single shortcut can usefully be.
+        """
+        stored = self.settings.get("theme", self.current_theme)
+        # From auto or a named theme, flip relative to what is on screen now.
+        target = "light" if resolve_theme(stored) == "dark" else "dark"
+        self.apply_theme(target)
+
+    def apply_theme(self, theme: str):
+        """Set the theme preference, repaint, and persist it."""
+        self.settings["theme"] = theme
+        self.current_theme = resolve_theme(theme)
+        self._apply_stylesheet()
+        self._repaint_log()
+        if hasattr(self, "templates_tab"):
+            self.templates_tab.set_theme(theme)
+        self._append_log(S.LOG_THEME_CHANGED.format(theme=theme))
+
+    def _on_theme_changed(self, index=None):
+        """Handler for the Templates tab's theme selector."""
+        selected = self.templates_tab.selected_theme()
+        if selected != self.settings.get("theme"):
+            self.apply_theme(selected)
+
+    def _repaint_log(self):
+        """Re-render buffered log lines in the new theme's palette.
+
+        Log colours are baked into the HTML at append time, so a theme change
+        leaves earlier lines in the old palette — which is exactly the bug the
+        light theme's log had before per-theme palettes existed.
+        """
+        self.main_tab._log_theme = self.current_theme
+        self.main_tab._apply_log_filter()
+
+    # ── Font zoom ───────────────────────────────────────────────────────────
+
+    def zoom_in(self):
+        self._set_font_scale(self.font_scale + FONT_SCALE_STEP)
+
+    def zoom_out(self):
+        self._set_font_scale(self.font_scale - FONT_SCALE_STEP)
+
+    def zoom_reset(self):
+        self._set_font_scale(DEFAULT_FONT_SCALE)
+
+    def _set_font_scale(self, scale: float):
+        """Rescale every font in the stylesheet, clamped to a usable range."""
+        new_scale = clamp_scale(scale)
+        if new_scale == self.font_scale:
+            return
+        self.font_scale = new_scale
+        self.settings["font_scale"] = new_scale
+        self._apply_stylesheet()
+        self._append_log(S.LOG_ZOOM_FMT.format(percent=round(new_scale * 100)))
+
+    # ── Simple / advanced mode ─────────────────────────────────────────────
+
+    def toggle_mode(self):
+        self.set_simple_mode(not self.simple_mode)
+
+    def set_simple_mode(self, simple: bool):
+        """Show either the essential tabs or all of them, and remember which."""
+        self.simple_mode = bool(simple)
+        self.settings["simple_mode"] = self.simple_mode
+        self._populate_tabs()
+        self.mode_btn.setText(self._mode_button_label())
+        self.mode_btn.setAccessibleName(self.mode_btn.text())
+        self.mode_btn.setToolTip(
+            S.MODE_ADVANCED_TIP if self.simple_mode else S.MODE_SIMPLE_TIP
+        )
+        self._append_log(S.LOG_MODE_SIMPLE if self.simple_mode else S.LOG_MODE_ADVANCED)
+
+    def run_startup_tasks(self):
+        """Anything that blocks, run after the window is visible.
+
+        Called by ``app.main`` rather than from ``__init__`` so that
+        constructing a MainWindow stays non-blocking and testable.
+        """
+        self._maybe_show_welcome()
+        self._maybe_check_for_updates()
+
+    def _maybe_show_welcome(self):
+        """Ask which mode to start in, once, on the very first run."""
+        if self.settings.get("welcomed"):
+            return
+        self.settings["welcomed"] = True
+        dialog = WelcomeDialog(self)
+        dialog.exec_()
+        self.set_simple_mode(dialog.simple_mode)
+        self.save_settings()
+
+    # ── Update check ───────────────────────────────────────────────────────
+
+    def _maybe_check_for_updates(self):
+        """Check on startup only if the user opted in — never by default.
+
+        A packaging tool that phones home unasked is not what anyone installed;
+        the setting defaults to off and the manual button is always available.
+        """
+        if self.settings.get("check_updates_on_start"):
+            self.check_for_updates(interactive=False)
+
+    def check_for_updates(self, interactive: bool = True):
+        """Look for a newer release. Reports only — nothing is downloaded."""
+        self._append_log(S.LOG_UPDATE_CHECKING)
+        info = check_for_update(APP_VERSION)
+        if info is None:
+            self._append_log(S.LOG_UPDATE_NONE.format(version=APP_VERSION))
+            if interactive:
+                QMessageBox.information(self, S.MSG_SUCCESS, S.UPDATE_NONE)
+            return
+
+        self._append_log(S.LOG_UPDATE_AVAILABLE.format(version=info.version, url=info.url))
+        reply = QMessageBox.question(
+            self,
+            S.MSG_INFO_TITLE,
+            S.UPDATE_AVAILABLE_FMT.format(version=info.version, current=APP_VERSION),
+            QMessageBox.Open | QMessageBox.Close,
+            QMessageBox.Close,
+        )
+        if reply == QMessageBox.Open:
+            webbrowser.open(info.url or RELEASES_PAGE_URL)
 
     def _on_language_changed(self, index):
         """Switch locale and rebuild the UI in place."""
@@ -631,11 +1025,16 @@ class MainWindow(QMainWindow):
         """
         config = self._current_config()
         version_info = self.version_info_tab.version_info()
-        log_html = self.main_tab.log_output.toHtml()
+        # Snapshot the buffer, not the rendered HTML: the filter re-renders
+        # from the buffer, so restoring HTML alone would lose the severities.
+        log_lines = self.main_tab.log_lines()
+        batch_sources = self.batch_tab.sources()
 
         set_locale(locale_code)
         self._apply_layout_direction()
-        self.setStyleSheet(themed_stylesheet(self.current_theme, locale_code))
+        self.setStyleSheet(
+            themed_stylesheet(self.current_theme, locale_code, self.font_scale)
+        )
         self.setWindowTitle(S.WINDOW_TITLE_FMT.format(name=APP_NAME, version=APP_VERSION))
         self.setCentralWidget(self._build_central_widget())
         self.statusBar().showMessage(f"{COPYRIGHT} | {DEVELOPER}")
@@ -651,8 +1050,12 @@ class MainWindow(QMainWindow):
         vi.vi_product_name.setText(version_info.product_name)
         vi.vi_product_version.setText(version_info.product_version)
 
-        self.main_tab.log_output.setHtml(log_html)
+        self.main_tab.restore_log(log_lines)
+        self.main_tab.refresh_icon_preview()
+        self.batch_tab.set_sources(batch_sources)
+        self.mode_btn.setText(self._mode_button_label())
         self._refresh_history_list()
+        self._refresh_presets_list()
         self._register_shortcuts()
 
     # ─── Version info / manifest temp files ─────────────────────────────
@@ -983,12 +1386,19 @@ class MainWindow(QMainWindow):
             ("Ctrl+B", self.start_conversion),
             ("Ctrl+Shift+B", self.cancel_conversion),
             ("Ctrl+P", self.preview_command),
-            ("Ctrl+L", self.main_tab.log_output.clear),
+            ("Ctrl+L", self.main_tab.clear_log),
             ("Ctrl+E", self.main_tab.export_log),
             ("Ctrl+S", self.save_current_settings),
             ("Ctrl+T", self.toggle_theme),
             ("F5", self.detect_imports_action),
             ("Ctrl+F", self.main_tab.log_search.setFocus),
+            ("Ctrl+M", self.toggle_mode),
+            # Zoom. Ctrl+= is bound too because reaching Ctrl++ on most
+            # layouts means pressing shift, which many apps do not require.
+            ("Ctrl++", self.zoom_in),
+            ("Ctrl+=", self.zoom_in),
+            ("Ctrl+-", self.zoom_out),
+            ("Ctrl+0", self.zoom_reset),
         ]
         for sequence, slot in bindings:
             shortcut = QShortcut(QKeySequence(sequence), self)
@@ -1033,18 +1443,23 @@ class MainWindow(QMainWindow):
 
     def closeEvent(self, event):
         self.save_settings()
-        if self.conversion_thread and self.conversion_thread.isRunning():
+        if self._build_in_progress():
             reply = QMessageBox.question(
                 self,
                 S.MSG_CONFIRM,
                 S.MSG_CLOSE_CONFIRM,
                 QMessageBox.Yes | QMessageBox.No,
             )
-            if reply == QMessageBox.Yes:
-                self.conversion_thread.cancel()
-                self.conversion_thread.wait()
-                event.accept()
-            else:
+            if reply != QMessageBox.Yes:
                 event.ignore()
-        else:
-            event.accept()
+                return
+            # Both threads spawn a child process; leaving either running
+            # orphans a PyInstaller run after the window is gone.
+            for thread in (self.conversion_thread, self.batch_thread):
+                if thread and thread.isRunning():
+                    thread.cancel()
+                    thread.wait()
+
+        self._cleanup_temp_files()
+        self.tray.hide()
+        event.accept()

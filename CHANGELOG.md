@@ -5,6 +5,86 @@ follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Phase 9 — Interface overhaul and new features
+
+Implements [UI_IMPROVEMENT_PLAN.md](UI_IMPROVEMENT_PLAN.md): the whole of its
+Phase 9 (interface) plus the batch, update-check and preset items from Phase 10.
+
+#### Added — interface
+- **Simple mode, and it is the default.** A new user met nine tabs of
+  PyInstaller options when all they wanted was one `.exe`. Simple mode shows
+  three (Main, Templates, About); `Ctrl+M` or the mode button reveals the rest.
+  A one-time welcome dialog asks which to start in. Hidden tabs are detached
+  from the tab bar, never destroyed, so switching modes mid-setup loses nothing.
+- **Two new themes and an automatic one.** `nord` and `high-contrast` join dark
+  and light, and `auto` follows the OS setting (registry on Windows, `defaults`
+  on macOS, `gsettings`/`GTK_THEME` on Linux). Selectable from the Templates
+  tab; `Ctrl+T` still flips dark/light.
+- **Font zoom** — `Ctrl++` / `Ctrl+-` / `Ctrl+0`, persisted, clamped to
+  0.7×–2.0×. Every size in the stylesheet scales, not just the log.
+- **System tray icon and desktop notifications.** A build runs for minutes; the
+  only way to know it had finished was to keep watching the window. Notifies on
+  success and failure, and only when the window is not already focused.
+  Degrades to a no-op where no tray exists (headless CI, bare WMs).
+- **Log severity filter** — All / Errors / Warnings / Success, beside the
+  existing text search. Export still writes the *whole* log, not just what the
+  filter shows.
+- **Icon preview** at 16/32/48/64px, the sizes Windows actually requests. A PNG
+  renamed to `.ico` gives itself away here instead of in the taskbar.
+- **Platform notices.** The Deploy, Installer and Version Info tabs now say
+  plainly, up front, that signing, manifests, version resources and Inno Setup
+  only take effect when building on Windows. Previously they rendered
+  identically on Linux and macOS and the failure only surfaced after a build as
+  a tool-not-found error.
+
+#### Added — features
+- **Batch conversion** (new `📚` tab): queue several `.py` files and build them
+  all with the current settings, with a per-file status marker and a summary.
+  Runs strictly sequentially — PyInstaller shares `build/` and `dist/` and
+  concurrent runs corrupt each other's intermediates. Verified end to end
+  against PyInstaller 6.22.
+- **Named presets**: save the current form under a name and restore it in one
+  click, plus export/import for sharing. An imported preset goes through the
+  same `--runtime-hook` confirmation as a settings file.
+- **Update check** — report-only and **off by default**. Reports a newer
+  GitHub release and offers to open the page; it never downloads or runs
+  anything, matching the explicit-consent rule Phase 8 applied to `pip install`.
+
+#### Fixed
+- **Progress bar reflected chattiness, not progress.** It nudged forward
+  whenever a line containing `Analyzing`/`Processing`/`Building` appeared, so
+  two projects sat at completely different values at the same point in the
+  build. `core/build_stages.py` now reads the phase PyInstaller announces
+  (`Building PYZ`, `Building EXE`, …) and names it above the bar. Progress is
+  monotonic and never reaches 100 from log text alone — only a zero exit code
+  means done.
+- **Contrast failures across both existing themes.** The light theme's primary
+  Build button was white-on-`#40a02b` at **2.96:1**, well under WCAG AA; the
+  status bar was 3.59:1 (dark) and 3.73:1 (light), and the About tab's muted
+  text 4.45:1. Every palette now clears 4.5:1 on text, buttons, tabs and status
+  bar, enforced by tests over all four themes.
+- **Theme changes left earlier log lines in the old palette**, because colours
+  are baked into the HTML when a line is appended. The log now re-renders from
+  a buffer on theme change.
+- **`closeEvent` could orphan a running build**: it only checked the conversion
+  thread, and did not clean up temp files on the way out.
+
+#### Changed
+- **`styles.py` is palette-driven.** Two hand-maintained ~200-line CSS strings
+  became one template rendered from a colour table, so a theme is now a
+  dictionary of colours (and adding the two new ones did not duplicate a single
+  selector). `DARK_THEME`, `LIGHT_THEME` and `THEMES` still exist and still
+  render the same rules.
+- **`MainWindow.__init__` no longer blocks.** The first-run dialog and update
+  check moved to `run_startup_tasks()`, called by `app.main` after the window is
+  shown — a constructor that opens a modal cannot be instantiated by a test.
+- `is_windows()` accepts `cygwin` and `msys`, which do reach the Windows SDK.
+- Version bumped to 1.2.0; presets live in `presets.json` beside settings and
+  history.
+
+329 -> 666 tests. Core coverage 97%.
+
+
 ### Phase 8 — Priority fix plan (review items 3-30)
 
 Implements the prioritised fix plan from the full repository review. Items 1,
