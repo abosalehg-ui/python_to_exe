@@ -232,8 +232,12 @@ def test_findings_survive_a_language_switch(window, tmp_path):
     window.main_tab.source_input.setText(source)
     window.run_doctor()
     window.retranslate("en")
-    assert "package_needs_collect" in list_codes(window)
-    assert "needs files" in window.doctor_tab.findings_list.item(0).text()
+    codes = list_codes(window)
+    assert "package_needs_collect" in codes
+    # Look the item up by code: whether python-docx is installed decides if a
+    # "not installed" error sorts above it, and CI does not install it.
+    item = window.doctor_tab.findings_list.item(codes.index("package_needs_collect"))
+    assert "needs files" in item.text()
 
 
 # ── Diagnostic run ─────────────────────────────────────────────────────────
