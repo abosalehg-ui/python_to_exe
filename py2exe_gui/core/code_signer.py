@@ -4,8 +4,14 @@ Actually running signtool is delegated to the UI layer so this module
 stays UI- and subprocess-free (and testable).
 """
 
+import re
 from dataclasses import dataclass
 from typing import List, Optional, Tuple
+
+# "/p <password>" inside one argument — ISCC takes the whole signtool command
+# as a single "/Sbyparam=signtool sign ... /p secret ... $f" token, where a
+# password with spaces is wrapped in Inno Setup's $q quote marker.
+_EMBEDDED_PASSWORD = re.compile(r"(?<!\S)/p\s+(?:\$q.*?\$q|\S+)")
 
 
 @dataclass
@@ -81,7 +87,8 @@ def redact_password(command: List[str]) -> List[str]:
     """Return a copy of ``command`` with /p values replaced by '***'.
 
     Use this when logging or displaying the command to avoid leaking the
-    certificate password.
+    certificate password — including a password embedded in a single
+    argument, as in the ``/Sbyparam=...`` that signs an installer.
     """
     if not command:
         return list(command)
@@ -92,7 +99,9 @@ def redact_password(command: List[str]) -> List[str]:
             redacted.append("***")
             skip_next = False
             continue
-        redacted.append(token)
         if token == "/p":
             skip_next = True
+        elif "/p" in token:
+            token = _EMBEDDED_PASSWORD.sub("/p ***", token)
+        redacted.append(token)
     return redacted

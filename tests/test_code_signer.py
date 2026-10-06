@@ -186,3 +186,20 @@ def test_pfx_mode_is_still_the_default():
     assert error is None
     assert "/f" in cmd
     assert "/n" not in cmd
+
+
+def test_redact_password_inside_an_iscc_sign_parameter():
+    """ISCC gets the whole signtool command as one /Sbyparam=... argument."""
+    from py2exe_gui.core.installer import build_iscc_command
+
+    sign = ["signtool", "sign", "/f", "C:/certs/me.pfx", "/p", "s3cret pass", "/fd", "sha256"]
+    cmd, _ = build_iscc_command("app.iss", iscc_path="ISCC.exe", sign_command=sign)
+    assert any("s3cret" in token for token in cmd)
+    redacted = redact_password(cmd)
+    assert not any("s3cret" in token for token in redacted)
+    assert any("/p ***" in token and "/fd sha256" in token for token in redacted)
+    plain, _ = build_iscc_command("app.iss", iscc_path="ISCC.exe",
+                                  sign_command=["signtool", "sign", "/p", "hunter2", "/q"])
+    assert "hunter2" not in " ".join(redact_password(plain))
+    # Paths that merely contain "/p" are left alone.
+    assert redact_password(["C:/proj/pkg/app.exe"]) == ["C:/proj/pkg/app.exe"]
