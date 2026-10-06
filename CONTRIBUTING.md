@@ -39,6 +39,14 @@ ruff check py2exe_gui/ tests/       # فحص الكود
 3. أضف الترجمات في `class Ar` و `class En` في `strings.py`
 4. `pytest tests/test_templates.py` يجب أن يمرّ
 
+### إضافة مكتبة إلى قاعدة المعرفة
+
+قاعدة معرفة طبيب المشروع ملف بيانات: `py2exe_gui/knowledge/packages.json`.
+المفتاح هو **اسم الاستيراد** (`PIL` لا `Pillow`). الحقول كلها اختيارية:
+`pip`، `hidden_imports`، `collect_data`، `collect_submodules`، `collect_all`،
+`copy_metadata`، `data_dirs`، `console_streams`، `large`، `notes` (`ar` + `en`).
+أضف فقط ما جرّبته فعلاً على بناء حقيقي، ثم شغّل `pytest tests/test_knowledge.py`.
+
 ### إضافة لغة جديدة
 
 1. أنشئ `class Xx` في `strings.py` بكل المفاتيح الموجودة في `Ar`/`En`
@@ -84,6 +92,16 @@ ruff check py2exe_gui/ tests/       # lint check
 2. Add keys to `_NAME_ATTR` and `_DESC_ATTR`
 3. Add translations to both `class Ar` and `class En` in `strings.py`
 4. `pytest tests/test_templates.py` must pass
+
+### Adding a Package to the Knowledge Base
+
+The project doctor's knowledge base is a data file:
+`py2exe_gui/knowledge/packages.json`. Entries are keyed by **import name**
+(`PIL`, not `Pillow`). Every field is optional: `pip`, `hidden_imports`,
+`collect_data`, `collect_submodules`, `collect_all`, `copy_metadata`,
+`data_dirs`, `console_streams`, `large`, `notes` (`ar` + `en`). Only add what
+you have verified against a real build, then run
+`pytest tests/test_knowledge.py`.
 
 ### Adding a New Language
 

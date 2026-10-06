@@ -234,6 +234,9 @@ class Ar:
         "كشف تلقائي للمكتبات",
         "حفظ وتحميل الإعدادات",
         "سجل تفصيلي للعملية",
+        "طبيب مشروع يكتشف ما سيكسر الـ EXE ويصلحه بنقرة",
+        "تشخيص أعطال البناء والتشغيل",
+        "استوديو أيقونات .ico بكل الأحجام",
     ]
 
     # Language selector (Phase 3)
@@ -591,6 +594,230 @@ class Ar:
     DIALOG_EXPORT_PRESETS = "تصدير الإعدادات المحفوظة"
     DIALOG_IMPORT_PRESETS = "استيراد إعدادات محفوظة"
 
+    # ── 1.3: project doctor and diagnostics ──
+    TAB_DOCTOR = "🩺 طبيب المشروع"
+    DOCTOR_SCORE_FMT = "درجة الجاهزية: {score}/100"
+    DOCTOR_SCORE_NONE = "درجة الجاهزية: —"
+    DOCTOR_SUMMARY_FMT = "{errors} خطأ · {warnings} تحذير · {infos} ملاحظة"
+    DOCTOR_BUILD_SUMMARY_FMT = "مشاكل من آخر بناء/تشغيل: {count}"
+    DOCTOR_HINT = (
+        "يفحص الطبيب كودك دون تشغيله بحثاً عمّا يعمل في بايثون وينكسر بعد "
+        "التحويل، ويقرأ أخطاء آخر بناء وتشغيل. حدّد الإصلاحات ثم طبّقها بنقرة."
+    )
+    DOCTOR_NO_SOURCE = "اختر ملف المصدر في التبويب الرئيسي ليبدأ الفحص."
+    DOCTOR_ALL_CLEAR = "✅ لا مشاكل معروفة — مشروعك جاهز للبناء"
+    BTN_DOCTOR_EXAMINE = "🔍 افحص الآن"
+    BTN_DOCTOR_APPLY = "✅ طبّق الإصلاحات المحددة"
+    BTN_DOCTOR_APPLY_REBUILD = "🔁 طبّق وأعد البناء"
+    BTN_DOCTOR_DIAGNOSE = "🧪 تشغيل تشخيصي"
+    BTN_DOCTOR_DIAGNOSE_TIP = (
+        "التطبيق بلا Console يُخفي رسالة الخطأ عند انهياره. هذا الزر يبني نسخة "
+        "تشخيصية مع Console في مجلد جانبي، يشغّلها، ويقرأ الخطأ الحقيقي."
+    )
+    BTN_DOCTOR_COPY = "📋 نسخ الكود"
+    BTN_DOCTOR_COPY_PIP = "📋 نسخ أمر التثبيت"
+    DOCTOR_COPIED = "📋 تم النسخ إلى الحافظة"
+    DOCTOR_FIXES_HEADER = "الإصلاح التلقائي:"
+    DOCTOR_MANUAL_HEADER = "يتطلب تعديلاً منك — انسخ الكود التالي:"
+    DOCTOR_PIP_HEADER = "ثبّت المكتبة في بايثون الذي يبني التطبيق:"
+    DOCTOR_NOTE_HEADER = "ملاحظة:"
+    DOCTOR_NOTHING_SELECTED = "لم تحدد أي إصلاح قابل للتطبيق"
+    DOCTOR_READINESS_BTN_FMT = "🩺 {score}/100"
+    DOCTOR_READINESS_TIP = "درجة جاهزية المشروع للتحويل — اضغط لعرض التفاصيل"
+    LOG_DOCTOR_FIX_APPLIED = "🩺 تم تطبيق: {fix}"
+    LOG_DOCTOR_PREBUILD = (
+        "🩺 الطبيب وجد {errors} خطأ قد يكسر الـ EXE — راجع تبويب «طبيب المشروع»"
+    )
+    LOG_DOCTOR_BUILD_FINDINGS = (
+        "🩺 تم تشخيص {count} سبب محتمل مع حلول مقترحة — راجع تبويب «طبيب المشروع»"
+    )
+    MSG_DOCTOR_FAILED_HINT = "\n\n🩺 الطبيب وجد {count} سبب محتمل مع حلول جاهزة في تبويب «طبيب المشروع»."
+    LOG_SMOKE_WINDOWED_HINT = (
+        "ℹ️ تطبيق بلا Console: إن ظهر خطأ فلن يراه الاختبار. استخدم «🧪 تشغيل تشخيصي» "
+        "في تبويب الطبيب لقراءة الخطأ الحقيقي."
+    )
+    LOG_DIAG_START = "🧪 بناء نسخة تشخيصية (مع Console) في: {path}"
+    LOG_DIAG_RUN = "🧪 تشغيل النسخة التشخيصية..."
+    LOG_DIAG_DONE_FMT = "🧪 انتهى التشغيل التشخيصي: {count} مشكلة"
+    LOG_DIAG_CLEAN = "🧪 النسخة التشخيصية عملت دون أخطاء ظاهرة خلال مهلة الاختبار"
+    LOG_DIAG_BUILD_FAILED = "🧪 فشل بناء النسخة التشخيصية — راجع السجل"
+    MSG_DIAG_BUSY = "هناك عملية بناء قيد التنفيذ. انتظر حتى تنتهي."
+
+    ORIGIN_DOCTOR = "فحص مسبق"
+    ORIGIN_BUILD = "سجل البناء"
+    ORIGIN_WARN = "تحذيرات PyInstaller"
+    ORIGIN_RUNTIME = "تشغيل الـ EXE"
+
+    FIX_LABEL_HIDDEN_IMPORT = "إضافة Hidden Import: {value}"
+    FIX_LABEL_ADD_DATA = "تضمين مع الـ EXE: {value}"
+    FIX_LABEL_FLAG = "إضافة الخيار: {value}"
+    FIX_LABEL_CONSOLE = "إعادة تفعيل نافذة Console"
+    FIX_LABEL_SET_SOURCE = "البناء من الملف: {value}"
+
+    FINDING_SOURCE_UNREADABLE_TITLE = "تعذّرت قراءة ملف المصدر"
+    FINDING_SOURCE_UNREADABLE_DETAIL = "الخطأ: {error}. تأكد أن الملف موجود ومحفوظ بترميز UTF-8."
+    FINDING_SYNTAX_ERROR_TITLE = "خطأ صياغة في السطر {line}"
+    FINDING_SYNTAX_ERROR_DETAIL = "بايثون لا يستطيع قراءة الملف: {error}. أصلحه قبل البناء."
+    FINDING_MISSING_PACKAGE_TITLE = "المكتبة «{module}» غير مثبتة في بيئة البناء"
+    FINDING_MISSING_PACKAGE_DETAIL = (
+        "PyInstaller يضمّن فقط ما يجده في بايثون الذي يبني التطبيق. بدونها سيُغلق "
+        "الـ EXE فوراً بخطأ ModuleNotFoundError."
+    )
+    FINDING_PACKAGE_NEEDS_COLLECT_TITLE = "«{package}» تحتاج ملفات لا يراها PyInstaller وحده"
+    FINDING_PACKAGE_NEEDS_COLLECT_DETAIL = (
+        "هذه المكتبة تحمّل وحدات أو ملفات بيانات بطريقة ديناميكية. الإصلاح يضيف "
+        "خيارات التجميع المناسبة لها."
+    )
+    FINDING_PACKAGE_DATA_DIR_TITLE = "مجلد «{folder}» الذي تحتاجه {package} غير مضمّن"
+    FINDING_PACKAGE_DATA_DIR_DETAIL = (
+        "{package} تبحث عن هذا المجلد بجوار البرنامج وقت التشغيل، ولن يكون موجوداً "
+        "داخل الـ EXE ما لم يُضمَّن."
+    )
+    FINDING_PACKAGE_CONSOLE_STREAMS_TITLE = "«{package}» تنهار في تطبيق بلا Console"
+    FINDING_PACKAGE_CONSOLE_STREAMS_DETAIL = (
+        "هذه المكتبة تكتب مباشرة إلى sys.stdout أو sys.stderr، وهما None في تطبيق "
+        "بلا Console. إما أن تُعيد الـ Console، أو تضيف الكود التالي أول البرنامج."
+    )
+    FINDING_LARGE_PACKAGE_TITLE = "«{package}» ستزيد حجم الـ EXE كثيراً"
+    FINDING_LARGE_PACKAGE_DETAIL = "ليست مشكلة، لكن توقّع حجماً كبيراً ووقت إقلاع أطول في وضع الملف الواحد."
+    FINDING_MULTIPLE_QT_BINDINGS_TITLE = "الكود يستورد أكثر من مكتبة Qt: {bindings}"
+    FINDING_MULTIPLE_QT_BINDINGS_DETAIL = (
+        "PyInstaller يرفض تضمين أكثر من مكتبة Qt في تطبيق واحد. اختر واحدة فقط في الكود."
+    )
+    FINDING_OTHER_QT_BINDINGS_INSTALLED_TITLE = "مكتبات Qt أخرى مثبتة بجانب {binding}"
+    FINDING_OTHER_QT_BINDINGS_INSTALLED_DETAIL = (
+        "إن جرّتها مكتبة أخرى (مثل matplotlib) يتوقف البناء بخطأ «multiple Qt bindings». "
+        "استبعادها احتياط آمن ويقلل الحجم."
+    )
+    FINDING_DATA_NOT_BUNDLED_TITLE = "الملف «{path}» يستخدمه الكود لكنه غير مضمّن"
+    FINDING_DATA_NOT_BUNDLED_DETAIL = (
+        "الكود يشير إلى «{literal}» وهو موجود بجوار السكربت، لكنه لن يكون داخل الـ EXE "
+        "فيظهر FileNotFoundError عند التشغيل."
+    )
+    FINDING_RELATIVE_PATHS_TITLE = "مسارات نسبية ستنكسر بعد التحويل"
+    FINDING_RELATIVE_PATHS_DETAIL = (
+        "مسار مثل «{example}» يُحسب من مجلد التشغيل الحالي، لا من مكان الملفات المضمّنة "
+        "داخل الـ EXE. استخدم الدالة resource_path التالية لكل ملف بيانات."
+    )
+    FINDING_MISSING_FREEZE_SUPPORT_TITLE = "multiprocessing بدون freeze_support()"
+    FINDING_MISSING_FREEZE_SUPPORT_DETAIL = (
+        "بدونها يفتح الـ EXE على Windows نسخاً متتالية من نفسه بدل تشغيل العمليات "
+        "الفرعية. أضف السطر أول كتلة if __name__ == \"__main__\"."
+    )
+    FINDING_INPUT_IN_WINDOWED_TITLE = "input() في تطبيق بلا Console"
+    FINDING_INPUT_IN_WINDOWED_DETAIL = (
+        "لا توجد لوحة أوامر يُكتب فيها الإدخال، فينهار البرنامج بخطأ "
+        "«input(): lost sys.stdin». أعد تفعيل الـ Console أو استبدل input بنافذة إدخال."
+    )
+    FINDING_STREAM_IN_WINDOWED_TITLE = "{stream} يُستخدم مباشرة في تطبيق بلا Console"
+    FINDING_STREAM_IN_WINDOWED_DETAIL = (
+        "{stream} يساوي None في تطبيق بلا Console، فأي استدعاء عليه ينهار. print() "
+        "آمنة، لكن الاستخدام المباشر ليس كذلك."
+    )
+    FINDING_NO_ENTRY_POINT_TITLE = "الملف لا يشغّل شيئاً — ربما اخترت الملف الخطأ"
+    FINDING_NO_ENTRY_POINT_DETAIL = (
+        "الملف يعرّف دوالاً وأصنافاً فقط، فسيُغلق الـ EXE دون أن يفعل شيئاً. يبدو أن "
+        "«{candidate}» هو نقطة الدخول الحقيقية."
+    )
+    FINDING_NO_ENTRY_POINT_ALONE_TITLE = "الملف لا يشغّل شيئاً"
+    FINDING_NO_ENTRY_POINT_ALONE_DETAIL = (
+        "الملف يعرّف دوالاً وأصنافاً فقط ولا يستدعي أياً منها، فسيُغلق الـ EXE فوراً. "
+        "أضف نقطة دخول."
+    )
+    FINDING_ICON_NOT_ICO_TITLE = "«{icon}» ليس ملف .ico حقيقياً"
+    FINDING_ICON_NOT_ICO_DETAIL = (
+        "يبدو أنه صورة أُعيدت تسميتها إلى .ico. أنشئ أيقونة صحيحة بأحجام متعددة من "
+        "«🎨 استوديو الأيقونات» في التبويب الرئيسي."
+    )
+    FINDING_ICON_SINGLE_SIZE_TITLE = "«{icon}» يحوي حجماً واحداً فقط ({size}px)"
+    FINDING_ICON_SINGLE_SIZE_DETAIL = (
+        "سيقوم Windows بتكبيرها أو تصغيرها فتظهر مشوّشة في شريط المهام وسطح المكتب. "
+        "«🎨 استوديو الأيقونات» يولّد كل الأحجام."
+    )
+    FINDING_PYINSTALLER_MISSING_TITLE = "PyInstaller غير مثبت في بيئة البناء"
+    FINDING_PYINSTALLER_MISSING_DETAIL = "ثبّته بالأمر: pip install pyinstaller ثم أعد البناء."
+    FINDING_RUNTIME_MISSING_MODULE_TITLE = "الـ EXE لم يجد الوحدة «{module}»"
+    FINDING_RUNTIME_MISSING_MODULE_DETAIL = (
+        "المكتبة مثبتة لكن PyInstaller لم يكتشف استيرادها (استيراد ديناميكي غالباً). "
+        "الإصلاح يضيفها صراحةً."
+    )
+    FINDING_MISSING_METADATA_TITLE = "بيانات الحزمة «{package}» الوصفية غير مضمّنة"
+    FINDING_MISSING_METADATA_DETAIL = (
+        "الكود (أو مكتبة يستخدمها) يقرأ إصدار الحزمة وقت التشغيل عبر importlib.metadata. "
+        "الإصلاح ينسخ بياناتها الوصفية إلى الـ EXE."
+    )
+    FINDING_MISSING_DATA_FILE_TITLE = "الـ EXE لم يجد الملف «{path}»"
+    FINDING_MISSING_DATA_FILE_DETAIL = (
+        "الملف إما غير مضمّن، أو مضمّن لكن الكود يبحث عنه بمسار نسبي. ضمّنه، واستخدم "
+        "resource_path للوصول إليه."
+    )
+    FINDING_TEMPLATE_NOT_FOUND_TITLE = "القالب «{template}» غير موجود داخل الـ EXE"
+    FINDING_TEMPLATE_NOT_FOUND_DETAIL = "مجلد templates لم يُضمَّن مع التطبيق. الإصلاح يضمّنه."
+    FINDING_STREAMS_NONE_TITLE = "انهيار بسبب غياب الـ Console (.{attr})"
+    FINDING_STREAMS_NONE_DETAIL = (
+        "كود ما استدعى sys.stdout أو sys.stderr وهما None في تطبيق بلا Console. أعد "
+        "تفعيل الـ Console أو أضف الكود التالي أول البرنامج."
+    )
+    FINDING_DLL_LOAD_FAILED_TITLE = "فشل تحميل DLL أثناء استيراد «{module}»"
+    FINDING_DLL_LOAD_FAILED_DETAIL = (
+        "ملف مكتبة ثنائي تحتاجه «{package}» لم يُضمَّن. الإصلاح يجمع ملفاتها الثنائية؛ "
+        "وإن استمر الخطأ فقد يلزم تثبيت Visual C++ Redistributable على الجهاز المستهدف."
+    )
+    FINDING_MULTIPLE_QT_BINDINGS_BUILD_TITLE = "البناء توقف: أكثر من مكتبة Qt ({bindings})"
+    FINDING_MULTIPLE_QT_BINDINGS_BUILD_DETAIL = (
+        "PyInstaller لا يدعم أكثر من مكتبة Qt في تطبيق واحد. الإصلاح يستبعد {drop}."
+    )
+    FINDING_ADD_DATA_MISSING_TITLE = "ملف إضافي غير موجود: {path}"
+    FINDING_ADD_DATA_MISSING_DETAIL = (
+        "أحد خيارات --add-data يشير إلى مسار غير موجود. صحّحه في «أوامر PyInstaller "
+        "إضافية» أو احذفه."
+    )
+    FINDING_ICON_WRONG_FORMAT_TITLE = "صيغة الأيقونة «{icon}» غير مدعومة"
+    FINDING_ICON_WRONG_FORMAT_DETAIL = (
+        "Windows يقبل .ico فقط. حوّل الصورة إلى أيقونة من «🎨 استوديو الأيقونات» في "
+        "التبويب الرئيسي."
+    )
+    FINDING_FILE_LOCKED_TITLE = "الملف «{path}» مقفل"
+    FINDING_FILE_LOCKED_DETAIL = (
+        "غالباً النسخة السابقة من البرنامج ما زالت تعمل، أو مكافح الفيروسات يفحصها. "
+        "أغلق البرنامج وأعد المحاولة."
+    )
+    FINDING_RUNTIME_UNHANDLED_TITLE = "الـ EXE انهار بخطأ غير معروف"
+    FINDING_RUNTIME_UNHANDLED_DETAIL = (
+        "آخر خطأ: {error}\nهذا الخطأ ليس من الأنماط المعروفة للتحويل — قد يكون خطأً في "
+        "الكود نفسه. جرّب تشغيل السكربت بـ python للمقارنة."
+    )
+    FINDING_WARN_MISSING_MODULE_TITLE = "PyInstaller لم يجد «{module}» الذي يستورده كودك"
+    FINDING_WARN_MISSING_MODULE_DETAIL = (
+        "ورد في ملف تحذيرات PyInstaller. إن كانت مكتبة خارجية فثبّتها في بيئة البناء."
+    )
+
+    # ── 1.3: icon studio ──
+    BTN_ICON_STUDIO = "🎨"
+    ICON_STUDIO_TITLE = "🎨 استوديو الأيقونات"
+    ICON_STUDIO_HINT = (
+        "أنشئ ملف .ico حقيقياً بكل الأحجام التي يطلبها Windows "
+        "(16 إلى 256) من صورة، أو من حروف اسم برنامجك."
+    )
+    ICON_STUDIO_FROM_IMAGE = "من صورة"
+    ICON_STUDIO_FROM_TEXT = "من حروف"
+    ICON_STUDIO_CHOOSE_IMAGE = "📂 اختر صورة"
+    ICON_STUDIO_IMAGE_FILTER = "Images (*.png *.jpg *.jpeg *.bmp *.gif *.svg *.webp);;All Files (*.*)"
+    ICON_STUDIO_TEXT_LABEL = "النص (حرف أو حرفان):"
+    ICON_STUDIO_COLOR = "🎨 لون الخلفية"
+    ICON_STUDIO_SHAPE_LABEL = "الشكل:"
+    ICON_STUDIO_SHAPE_ROUNDED = "مربع بزوايا دائرية"
+    ICON_STUDIO_SHAPE_CIRCLE = "دائرة"
+    ICON_STUDIO_SHAPE_SQUARE = "مربع"
+    ICON_STUDIO_PREVIEW = "معاينة:"
+    ICON_STUDIO_SAVE = "💾 حفظ واستخدام الأيقونة"
+    ICON_STUDIO_SAVE_DIALOG = "حفظ الأيقونة"
+    ICON_STUDIO_ICO_FILTER = "Icon Files (*.ico)"
+    ICON_STUDIO_NOTHING = "اختر صورة أو اكتب نصاً أولاً"
+    ICON_STUDIO_BAD_IMAGE = "تعذّر فتح الصورة"
+    ICON_STUDIO_SAVE_FAIL = "تعذّر حفظ الأيقونة: {error}"
+    LOG_ICON_STUDIO_SAVED = "🎨 تم إنشاء الأيقونة ({sizes}): {path}"
+
 
 class En:
     """English strings."""
@@ -821,6 +1048,9 @@ class En:
         "Automatic dependency detection",
         "Save and load settings",
         "Detailed build log",
+        "Project doctor that finds what will break the EXE and fixes it in one click",
+        "Build and runtime failure diagnostics",
+        "Icon Studio for multi-size .ico files",
     ]
 
     # Language selector
@@ -1173,6 +1403,247 @@ class En:
     LOG_PRESET_IMPORT_NONE = "No new presets imported (the names already exist)"
     DIALOG_EXPORT_PRESETS = "Export saved presets"
     DIALOG_IMPORT_PRESETS = "Import saved presets"
+
+    # ── 1.3: project doctor and diagnostics ──
+    TAB_DOCTOR = "🩺 Project Doctor"
+    DOCTOR_SCORE_FMT = "Readiness: {score}/100"
+    DOCTOR_SCORE_NONE = "Readiness: —"
+    DOCTOR_SUMMARY_FMT = "{errors} error(s) · {warnings} warning(s) · {infos} note(s)"
+    DOCTOR_BUILD_SUMMARY_FMT = "Issues from the last build/run: {count}"
+    DOCTOR_HINT = (
+        "The doctor reads your code without running it, looking for things that "
+        "work in Python but break once frozen, and reads the errors from the last "
+        "build and run. Tick the fixes you want and apply them in one click."
+    )
+    DOCTOR_NO_SOURCE = "Choose a source file on the Main tab to start the checkup."
+    DOCTOR_ALL_CLEAR = "✅ No known problems — your project is ready to build"
+    BTN_DOCTOR_EXAMINE = "🔍 Check now"
+    BTN_DOCTOR_APPLY = "✅ Apply selected fixes"
+    BTN_DOCTOR_APPLY_REBUILD = "🔁 Apply and rebuild"
+    BTN_DOCTOR_DIAGNOSE = "🧪 Diagnostic run"
+    BTN_DOCTOR_DIAGNOSE_TIP = (
+        "A windowed app hides its error message when it crashes. This builds a "
+        "diagnostic copy with a console into a side folder, runs it, and reads "
+        "the real error."
+    )
+    BTN_DOCTOR_COPY = "📋 Copy code"
+    BTN_DOCTOR_COPY_PIP = "📋 Copy install command"
+    DOCTOR_COPIED = "📋 Copied to clipboard"
+    DOCTOR_FIXES_HEADER = "Automatic fix:"
+    DOCTOR_MANUAL_HEADER = "Needs a change from you — copy this code:"
+    DOCTOR_PIP_HEADER = "Install it into the Python that builds the app:"
+    DOCTOR_NOTE_HEADER = "Note:"
+    DOCTOR_NOTHING_SELECTED = "No applicable fix is selected"
+    DOCTOR_READINESS_BTN_FMT = "🩺 {score}/100"
+    DOCTOR_READINESS_TIP = "How ready the project is to build — click for details"
+    LOG_DOCTOR_FIX_APPLIED = "🩺 Applied: {fix}"
+    LOG_DOCTOR_PREBUILD = (
+        "🩺 The doctor found {errors} error(s) that may break the EXE — see the "
+        "Project Doctor tab"
+    )
+    LOG_DOCTOR_BUILD_FINDINGS = (
+        "🩺 Diagnosed {count} likely cause(s) with suggested fixes — see the "
+        "Project Doctor tab"
+    )
+    MSG_DOCTOR_FAILED_HINT = (
+        "\n\n🩺 The doctor found {count} likely cause(s) with ready fixes on the "
+        "Project Doctor tab."
+    )
+    LOG_SMOKE_WINDOWED_HINT = (
+        "ℹ️ Windowed app: if it shows an error, the smoke test cannot see it. Use "
+        "“🧪 Diagnostic run” on the Doctor tab to read the real error."
+    )
+    LOG_DIAG_START = "🧪 Building a diagnostic copy (with console) in: {path}"
+    LOG_DIAG_RUN = "🧪 Running the diagnostic copy..."
+    LOG_DIAG_DONE_FMT = "🧪 Diagnostic run finished: {count} issue(s)"
+    LOG_DIAG_CLEAN = "🧪 The diagnostic copy ran without visible errors within the timeout"
+    LOG_DIAG_BUILD_FAILED = "🧪 The diagnostic build failed — see the log"
+    MSG_DIAG_BUSY = "A build is already running. Wait for it to finish."
+
+    ORIGIN_DOCTOR = "Pre-build check"
+    ORIGIN_BUILD = "Build log"
+    ORIGIN_WARN = "PyInstaller warnings"
+    ORIGIN_RUNTIME = "Running the EXE"
+
+    FIX_LABEL_HIDDEN_IMPORT = "Add hidden import: {value}"
+    FIX_LABEL_ADD_DATA = "Bundle with the EXE: {value}"
+    FIX_LABEL_FLAG = "Add option: {value}"
+    FIX_LABEL_CONSOLE = "Turn the console back on"
+    FIX_LABEL_SET_SOURCE = "Build from: {value}"
+
+    FINDING_SOURCE_UNREADABLE_TITLE = "The source file could not be read"
+    FINDING_SOURCE_UNREADABLE_DETAIL = "Error: {error}. Make sure the file exists and is saved as UTF-8."
+    FINDING_SYNTAX_ERROR_TITLE = "Syntax error on line {line}"
+    FINDING_SYNTAX_ERROR_DETAIL = "Python cannot read the file: {error}. Fix it before building."
+    FINDING_MISSING_PACKAGE_TITLE = "“{module}” is not installed in the build environment"
+    FINDING_MISSING_PACKAGE_DETAIL = (
+        "PyInstaller bundles only what the Python running the build can import. "
+        "Without it the EXE closes immediately with ModuleNotFoundError."
+    )
+    FINDING_PACKAGE_NEEDS_COLLECT_TITLE = "“{package}” needs files PyInstaller can't see alone"
+    FINDING_PACKAGE_NEEDS_COLLECT_DETAIL = (
+        "This library loads modules or data files dynamically. The fix adds the "
+        "collection options it needs."
+    )
+    FINDING_PACKAGE_DATA_DIR_TITLE = "The “{folder}” folder {package} needs is not bundled"
+    FINDING_PACKAGE_DATA_DIR_DETAIL = (
+        "{package} looks for this folder next to the program at runtime, and it "
+        "won't exist inside the EXE unless it is bundled."
+    )
+    FINDING_PACKAGE_CONSOLE_STREAMS_TITLE = "“{package}” crashes in a windowed app"
+    FINDING_PACKAGE_CONSOLE_STREAMS_DETAIL = (
+        "This library writes straight to sys.stdout or sys.stderr, which are None "
+        "in a windowed app. Either turn the console back on, or add this code at "
+        "the top of your program."
+    )
+    FINDING_LARGE_PACKAGE_TITLE = "“{package}” will make the EXE much larger"
+    FINDING_LARGE_PACKAGE_DETAIL = "Not a problem, but expect a large file and a slower start in one-file mode."
+    FINDING_MULTIPLE_QT_BINDINGS_TITLE = "The code imports more than one Qt binding: {bindings}"
+    FINDING_MULTIPLE_QT_BINDINGS_DETAIL = (
+        "PyInstaller refuses to bundle more than one Qt binding in an app. Pick one "
+        "in your code."
+    )
+    FINDING_OTHER_QT_BINDINGS_INSTALLED_TITLE = "Other Qt bindings are installed besides {binding}"
+    FINDING_OTHER_QT_BINDINGS_INSTALLED_DETAIL = (
+        "If another library (matplotlib, for example) pulls one in, the build stops "
+        "with “multiple Qt bindings”. Excluding them is a safe precaution and "
+        "reduces size."
+    )
+    FINDING_DATA_NOT_BUNDLED_TITLE = "“{path}” is used by the code but not bundled"
+    FINDING_DATA_NOT_BUNDLED_DETAIL = (
+        "The code refers to “{literal}”, which exists next to the script, but it "
+        "won't be inside the EXE, so it fails with FileNotFoundError at runtime."
+    )
+    FINDING_RELATIVE_PATHS_TITLE = "Relative paths that will break once frozen"
+    FINDING_RELATIVE_PATHS_DETAIL = (
+        "A path such as “{example}” is resolved from the current working folder, "
+        "not from where the bundled files live inside the EXE. Use this "
+        "resource_path function for every data file."
+    )
+    FINDING_MISSING_FREEZE_SUPPORT_TITLE = "multiprocessing without freeze_support()"
+    FINDING_MISSING_FREEZE_SUPPORT_DETAIL = (
+        "Without it a Windows EXE keeps launching copies of itself instead of "
+        "running worker processes. Add the call as the first line of the "
+        "if __name__ == \"__main__\" block."
+    )
+    FINDING_INPUT_IN_WINDOWED_TITLE = "input() in a windowed app"
+    FINDING_INPUT_IN_WINDOWED_DETAIL = (
+        "There is no console to type into, so the program crashes with "
+        "“input(): lost sys.stdin”. Turn the console back on or replace input() "
+        "with a dialog."
+    )
+    FINDING_STREAM_IN_WINDOWED_TITLE = "{stream} is used directly in a windowed app"
+    FINDING_STREAM_IN_WINDOWED_DETAIL = (
+        "{stream} is None in a windowed app, so any call on it crashes. print() "
+        "is safe; direct use is not."
+    )
+    FINDING_NO_ENTRY_POINT_TITLE = "This file doesn't run anything — wrong file?"
+    FINDING_NO_ENTRY_POINT_DETAIL = (
+        "The file only defines functions and classes, so the EXE would exit "
+        "without doing anything. “{candidate}” looks like the real entry point."
+    )
+    FINDING_NO_ENTRY_POINT_ALONE_TITLE = "This file doesn't run anything"
+    FINDING_NO_ENTRY_POINT_ALONE_DETAIL = (
+        "The file only defines functions and classes and never calls them, so the "
+        "EXE would exit immediately. Add an entry point."
+    )
+    FINDING_ICON_NOT_ICO_TITLE = "“{icon}” is not a real .ico file"
+    FINDING_ICON_NOT_ICO_DETAIL = (
+        "It looks like an image renamed to .ico. Create a proper multi-size icon "
+        "with “🎨 Icon Studio” on the Main tab."
+    )
+    FINDING_ICON_SINGLE_SIZE_TITLE = "“{icon}” contains only one size ({size}px)"
+    FINDING_ICON_SINGLE_SIZE_DETAIL = (
+        "Windows will scale it and it will look blurry in the taskbar and on the "
+        "desktop. “🎨 Icon Studio” generates every size."
+    )
+    FINDING_PYINSTALLER_MISSING_TITLE = "PyInstaller is not installed in the build environment"
+    FINDING_PYINSTALLER_MISSING_DETAIL = "Install it with: pip install pyinstaller, then build again."
+    FINDING_RUNTIME_MISSING_MODULE_TITLE = "The EXE could not find the module “{module}”"
+    FINDING_RUNTIME_MISSING_MODULE_DETAIL = (
+        "The library is installed, but PyInstaller did not detect the import "
+        "(usually a dynamic import). The fix adds it explicitly."
+    )
+    FINDING_MISSING_METADATA_TITLE = "Package metadata for “{package}” is not bundled"
+    FINDING_MISSING_METADATA_DETAIL = (
+        "Your code (or a library it uses) reads the package version at runtime "
+        "through importlib.metadata. The fix copies its metadata into the EXE."
+    )
+    FINDING_MISSING_DATA_FILE_TITLE = "The EXE could not find “{path}”"
+    FINDING_MISSING_DATA_FILE_DETAIL = (
+        "The file is either not bundled, or bundled but looked up with a relative "
+        "path. Bundle it, and use resource_path to reach it."
+    )
+    FINDING_TEMPLATE_NOT_FOUND_TITLE = "Template “{template}” is missing from the EXE"
+    FINDING_TEMPLATE_NOT_FOUND_DETAIL = "The templates folder was not bundled. The fix bundles it."
+    FINDING_STREAMS_NONE_TITLE = "Crash caused by the missing console (.{attr})"
+    FINDING_STREAMS_NONE_DETAIL = (
+        "Some code called sys.stdout or sys.stderr, which are None in a windowed "
+        "app. Turn the console back on, or add this code at the top of your program."
+    )
+    FINDING_DLL_LOAD_FAILED_TITLE = "A DLL failed to load while importing “{module}”"
+    FINDING_DLL_LOAD_FAILED_DETAIL = (
+        "A binary file that “{package}” needs was not bundled. The fix collects its "
+        "binaries; if the error persists, the target machine may need the Visual "
+        "C++ Redistributable."
+    )
+    FINDING_MULTIPLE_QT_BINDINGS_BUILD_TITLE = "Build stopped: more than one Qt binding ({bindings})"
+    FINDING_MULTIPLE_QT_BINDINGS_BUILD_DETAIL = (
+        "PyInstaller does not support more than one Qt binding in an app. The fix "
+        "excludes {drop}."
+    )
+    FINDING_ADD_DATA_MISSING_TITLE = "Extra file not found: {path}"
+    FINDING_ADD_DATA_MISSING_DETAIL = (
+        "An --add-data option points to a path that doesn't exist. Correct or "
+        "remove it under “Extra PyInstaller arguments”."
+    )
+    FINDING_ICON_WRONG_FORMAT_TITLE = "Icon format of “{icon}” is not supported"
+    FINDING_ICON_WRONG_FORMAT_DETAIL = (
+        "Windows accepts .ico only. Convert the image with “🎨 Icon Studio” on the "
+        "Main tab."
+    )
+    FINDING_FILE_LOCKED_TITLE = "“{path}” is locked"
+    FINDING_FILE_LOCKED_DETAIL = (
+        "Usually the previous build of the program is still running, or an "
+        "antivirus is scanning it. Close the program and try again."
+    )
+    FINDING_RUNTIME_UNHANDLED_TITLE = "The EXE crashed with an unrecognised error"
+    FINDING_RUNTIME_UNHANDLED_DETAIL = (
+        "Last error: {error}\nThis isn't one of the known freezing problems — it "
+        "may be a bug in the code itself. Try running the script with python to "
+        "compare."
+    )
+    FINDING_WARN_MISSING_MODULE_TITLE = "PyInstaller could not find “{module}”, which your code imports"
+    FINDING_WARN_MISSING_MODULE_DETAIL = (
+        "Listed in PyInstaller's warnings file. If it is a third-party library, "
+        "install it into the build environment."
+    )
+
+    # ── 1.3: icon studio ──
+    BTN_ICON_STUDIO = "🎨"
+    ICON_STUDIO_TITLE = "🎨 Icon Studio"
+    ICON_STUDIO_HINT = (
+        "Create a real .ico with every size Windows asks for (16 to 256) from an "
+        "image, or from your program's initials."
+    )
+    ICON_STUDIO_FROM_IMAGE = "From image"
+    ICON_STUDIO_FROM_TEXT = "From letters"
+    ICON_STUDIO_CHOOSE_IMAGE = "📂 Choose image"
+    ICON_STUDIO_IMAGE_FILTER = "Images (*.png *.jpg *.jpeg *.bmp *.gif *.svg *.webp);;All Files (*.*)"
+    ICON_STUDIO_TEXT_LABEL = "Text (one or two letters):"
+    ICON_STUDIO_COLOR = "🎨 Background colour"
+    ICON_STUDIO_SHAPE_LABEL = "Shape:"
+    ICON_STUDIO_SHAPE_ROUNDED = "Rounded square"
+    ICON_STUDIO_SHAPE_CIRCLE = "Circle"
+    ICON_STUDIO_SHAPE_SQUARE = "Square"
+    ICON_STUDIO_PREVIEW = "Preview:"
+    ICON_STUDIO_SAVE = "💾 Save and use icon"
+    ICON_STUDIO_SAVE_DIALOG = "Save icon"
+    ICON_STUDIO_ICO_FILTER = "Icon Files (*.ico)"
+    ICON_STUDIO_NOTHING = "Choose an image or type some text first"
+    ICON_STUDIO_BAD_IMAGE = "The image could not be opened"
+    ICON_STUDIO_SAVE_FAIL = "Could not save the icon: {error}"
+    LOG_ICON_STUDIO_SAVED = "🎨 Icon created ({sizes}): {path}"
 
 
 # ──────────────────────────────────────────────────────────────────────────

@@ -5,6 +5,7 @@ from py2exe_gui.ui.tabs.advanced_tab import AdvancedTab
 from py2exe_gui.ui.tabs.base import BaseTab, browse_button, scrollable
 from py2exe_gui.ui.tabs.batch_tab import BatchTab
 from py2exe_gui.ui.tabs.deploy_tab import DeployTab
+from py2exe_gui.ui.tabs.doctor_tab import DoctorTab
 from py2exe_gui.ui.tabs.history_tab import HistoryTab
 from py2exe_gui.ui.tabs.installer_tab import InstallerTab
 from py2exe_gui.ui.tabs.main_tab import MainTab
@@ -17,6 +18,7 @@ __all__ = [
     "BaseTab",
     "BatchTab",
     "DeployTab",
+    "DoctorTab",
     "HistoryTab",
     "InstallerTab",
     "MainTab",

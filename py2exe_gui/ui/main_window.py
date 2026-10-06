@@ -13,8 +13,9 @@ import sys
 import tempfile
 import time
 import webbrowser
+from dataclasses import replace
 
-from PyQt5.QtCore import Qt
+from PyQt5.QtCore import Qt, QTimer
 from PyQt5.QtGui import QFont, QKeySequence
 from PyQt5.QtWidgets import (
     QFileDialog,
@@ -49,11 +50,16 @@ from py2exe_gui.core import (
     InstallerConfig,
     ManifestConfig,
     PresetLibrary,
+    apply_fixes,
     build_iscc_command,
     build_pyinstaller_command,
     build_signtool_command,
     check_for_update,
+    dedupe_findings,
     detect_imports,
+    diagnose_output,
+    diagnostic_config,
+    examine,
     filter_non_stdlib,
     find_dangerous_args,
     find_iscc,
@@ -61,13 +67,19 @@ from py2exe_gui.core import (
     generate_manifest,
     generate_version_file,
     installer_output_path,
+    local_module_names,
     locate_built_executable,
     make_record,
+    needs_diagnostic_run,
     parse_requirements,
+    read_warn_findings,
+    readiness_score,
     redact_password,
     resolve_languages,
+    sort_findings,
     summarize,
 )
+from py2exe_gui.core.fixes import ORIGIN_BUILD, ORIGIN_RUNTIME, fix_is_applied
 from py2exe_gui.core.installer import validate as validate_installer
 from py2exe_gui.strings import (
     LOCALE_LAYOUT,
@@ -85,7 +97,10 @@ from py2exe_gui.styles import (
 from py2exe_gui.templates import TEMPLATES, template_name
 from py2exe_gui.ui.batch_thread import BatchThread
 from py2exe_gui.ui.conversion_thread import ConversionThread
+from py2exe_gui.ui.diagnostic_thread import DiagnosticThread
 from py2exe_gui.ui.dialogs import CommandPreviewDialog, PresetNameDialog, WelcomeDialog
+from py2exe_gui.ui.finding_text import fix_label
+from py2exe_gui.ui.icon_studio_dialog import IconStudioDialog
 from py2exe_gui.ui.installer_thread import InstallerThread
 from py2exe_gui.ui.post_build_thread import PostBuildThread
 from py2exe_gui.ui.tabs import (
@@ -93,6 +108,7 @@ from py2exe_gui.ui.tabs import (
     AdvancedTab,
     BatchTab,
     DeployTab,
+    DoctorTab,
     HistoryTab,
     InstallerTab,
     MainTab,
@@ -103,7 +119,11 @@ from py2exe_gui.ui.tray import BuildTray
 
 # Tabs shown in simple mode. Eight tabs at once is a lot to meet when all you
 # want is one .exe; the rest stay one button away.
-SIMPLE_MODE_TABS = ("main", "templates", "about")
+SIMPLE_MODE_TABS = ("main", "doctor", "templates", "about")
+
+# Wait this long after the last edit before re-examining the project, so the
+# doctor does not re-parse the script on every keystroke in the path field.
+DOCTOR_DEBOUNCE_MS = 500
 
 
 class MainWindow(QMainWindow):
@@ -115,6 +135,7 @@ class MainWindow(QMainWindow):
         self.installer_thread = None
         self.post_build_thread = None
         self.batch_thread = None
+        self.diagnostic_thread = None
         self.settings = {}
         self.current_theme = "dark"
         self.font_scale = DEFAULT_FONT_SCALE
@@ -126,6 +147,18 @@ class MainWindow(QMainWindow):
         self._last_built_exe = ""
         self._shortcuts = []
         self._batch_jobs = []
+        # Project doctor state: what the pre-build check predicts, and what
+        # the last build / run actually reported (kept until the source changes).
+        self._doctor_findings = []
+        self._build_findings = []
+        self._build_findings_source = ""
+        self._source_imports = set()
+        self._build_output = []
+        self._build_wall_start = 0.0
+        self._doctor_timer = QTimer(self)
+        self._doctor_timer.setSingleShot(True)
+        self._doctor_timer.setInterval(DOCTOR_DEBOUNCE_MS)
+        self._doctor_timer.timeout.connect(self.run_doctor)
         self.history = BuildHistory(HISTORY_FILE)
         self.presets = PresetLibrary(PRESETS_FILE)
         self.load_settings()
@@ -179,6 +212,7 @@ class MainWindow(QMainWindow):
         layout.addWidget(self._create_header())
 
         self.main_tab = MainTab(self)
+        self.doctor_tab = DoctorTab(self)
         self.advanced_tab = AdvancedTab(self)
         self.version_info_tab = VersionInfoTab(self)
         self.deploy_tab = DeployTab(self)
@@ -191,6 +225,7 @@ class MainWindow(QMainWindow):
         # Keyed so simple mode can pick a subset by name rather than by index.
         self._all_tabs = (
             ("main", self.main_tab, S.TAB_MAIN),
+            ("doctor", self.doctor_tab, S.TAB_DOCTOR),
             ("advanced", self.advanced_tab, S.TAB_ADVANCED),
             ("version_info", self.version_info_tab, S.TAB_VERSION_INFO),
             ("deploy", self.deploy_tab, S.TAB_DEPLOY),
@@ -206,6 +241,13 @@ class MainWindow(QMainWindow):
         layout.addWidget(self.tabs)
 
         self.templates_tab.set_theme(self.settings.get("theme", "dark"))
+
+        # Re-examine whenever something the doctor's checks depend on changes.
+        main = self.main_tab
+        main.source_input.textChanged.connect(self._schedule_doctor)
+        main.icon_input.textChanged.connect(self._schedule_doctor)
+        main.windowed_check.toggled.connect(self._schedule_doctor)
+        main.noconsole_check.toggled.connect(self._schedule_doctor)
 
         layout.addWidget(self._create_progress_group())
         layout.addLayout(self._create_action_buttons())
@@ -663,7 +705,7 @@ class MainWindow(QMainWindow):
         )
 
     def _build_in_progress(self) -> bool:
-        for thread in (self.conversion_thread, self.batch_thread):
+        for thread in (self.conversion_thread, self.batch_thread, self.diagnostic_thread):
             if thread and thread.isRunning():
                 return True
         return False
@@ -757,7 +799,16 @@ class MainWindow(QMainWindow):
             return
 
         self._build_start_time = time.monotonic()
+        self._build_wall_start = time.time()
         self._build_config_snapshot = config.to_dict()
+        self._build_output = []
+
+        # A last look before building: the doctor never blocks a build, but
+        # errors it can already see are worth one line in the log.
+        self.run_doctor()
+        errors = sum(f.severity == "error" for f in self._doctor_findings)
+        if errors:
+            self._append_log(S.LOG_DOCTOR_PREBUILD.format(errors=errors))
 
         work_dir = self.main_tab.output_dir.text() or os.path.dirname(
             self.main_tab.source_input.text()
@@ -770,6 +821,7 @@ class MainWindow(QMainWindow):
 
         self.conversion_thread = ConversionThread(cmd, work_dir)
         self.conversion_thread.log_signal.connect(self._append_log)
+        self.conversion_thread.log_signal.connect(self._build_output.append)
         self.conversion_thread.progress_signal.connect(self.progress_bar.setValue)
         self.conversion_thread.stage_signal.connect(self._on_stage_changed)
         self.conversion_thread.finished_signal.connect(self.on_conversion_finished)
@@ -819,6 +871,12 @@ class MainWindow(QMainWindow):
                     S.LOG_HISTORY_SAVE_FAIL.format(error=self.history.last_error)
                 )
             self._refresh_history_list()
+
+        diagnosed = []
+        if snapshot and message != S.CONV_CANCELLED:
+            diagnosed = self._diagnose_build(BuildConfig.from_dict(snapshot))
+            if not success and diagnosed:
+                message += S.MSG_DOCTOR_FAILED_HINT.format(count=len(diagnosed))
 
         # Post-build actions only make sense for a successful build.
         if success and snapshot:
@@ -1052,6 +1110,7 @@ class MainWindow(QMainWindow):
 
         self.main_tab.restore_log(log_lines)
         self.main_tab.refresh_icon_preview()
+        self._refresh_doctor_view()
         self.batch_tab.set_sources(batch_sources)
         self.mode_btn.setText(self._mode_button_label())
         self._refresh_history_list()
@@ -1166,6 +1225,189 @@ class MainWindow(QMainWindow):
         self._refresh_history_list()
         self._append_log(S.HISTORY_CLEARED)
 
+    # ─── Project doctor ─────────────────────────────────────────────────
+
+    def _schedule_doctor(self, *_args):
+        self._doctor_timer.start()
+
+    def _source_path(self) -> str:
+        return self.main_tab.source_input.text().strip()
+
+    def run_doctor(self):
+        """Examine the current script and settings, then refresh the views."""
+        self._doctor_timer.stop()
+        source = self._source_path()
+        if not source or not os.path.isfile(source):
+            self._doctor_findings = []
+            self._source_imports = set()
+            self._refresh_doctor_view()
+            return
+        # Findings from a build of a different script no longer apply.
+        if self._build_findings and source != self._build_findings_source:
+            self._build_findings = []
+        report = examine(source, self._current_config())
+        self._doctor_findings = report.findings
+        self._source_imports = report.imports
+        self._refresh_doctor_view()
+
+    def _refresh_doctor_view(self):
+        source = self._source_path()
+        has_source = bool(source) and os.path.isfile(source)
+        self.doctor_tab.show_findings(
+            self._doctor_findings, self._build_findings, has_source=has_source
+        )
+        self.main_tab.set_readiness(
+            self.doctor_tab_score() if has_source else None
+        )
+
+    def doctor_tab_score(self) -> int:
+        return readiness_score(self._doctor_findings)
+
+    def show_doctor_tab(self):
+        self.tabs.setCurrentWidget(self.doctor_tab)
+
+    def _set_build_findings(self, findings, source: str):
+        # A fix already in the settings is not a remedy any more (bundling a
+        # file that is read by a relative path, say): keep the finding and its
+        # advice, drop the no-op fix so it isn't offered again.
+        config = self._current_config()
+        findings = [
+            replace(f, fixes=tuple(x for x in f.fixes if not fix_is_applied(config, x)))
+            for f in findings
+        ]
+        self._build_findings = sort_findings(dedupe_findings(findings))
+        self._build_findings_source = source
+        self._refresh_doctor_view()
+        if self._build_findings:
+            self._append_log(
+                S.LOG_DOCTOR_BUILD_FINDINGS.format(count=len(self._build_findings))
+            )
+
+    def apply_doctor_fixes(self, fixes, rebuild: bool = False):
+        """Apply fixes chosen on the Doctor tab, optionally rebuilding."""
+        if not fixes:
+            QMessageBox.information(self, S.MSG_WARNING, S.DOCTOR_NOTHING_SELECTED)
+            return
+        if self._build_in_progress():
+            QMessageBox.warning(self, S.MSG_WARNING, S.MSG_DIAG_BUSY)
+            return
+        new_config, applied = apply_fixes(self._current_config(), fixes)
+        self._apply_config(new_config)
+        for fix in applied:
+            self._append_log(S.LOG_DOCTOR_FIX_APPLIED.format(fix=fix_label(fix)))
+
+        # Build/runtime findings whose fixes are now all in place are resolved.
+        self._build_findings = [
+            f for f in self._build_findings
+            if not f.fixes or not all(fix_is_applied(new_config, x) for x in f.fixes)
+        ]
+        self.run_doctor()
+        if rebuild:
+            self.start_conversion()
+
+    def _diagnose_build(self, config: BuildConfig):
+        """Read the build log and warn file of the build that just ended."""
+        findings = diagnose_output(
+            "\n".join(self._build_output),
+            origin=ORIGIN_BUILD,
+            source=config.source,
+            source_imports=self._source_imports,
+        )
+        findings += read_warn_findings(
+            config,
+            local_module_names(os.path.dirname(os.path.abspath(config.source))),
+            min_mtime=self._build_wall_start,
+        )
+        self._set_build_findings(findings, config.source)
+        return self._build_findings
+
+    def _on_smoke_result(self, config: BuildConfig, passed: bool, output: str):
+        """Turn what the built EXE printed into findings."""
+        findings = []
+        if output and (not passed or "Traceback" in output):
+            findings = diagnose_output(
+                output,
+                origin=ORIGIN_RUNTIME,
+                source=config.source,
+                source_imports=self._source_imports,
+            )
+        if findings:
+            self._set_build_findings(self._build_findings + findings, config.source)
+        if passed and needs_diagnostic_run(config):
+            self._append_log(S.LOG_SMOKE_WINDOWED_HINT)
+
+    def start_diagnostic_run(self):
+        """Build a console copy of the app, run it, and diagnose its output."""
+        if self._build_in_progress():
+            QMessageBox.warning(self, S.MSG_WARNING, S.MSG_DIAG_BUSY)
+            return
+        config = self._current_config()
+        if not config.source or not os.path.isfile(config.source):
+            QMessageBox.warning(self, S.MSG_WARNING, S.ERR_NO_SOURCE)
+            return
+        if not config.output_dir:
+            config.output_dir = os.path.dirname(os.path.abspath(config.source))
+        diag = diagnostic_config(config)
+        cmd, error = build_pyinstaller_command(diag)
+        if error:
+            QMessageBox.warning(self, S.MSG_WARNING, error)
+            return
+        if not self._ensure_pyinstaller():
+            return
+
+        self.convert_btn.setEnabled(False)
+        self.doctor_tab.diagnose_btn.setEnabled(False)
+        self.progress_bar.setRange(0, 0)  # busy: no stage tracking here
+
+        timeout = max(8.0, float(self.deploy_tab.smoke_timeout.value()))
+        self.diagnostic_thread = DiagnosticThread(cmd, diag, timeout=timeout)
+        self.diagnostic_thread.log_signal.connect(self._append_log)
+        self.diagnostic_thread.finished_signal.connect(
+            lambda built, output, build_log: self._on_diagnostic_finished(
+                config, built, output, build_log
+            )
+        )
+        self.diagnostic_thread.start()
+
+    def _on_diagnostic_finished(self, config, built: bool, output: str, build_log: str):
+        self.progress_bar.setRange(0, 100)
+        self.progress_bar.setValue(0)
+        self.progress_bar.setFormat(S.PROGRESS_READY)
+        self.convert_btn.setEnabled(True)
+        self.doctor_tab.diagnose_btn.setEnabled(True)
+
+        imports = self._source_imports
+        if built:
+            findings = diagnose_output(
+                output, origin=ORIGIN_RUNTIME, source=config.source, source_imports=imports
+            )
+        else:
+            findings = diagnose_output(
+                build_log, origin=ORIGIN_BUILD, source=config.source, source_imports=imports
+            )
+        # The diagnostic run is the freshest evidence: it replaces, not adds to,
+        # what the last build reported.
+        self._set_build_findings(findings, config.source)
+        if built and not findings:
+            self._append_log(S.LOG_DIAG_CLEAN)
+        self._append_log(S.LOG_DIAG_DONE_FMT.format(count=len(findings)))
+        self.show_doctor_tab()
+
+    # ─── Icon studio ────────────────────────────────────────────────────
+
+    def open_icon_studio(self):
+        source = self._source_path()
+        name = self.main_tab.output_name.text().strip() or (
+            os.path.splitext(os.path.basename(source))[0] if source else ""
+        )
+        start_dir = os.path.dirname(source) if source else ""
+        dialog = IconStudioDialog(self, app_name=name, start_dir=start_dir)
+        if dialog.exec_() and dialog.saved_path:
+            self.main_tab.icon_input.setText(dialog.saved_path)
+            self._append_log(
+                S.LOG_ICON_STUDIO_SAVED.format(sizes="16–256", path=dialog.saved_path)
+            )
+
     # ─── Post-build: signing, smoke test, installer ─────────────────────
 
     def _run_post_build_actions(self, config: BuildConfig):
@@ -1202,6 +1444,9 @@ class MainWindow(QMainWindow):
             smoke_timeout=float(self.deploy_tab.smoke_timeout.value()),
         )
         self.post_build_thread.log_signal.connect(self._append_log)
+        self.post_build_thread.smoke_signal.connect(
+            lambda passed, output: self._on_smoke_result(config, passed, output)
+        )
         self.post_build_thread.finished_signal.connect(
             lambda *_: self._start_installer_step(config)
         )
@@ -1455,7 +1700,9 @@ class MainWindow(QMainWindow):
                 return
             # Both threads spawn a child process; leaving either running
             # orphans a PyInstaller run after the window is gone.
-            for thread in (self.conversion_thread, self.batch_thread):
+            for thread in (
+                self.conversion_thread, self.batch_thread, self.diagnostic_thread
+            ):
                 if thread and thread.isRunning():
                     thread.cancel()
                     thread.wait()

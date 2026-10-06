@@ -13,8 +13,8 @@ from PyQt5.QtCore import QThread, pyqtSignal
 from py2exe_gui.core import (
     build_signtool_command,
     redact_password,
-    run_smoke_test,
 )
+from py2exe_gui.core.smoke_test import run_from_neutral_folder
 from py2exe_gui.strings import S
 
 
@@ -25,6 +25,8 @@ class PostBuildThread(QThread):
     #: (signing_attempted, signing_succeeded) — lets the caller decide whether
     #: to continue to the installer step.
     finished_signal = pyqtSignal(bool, bool)
+    #: (passed, everything the EXE printed) — fed to the doctor's diagnostics.
+    smoke_signal = pyqtSignal(bool, str)
 
     def __init__(
         self,
@@ -94,7 +96,10 @@ class PostBuildThread(QThread):
 
     def _smoke_test(self) -> None:
         self.log_signal.emit(S.LOG_SMOKE_START)
-        result = run_smoke_test(self.exe_path, timeout=self.smoke_timeout)
+        # Start it from a neutral folder, as a desktop shortcut would: a
+        # relative path that only worked from the build folder fails here.
+        result = run_from_neutral_folder(self.exe_path, timeout=self.smoke_timeout)
+        self.smoke_signal.emit(result.passed, result.output or result.error)
         if result.passed:
             self.log_signal.emit(S.LOG_SMOKE_OK)
         else:

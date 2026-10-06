@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "py2exe-gui"
-version = "1.1.0"
+version = "1.3.0"
 description = "Arabic-localized PyQt5 GUI to convert Python scripts to Windows executables via PyInstaller"
 readme = "README.md"
 requires-python = ">=3.8"
@@ -44,6 +44,10 @@ py2exe-gui = "py2exe_gui.app:main"
 [tool.setuptools.packages.find]
 include = ["py2exe_gui*"]
 exclude = ["tests*"]
+
+[tool.setuptools.package-data]
+# The doctor's knowledge base is data, not code; it must ship in the wheel.
+py2exe_gui = ["knowledge/*.json"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

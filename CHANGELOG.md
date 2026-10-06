@@ -5,6 +5,70 @@ follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### 1.3.0 — Project doctor and diagnostics
+
+First release of [PRODUCT_ROADMAP.md](PRODUCT_ROADMAP.md): the tool now
+answers "why won't my EXE work?" instead of only running PyInstaller.
+
+#### Added
+- **Project doctor** (new 🩺 tab, shown in simple mode too) — reads the
+  script with `ast`, never runs it, and reports what works under Python but
+  breaks once frozen: imports the build interpreter cannot resolve (the EXE
+  would die with `ModuleNotFoundError`), data files the code opens that are not
+  bundled, relative paths that resolve against the working folder rather than
+  the bundle, `multiprocessing` without `freeze_support()`, `input()` and direct
+  `sys.stdout`/`sys.stderr` use in windowed apps, a script with no entry point
+  (and which sibling looks like the real one), two Qt bindings, and `.ico`
+  files that are renamed PNGs or hold a single size. Readiness score out of
+  100, also shown as a badge beside the source field. Re-examines on its own
+  when the script, icon or console options change.
+- **One-click fixes.** Each finding carries the config changes that resolve
+  it (hidden import, bundled file/folder, `--collect-*`/`--copy-metadata`/
+  `--exclude-module`, console back on, a different entry script). Tick, then
+  *Apply* or *Apply and rebuild*. The user's source is never edited: fixes
+  that need a code change come as a snippet to copy (`resource_path()`,
+  `freeze_support()`, silencing `None` streams, a `main()` guard), and
+  missing packages come with their `pip install` command.
+- **Build and runtime diagnostics.** After every build the doctor reads the
+  build log (multiple Qt bindings, unreadable icon format, a locked output
+  file, `--add-data` paths that do not exist, PyInstaller not installed) and
+  `warn-<name>.txt`, keeping only modules *the user's code* imports — the raw
+  file lists dozens of harmless platform modules. A warn file older than the
+  build is ignored. The smoke test now keeps everything the EXE printed and
+  runs it from a neutral folder, as a shortcut would; its traceback is matched
+  against known failures (missing module or package metadata, missing data
+  file inside `_MEI…`/`_internal`, Flask `TemplateNotFound`, lost stdin,
+  `None` streams, DLL load failures). An unrecognised traceback is surfaced
+  verbatim, never guessed at. A failed build's message box says how many
+  likely causes the doctor found.
+- **Diagnostic run.** A windowed EXE that crashes shows its traceback in a
+  dialog, so no test could read it. The button builds the same app with the
+  console on into `<output>/p2e_diagnostic` (the real build is untouched),
+  runs it, and diagnoses what it printed.
+- **Package knowledge base** — `py2exe_gui/knowledge/packages.json`, 45
+  entries keyed by import name: pip names that differ (`cv2` → `opencv-python`),
+  collection flags (`docx`, `pptx`, `customtkinter`, `apscheduler`, `whisper`…),
+  hidden imports (`tkcalendar` → `babel.numbers`, `pyttsx3`, `plyer`), folders
+  a framework expects (`flask` → `templates`/`static`), packages that write to
+  console streams (`tqdm`, `uvicorn`), and size notes. Data, not code, so it can
+  grow by pull request; shipped in the wheel via `package-data`.
+- **🎨 Icon Studio** — builds a real `.ico` with all seven sizes Windows asks
+  for (16–256px), from an image (fitted, not stretched) or from one or two
+  letters on a coloured shape. Drawn with Qt and packed as PNG-in-ICO, so no
+  Pillow dependency.
+
+#### Fixed
+- Dialogs had no themed background: their labels used the theme's light text
+  colour on the platform's default light grey. `QDialog` now shares the main
+  window's background rule.
+
+#### Tests
+- 161 new tests (827 total): every doctor check, every diagnostic pattern
+  (fed with verbatim PyInstaller 6 / CPython output), the warn-file parser and
+  its filtering, the knowledge file's schema and bilingual notes, `.ico`
+  packing, fix application, the Doctor tab, the diagnostic thread, and Icon
+  Studio. Core tests still run without PyQt5 and on Python 3.9.
+
 ### Phase 9 — Interface overhaul and new features
 
 Implements [UI_IMPROVEMENT_PLAN.md](UI_IMPROVEMENT_PLAN.md): the whole of its
