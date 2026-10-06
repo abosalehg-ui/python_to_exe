@@ -106,7 +106,18 @@ def test_every_value_is_escaped():
 def test_empty_sections_say_none():
     page = render_html(sample(groups=[], largest_files=[], findings=[], command=[]),
                        {"none": "NOTHING"})
-    assert page.count("NOTHING") == 4
+    # breakdown, largest files, findings, Runtime Kit, options
+    assert page.count("NOTHING") == 5
+
+
+def test_runtime_kit_services_are_listed_and_escaped():
+    page = render_html(
+        sample(runtime_services=["Crash reporter", "<b>x</b>"]),
+        {"runtime_kit": "Runtime Kit", "none": "NOTHING"},
+    )
+    assert "<h2>Runtime Kit</h2>" in page
+    assert "<li>Crash reporter</li>" in page
+    assert "&lt;b&gt;x&lt;/b&gt;" in page and "<b>x</b>" not in page
 
 
 def test_write_report(tmp_path):

@@ -91,6 +91,15 @@ def presets_path() -> str:
     return os.path.join(config_dir(), "presets.json")
 
 
+def signing_key_path() -> str:
+    """The Runtime Kit's private update-signing key.
+
+    In the per-user *config* folder, in a sub-folder of its own that is made
+    owner-only: never in a project, a build, or a settings file.
+    """
+    return os.path.join(config_dir(), "signing", "update_signing_key.json")
+
+
 def legacy_path(name: str) -> str:
     """Path of an old CWD-relative file, for one-time migration."""
     return os.path.abspath(name)

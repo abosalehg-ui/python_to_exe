@@ -9,6 +9,7 @@ from typing import List
 
 from py2exe_gui.core.fixes import (
     FIX_ADD_DATA,
+    FIX_RUNTIME,
     FIX_SET_SOURCE,
     SNIPPETS,
     Finding,
@@ -55,11 +56,18 @@ def origin_label(origin: str) -> str:
     return getattr(S, f"ORIGIN_{origin.upper()}", origin)
 
 
+def service_label(service: str) -> str:
+    """A Runtime Kit service's name in the active locale."""
+    return getattr(S, f"KIT_NAME_{service.upper()}", service)
+
+
 def fix_label(fix: Fix) -> str:
     template = getattr(S, f"FIX_LABEL_{fix.kind.upper()}", fix.kind)
     value = fix.value
     if fix.kind in (FIX_ADD_DATA, FIX_SET_SOURCE):
         value = os.path.basename(value.rstrip("\\/")) or value
+    elif fix.kind == FIX_RUNTIME:
+        value = service_label(value)
     return _format(template, {"value": value})
 
 
@@ -93,6 +101,9 @@ def detail_lines(finding: Finding) -> List[str]:
     if finding.fixes:
         lines += ["", S.DOCTOR_FIXES_HEADER]
         lines += [f"  • {fix_label(fix)}" for fix in finding.fixes]
+    if finding.alternatives:
+        lines += ["", S.DOCTOR_ALT_HEADER]
+        lines += [f"  • {fix_label(fix)}" for fix in finding.alternatives]
     if finding.code in PIP_CODES:
         lines += ["", S.DOCTOR_PIP_HEADER, f"  {pip_command(finding)}"]
     if finding.snippet:

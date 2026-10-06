@@ -22,6 +22,8 @@ version metadata, build history, and a Windows manifest editor.
 | **Size lab** *(1.4)* | What's inside the EXE, library by library, read from PyInstaller's own TOC files; one-click `--exclude-module` suggestions; comparison with the previous build. Real example: a Pillow app went from 30.1 MB to 14.2 MB (−53%) in an isolated environment |
 | **Build report** *(1.4)* | Self-contained HTML per build: sizes, breakdown, SHA-256, Python/PyInstaller versions, doctor notes, options |
 | **Windows Sandbox** *(1.4)* | Generates a `.wsb` that runs the build on a clean, throw-away Windows (output mapped read-only) |
+| **Runtime Kit** *(1.5)* | Optional `p2e_runtime` package embedded in *your* EXE, one checkbox per service: `resource_path()`, a rotating log file for windowed apps, a crash reporter (saved report + native dialog, nothing sent), single instance. Standard library only, Python 3.8+, works with tkinter, Qt and console apps. Nothing on by default, no telemetry |
+| **Signed self-updater** *(1.5)* | `update.json` signed with **Ed25519** (pure-Python verifier that passes the RFC 8032 test vectors); HTTPS only, redirects to HTTP refused, size and SHA-256 checked before anything is replaced. One-file EXEs swap in place and restart; folder builds launch a verified installer. Key pair and a *Create signed update.json* helper in the app |
 | **Icon Studio** *(1.3)* | Real multi-size `.ico` (16–256px) from an image or from letters, drawn with Qt — no Pillow needed |
 | **Smart Analysis** | AST-based import detection (incl. `__import__` and `importlib`), `requirements.txt` import, hidden-imports auto-suggest |
 | **Deployment** | Splash screen, Windows manifest (DPI, UAC, supported OS), Authenticode code signing, post-build smoke test |
@@ -110,6 +112,18 @@ the imports — and creates it only after showing you the exact commands. Below,
 the **size lab** breaks the last build down by library and offers exclusions
 for libraries your code never imports; the **build report** option writes
 `<name>-build-report.html` beside `dist/` after each successful build.
+
+### 🧰 Runtime Kit
+One checkbox per service the built program gets, each with a one-line
+explanation, and a preview of exactly what is embedded (the two-line runtime
+hook and `p2e_runtime.json`). The updater section holds the update URL, this
+build's version, the embedded public key (*Use my key*), installer arguments
+for folder builds, and the key actions: **generate**, **back up** (with a
+warning, refused inside the project folder) and **import**. *Publish an
+update* writes `update.json` and `update.json.sig` next to a new build;
+nothing is uploaded. Your app calls `p2e_runtime.updates.check()` and
+`apply(info)` from its own UI; an opt-in check at start-up asks with a native
+dialog on Windows.
 
 ### 🩺 Project Doctor
 Readiness score, every predicted and actual problem in one list, and the fix
@@ -236,6 +250,23 @@ If any are present you get an explicit warning before it is applied.
 `--runtime-hook` injects code into **every** EXE you subsequently produce —
 including ones you sign and distribute. Only accept it from a source you trust.
 
+### Runtime Kit and the updater
+
+- The Runtime Kit is stored in settings as **booleans and text only**. The
+  runtime hook is written by the app at build time and never stored, so a
+  shared settings file cannot point it at code or an executable — while a
+  `--runtime-hook` typed into the extra arguments is still flagged.
+- A shared settings file that sets an **update key that is not yours** is
+  shown before it is applied: whoever holds that key could install programs
+  on your users' machines.
+- The updater refuses any `update.json` not signed with your key or not
+  served over HTTPS (redirects included), checks size and SHA-256 before
+  replacing anything, and never accepts an older or equal version.
+- The private key lives in `<config folder>/signing/` with owner-only
+  permissions, and never in the project, a build, a settings or preset file,
+  or the log. **If you lose it, programs you shipped can no longer be
+  updated** — back it up.
+
 ### PyInstaller installation
 
 Never installed silently. If it is missing you are shown the exact command
@@ -256,13 +287,21 @@ migrated once on first run.
 
 ```bash
 pip install -r requirements-dev.txt
-pytest tests/                   # 160+ unit tests
-ruff check py2exe_gui/ tests/   # lint
+pytest tests/ -m "not slow"                  # 1217 tests
+ruff check py2exe_gui/ p2e_runtime/ tests/   # lint
 ```
 
 ### Project Structure
 
 ```
+p2e_runtime/              # Runtime Kit embedded in EXEs (stdlib only, 3.8+)
+├── __init__.py           # install(), resource_path()
+├── paths.py, config.py   # bundle/user folders, p2e_runtime.json
+├── logs.py               # rotating log for windowed apps
+├── crash.py              # crash reporter
+├── single_instance.py    # named mutex (Windows) / fcntl lock (POSIX)
+├── updates.py            # signed self-updater
+└── _ed25519.py           # verify-only Ed25519 (RFC 8032)
 py2exe_gui/
 ├── app.py                # Application bootstrap
 ├── constants.py
@@ -288,6 +327,8 @@ py2exe_gui/
 │   ├── size_analyzer.py      # bundle inventory from PyInstaller's TOC files
 │   ├── build_report.py       # self-contained HTML report
 │   ├── sandbox.py            # Windows Sandbox .wsb
+│   ├── runtime_kit.py        # hook, p2e_runtime.json and options for the build
+│   ├── update_signing.py     # signing key, Ed25519 signing, update.json
 │   ├── build_history.py
 │   └── log_formatter.py
 └── ui/
@@ -299,7 +340,8 @@ py2exe_gui/
 ### Running Tests
 
 ```bash
-pytest tests/                              # all
+pytest tests/ -m "not slow"                # fast suite
+pytest tests/ -m slow                      # real PyInstaller builds (minutes)
 pytest tests/test_builder.py -v            # one module
 pytest --cov=py2exe_gui.core --cov-report=term
 ```
@@ -325,6 +367,8 @@ See [IDEAS.md](IDEAS.md) for the full roadmap. Currently:
   diagnostic run, package knowledge base, Icon Studio
 - ✅ **1.4:** Isolated per-project build environment + lock file, size lab with
   slimming suggestions, HTML build report, Windows Sandbox testing
+- ✅ **1.5:** Runtime Kit (`p2e_runtime`): Ed25519-signed self-updater, crash
+  reporter, single instance, `resource_path()`, log file for windowed apps
 - 🧭 **Vision (1.5 → 2.0):** see [PRODUCT_ROADMAP.md](PRODUCT_ROADMAP.md)
 - ⏳ **Next:** venv management, multi-file projects, Linux/macOS installers,
   `.spec` editor, VirusTotal, PySide6 migration —

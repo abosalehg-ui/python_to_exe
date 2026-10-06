@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "py2exe-gui"
-version = "1.4.0"
+version = "1.5.0"
 description = "Arabic-localized PyQt5 GUI to convert Python scripts to Windows executables via PyInstaller"
 readme = "README.md"
 requires-python = ">=3.8"
@@ -42,7 +42,9 @@ dev = [
 py2exe-gui = "py2exe_gui.app:main"
 
 [tool.setuptools.packages.find]
-include = ["py2exe_gui*"]
+# p2e_runtime is the Runtime Kit embedded in users' EXEs: a separate,
+# standard-library-only package (publishable on its own later).
+include = ["py2exe_gui*", "p2e_runtime*"]
 exclude = ["tests*"]
 
 [tool.setuptools.package-data]

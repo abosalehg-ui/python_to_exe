@@ -95,6 +95,9 @@ def run_smoke_test(
             ran=False, exited_cleanly=False, returncode=None,
             error="Executable not found",
         )
+    # An app built with the Runtime Kit would otherwise sit on its crash
+    # dialog (Windows) and look alive until the timeout.
+    env = dict(os.environ, P2E_RUNTIME_NO_DIALOGS="1")
     try:
         completed = subprocess.run(
             [exe_path],
@@ -102,6 +105,7 @@ def run_smoke_test(
             text=True,
             timeout=timeout,
             cwd=cwd,
+            env=env,
         )
     except subprocess.TimeoutExpired as e:
         return SmokeResult(

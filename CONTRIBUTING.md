@@ -20,7 +20,8 @@ pip install -r requirements-dev.txt
 
 ```bash
 pytest tests/                       # كل الاختبارات
-ruff check py2exe_gui/ tests/       # فحص الكود
+ruff check py2exe_gui/ p2e_runtime/ tests/   # فحص الكود
+pytest tests/ -m slow               # بناءات PyInstaller حقيقية (دقائق)
 ```
 
 ### إرشادات قبل فتح Pull Request
@@ -31,6 +32,9 @@ ruff check py2exe_gui/ tests/       # فحص الكود
 4. **عند إضافة نص جديد**: أضفه في `class Ar` و `class En` معاً. الاختبارات ستفشل إن نقص أحدهما.
 5. **شغّل `pytest` و `ruff`** قبل الـ commit. CI يفشل بدونهما.
 6. **رسالة الـ commit**: قصيرة، تصف الـ "لماذا" لا الـ "ماذا".
+7. **`p2e_runtime/` يعمل داخل برامج المستخدمين**: المكتبة القياسية فقط، Python 3.8+،
+   ولا يستورد `py2exe_gui` ولا أي واجهة. الخدمات تُستورد بالاسم، ولا شيء يُفعَّل
+   أو يتصل بالشبكة دون إعداد صريح.
 
 ### إضافة قالب جديد
 
@@ -74,7 +78,8 @@ pip install -r requirements-dev.txt
 
 ```bash
 pytest tests/                       # all tests
-ruff check py2exe_gui/ tests/       # lint check
+ruff check py2exe_gui/ p2e_runtime/ tests/   # lint check
+pytest tests/ -m slow               # real PyInstaller builds (minutes)
 ```
 
 ### Guidelines Before Opening a PR
@@ -85,6 +90,10 @@ ruff check py2exe_gui/ tests/       # lint check
 4. **When adding a new string**: add it to both `class Ar` and `class En`. Tests fail if either is missing.
 5. **Run `pytest` and `ruff`** before committing. CI rejects either failure.
 6. **Commit message**: short, describes "why" not "what".
+7. **`p2e_runtime/` runs inside users' programs**: standard library only,
+   Python 3.8+, and it never imports `py2exe_gui` or a GUI toolkit. Services
+   are imported by name, and nothing turns on or reaches the network without
+   explicit configuration.
 
 ### Adding a New Template
 

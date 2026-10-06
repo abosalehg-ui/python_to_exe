@@ -3,7 +3,7 @@
 import os
 import shlex
 import sys
-from typing import List, Optional, Tuple
+from typing import List, Optional, Sequence, Tuple
 
 from py2exe_gui.core.config import BuildConfig
 
@@ -62,8 +62,13 @@ def build_pyinstaller_command(
     config: BuildConfig,
     python_executable: Optional[str] = None,
     platform: Optional[str] = None,
+    extra_options: Sequence[str] = (),
 ) -> Tuple[Optional[List[str]], Optional[str]]:
     """Construct the PyInstaller command for the given config.
+
+    ``extra_options`` are options the app generated itself at build time —
+    the Runtime Kit's ``--runtime-hook`` and friends. They are passed here
+    rather than stored in the config, so no settings file can supply them.
 
     Returns a (command, error) tuple. On success error is None; on failure
     command is None and error contains a user-facing message.
@@ -130,6 +135,8 @@ def build_pyinstaller_command(
             cmd.append(f"--upx-dir={config.upx_dir}")
     else:
         cmd.append("--noupx")
+
+    cmd.extend(extra_options)
 
     if config.extra_args:
         cmd.extend(split_extra_args(config.extra_args, platform))

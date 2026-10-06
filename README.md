@@ -4,7 +4,7 @@
 
 ### أداة احترافية لتحويل تطبيقات بايثون إلى ملفات تنفيذية
 
-![Version](https://img.shields.io/badge/الإصدار-1.4.0-blue?style=for-the-badge)
+![Version](https://img.shields.io/badge/الإصدار-1.5.0-blue?style=for-the-badge)
 ![Python](https://img.shields.io/badge/Python-3.8+-green?style=for-the-badge&logo=python&logoColor=white)
 ![PyQt5](https://img.shields.io/badge/PyQt5-GUI-orange?style=for-the-badge&logo=qt&logoColor=white)
 ![Tests](https://img.shields.io/badge/الاختبارات-943_passing-brightgreen?style=for-the-badge)
@@ -150,6 +150,27 @@
 
 </td>
 </tr>
+<tr>
+<td width="50%">
+
+### 🧰 مكتبة التشغيل المدمجة (جديد في 1.5)
+- ✅ حزمة `p2e_runtime` تُضمَّن **اختيارياً** داخل برنامجك، كل خدمة بمربع اختيار
+- ✅ `resource_path()` · **ملف سجل** للتطبيق بلا Console · **مُبلِّغ انهيار**
+  يحفظ تقريراً ويخبر المستخدم أين · **نسخة واحدة فقط**
+- ✅ مكتبة قياسية فقط، Python 3.8+، تعمل مع tkinter وQt وأي تطبيق
+- ✅ **لا شيء مفعّل افتراضياً، ولا قياس استخدام، ولا شبكة** دون رابط تضبطه أنت
+
+</td>
+<td width="50%">
+
+### 🔄 المحدِّث الذاتي الموقَّع (جديد في 1.5)
+- ✅ `update.json` موقَّع بـ **Ed25519** (تحقق ببايثون خالص، يجتاز متجهات RFC 8032)
+- ✅ **HTTPS فقط**، ويُرفض أي تحويل إلى HTTP، ويُتحقق من الحجم وSHA-256 قبل الاستبدال
+- ✅ استبدال الـ EXE وإعادة تشغيله (ملف واحد) أو تشغيل مثبّت موقَّع (بناء مجلد)
+- ✅ مفتاحك الخاص في مجلد إعداداتك فقط + زر **«إنشاء update.json موقَّع»**
+
+</td>
+</tr>
 </table>
 
 ---
@@ -231,6 +252,7 @@ py2exe-gui
 | **⚙️ الإعدادات الرئيسية** | ملف المصدر + شارة الجاهزية، الإخراج، الأيقونة + معاينتها + 🎨 استوديو الأيقونات، الخيارات، السجل |
 | **🩺 طبيب المشروع** | درجة الجاهزية، المشاكل المتوقعة والفعلية، الإصلاحات بنقرة، نسخ الكود المقترح، التشغيل التشخيصي، اختبار Windows Sandbox |
 | **⚖️ الحجم والبيئة** | بيئة البناء المعزولة وملف القفل، مختبر الحجم ومقترحات التنحيف، تقرير البناء |
+| **🧰 مكتبة التشغيل** | خدمات تُضمَّن في الـ EXE (resource_path، السجل، الانهيار، النسخة الواحدة، المحدِّث)، مفتاح التوقيع، نشر تحديث، معاينة ما سيُضمَّن |
 | **🔧 إعدادات متقدمة** | ملفات إضافية، Hidden Imports، استيراد من requirements، UPX، أوامر مخصصة |
 | **📝 معلومات الإصدار** | CompanyName، FileDescription، FileVersion، ProductVersion، Copyright، إلخ |
 | **🚀 النشر** | Splash، Manifest (DPI/UAC/OS)، التوقيع الرقمي، Smoke Test |
@@ -342,6 +364,21 @@ py2exe-gui
 يحقن كوداً داخل **كل** ملف EXE تنتجه لاحقاً — بما فيها الملفات التي توقّعها
 رقمياً وتوزّعها. لا تقبل إلا إذا كنت تثق بمصدر الملف.
 
+### مكتبة التشغيل والمحدِّث الذاتي
+
+- تُضبط مكتبة التشغيل في ملف الإعدادات **بقيم نصية ومنطقية فقط**؛ ملف
+  `--runtime-hook` يكتبه البرنامج بنفسه وقت البناء ولا يُخزَّن في أي إعداد، فلا
+  يستطيع ملف إعدادات مشترك أن يشير إلى كود أو ملف تنفيذي. أما
+  `--runtime-hook` المكتوب في «أوامر PyInstaller إضافية» فيبقى مُحذَّراً منه.
+- إن حمل ملف إعدادات مشترك **مفتاح تحديث ليس مفتاحك** يظهر تحذير قبل
+  التطبيق: من يملك ذلك المفتاح يستطيع تثبيت برامج على أجهزة مستخدميك.
+- المحدِّث يرفض أي `update.json` غير موقَّع بمفتاحك أو غير HTTPS، ويتحقق من
+  الحجم وSHA-256 قبل الاستبدال، ولا يقبل إصداراً أقدم أو مساوياً.
+- المفتاح الخاص يُحفظ في `<مجلد الإعدادات>/signing/` بصلاحيات المالك فقط، ولا
+  يُكتب في المشروع ولا في البناء ولا في الإعدادات ولا في السجل. النسخة
+  الاحتياطية تُرفض داخل مجلد المشروع أو الإخراج. **إن فقدته فلن تستطيع تحديث
+  البرامج التي وزّعتها.**
+
 ### تثبيت PyInstaller
 
 لا يُثبَّت تلقائياً بصمت. إن لم يكن موجوداً يُعرض عليك الأمر الكامل
@@ -372,6 +409,15 @@ python_to_exe/
 ├── CONTRIBUTING.md
 ├── CHANGELOG.md
 ├── IDEAS.md                    # خارطة الطريق الشاملة
+│
+├── p2e_runtime/                # 🧰 مكتبة التشغيل (مكتبة قياسية فقط، تُضمَّن في الـ EXE)
+│   ├── __init__.py                   # install() + resource_path
+│   ├── paths.py / config.py          # المسارات وقراءة p2e_runtime.json
+│   ├── logs.py                       # سجل دوّار للتطبيق بلا Console
+│   ├── crash.py                      # مُبلِّغ الانهيار
+│   ├── single_instance.py            # mutex على Windows، قفل fcntl على POSIX
+│   ├── updates.py                    # المحدِّث الموقَّع
+│   └── _ed25519.py                   # تحقق Ed25519 فقط (RFC 8032)
 │
 ├── py2exe_gui/                 # الحزمة الرئيسية
 │   ├── app.py                  # bootstrap
@@ -405,6 +451,8 @@ python_to_exe/
 │   │   ├── size_analyzer.py          # 📏 ما بداخل الـ EXE من ملفات TOC
 │   │   ├── build_report.py           # 📄 تقرير HTML مستقل
 │   │   ├── sandbox.py                # 🧊 ملف .wsb لـ Windows Sandbox
+│   │   ├── runtime_kit.py            # 🧰 توليد hook وp2e_runtime.json وخيارات البناء
+│   │   ├── update_signing.py         # 🔐 مفتاح التوقيع + update.json الموقَّع
 │   │   ├── build_history.py
 │   │   └── log_formatter.py
 │   │
@@ -428,6 +476,7 @@ python_to_exe/
 │           ├── main_tab.py
 │           ├── doctor_tab.py
 │           ├── size_tab.py
+│           ├── runtime_tab.py
 │           ├── advanced_tab.py
 │           ├── version_info_tab.py
 │           ├── deploy_tab.py
@@ -437,7 +486,7 @@ python_to_exe/
 │           ├── history_tab.py
 │           └── about_tab.py
 │
-├── tests/                      # 666 اختبار (وحدة + واجهة headless + تكامل)
+├── tests/                      # 1223 اختباراً (وحدة + واجهة headless + تكامل)
 └── .github/
     ├── workflows/ci.yml        # pytest + GUI + ruff + pip-audit
     ├── dependabot.yml
@@ -450,8 +499,9 @@ python_to_exe/
 
 ```bash
 pip install -r requirements-dev.txt
-pytest tests/                              # 666 اختبار
-ruff check py2exe_gui/ tests/             # فحص الكود
+pytest tests/ -m "not slow"                # 1217 اختباراً سريعاً
+pytest tests/ -m slow                      # بناءات PyInstaller حقيقية (دقائق)
+ruff check py2exe_gui/ p2e_runtime/ tests/ # فحص الكود
 pytest --cov=py2exe_gui.core --cov-report=term
 ```
 
@@ -545,6 +595,8 @@ else:
   بنقرة، التشغيل التشخيصي، قاعدة معرفة المكتبات، استوديو الأيقونات
 - ✅ **الإصدار 1.4:** بيئة بناء معزولة لكل مشروع + ملف قفل، مختبر الحجم
   ومقترحات التنحيف، تقرير HTML لكل بناء، اختبار Windows Sandbox
+- ✅ **الإصدار 1.5:** مكتبة التشغيل المدمجة `p2e_runtime`: محدِّث ذاتي موقَّع
+  بـ Ed25519، مُبلِّغ انهيار، نسخة واحدة، `resource_path()`، سجل للتطبيق بلا Console
 - 🧭 **الرؤية القادمة (1.5 → 2.0):** تحويل الأداة إلى استوديو تسليم كامل —
   طبيب المشروع، تشخيص وإصلاح تلقائي للأعطال، بيئة بناء معزولة، محرك Nuitka،
   مكتبة تشغيل مدمجة (تحديث ذاتي + تقارير انهيار)، ونشر بنقرة —

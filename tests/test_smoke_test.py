@@ -165,3 +165,12 @@ def test_run_from_neutral_folder_cleans_up(tmp_path):
     folder = result.output.strip()
     assert "p2e_run_" in folder
     assert not os.path.exists(folder)
+
+
+@pytest.mark.skipif(sys.platform == "win32", reason="shell script stands in for the EXE")
+def test_smoke_test_runs_the_exe_without_runtime_kit_dialogs(tmp_path):
+    exe = tmp_path / "app"
+    exe.write_text("#!/bin/sh\necho \"dialogs=$P2E_RUNTIME_NO_DIALOGS\"\n")
+    exe.chmod(0o755)
+    result = run_smoke_test(str(exe), timeout=10)
+    assert "dialogs=1" in result.output

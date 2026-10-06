@@ -24,9 +24,11 @@ from py2exe_gui.core.fixes import (
     SEVERITY_WARNING,
     Finding,
     Fix,
+    finding_resolved,
     fix_is_applied,
     flag_fix,
     readiness_score,
+    runtime_fix,
     sort_findings,
 )
 from py2exe_gui.core.icon_studio import read_ico_file_sizes
@@ -37,6 +39,8 @@ from py2exe_gui.core.knowledge import (
     pip_name_for,
 )
 from py2exe_gui.core.project_scan import project_imports
+from py2exe_gui.core.runtime_kit import PACKAGE as RUNTIME_PACKAGE
+from py2exe_gui.core.runtime_kit import validate as validate_runtime_kit
 
 # Folder names that are never data: build output, environments, tooling.
 _IGNORED_DIRS = frozenset({
@@ -107,6 +111,10 @@ def examine(
     # package imported only by helpers.py is just as missing from the EXE.
     report.imports = detect_imports(code) | project_imports(source)
     report.third_party = {m for m in filter_non_stdlib(report.imports) if m not in local}
+    # The Runtime Kit is bundled by the converter, not installed in the build
+    # environment: never report it as a missing package.
+    uses_runtime = RUNTIME_PACKAGE in report.third_party
+    report.third_party.discard(RUNTIME_PACKAGE)
     # An interpreter other than this one is asked in a single subprocess.
     prefetch = getattr(is_installed, "prefetch", None)
     if prefetch is not None:
@@ -121,13 +129,12 @@ def examine(
     findings += _check_data_files(tree, code, config, project_dir, source)
     findings += _check_multiprocessing(tree, report.imports)
     if windowed:
-        findings += _check_windowed(tree)
+        findings += _check_windowed(tree, config)
     findings += _check_entry_point(tree, source, project_dir)
     findings += _check_icon(config)
+    findings += _check_runtime_kit(config, uses_runtime)
 
-    report.findings = sort_findings(
-        f for f in findings if not f.fixes or not all(fix_is_applied(config, x) for x in f.fixes)
-    )
+    report.findings = sort_findings(f for f in findings if not finding_resolved(config, f))
     return report
 
 
@@ -247,7 +254,7 @@ def _check_knowledge(
                     )
                 )
 
-        if info.console_streams and windowed:
+        if info.console_streams and windowed and not config.runtime_kit.log_redirect:
             findings.append(
                 Finding(
                     "package_console_streams",
@@ -255,6 +262,7 @@ def _check_knowledge(
                     {"package": module},
                     (Fix(FIX_CONSOLE),),
                     snippet="silence_streams",
+                    alternatives=(runtime_fix("log_redirect"),),
                 )
             )
 
@@ -353,12 +361,17 @@ def _check_data_files(tree, code, config, project_dir, source) -> List[Finding]:
     resolves_itself = any(m in code for m in ("_MEIPASS", "__file__", "resource_path"))
     if targets and not resolves_itself:
         example = sorted(targets.values())[0]
+        # With the Runtime Kit's resource_path on, the function is already in
+        # the EXE: one import line instead of a function to paste.
+        snippet = (
+            "runtime_resource_path" if config.runtime_kit.resource_path else "resource_path"
+        )
         findings.append(
             Finding(
                 "relative_paths",
                 SEVERITY_WARNING,
                 {"example": example},
-                snippet="resource_path",
+                snippet=snippet,
             )
         )
     return findings
@@ -373,8 +386,13 @@ def _check_multiprocessing(tree, imports) -> List[Finding]:
     return []
 
 
-def _check_windowed(tree) -> List[Finding]:
-    """In a windowed EXE sys.stdin/stdout/stderr are None."""
+def _check_windowed(tree, config) -> List[Finding]:
+    """In a windowed EXE sys.stdin/stdout/stderr are None.
+
+    The Runtime Kit's log redirection gives stdout/stderr a file to write to,
+    which resolves the stream findings (not ``input()``: there is still no
+    keyboard to read from).
+    """
     findings: List[Finding] = []
     reassigned: Set[str] = set()
     used: Set[str] = set()
@@ -402,6 +420,8 @@ def _check_windowed(tree) -> List[Finding]:
 
     if calls_input and "stdin" not in reassigned:
         findings.append(Finding("input_in_windowed", SEVERITY_ERROR, {}, (Fix(FIX_CONSOLE),)))
+    if config.runtime_kit.log_redirect:
+        return findings
     for stream in sorted(used - reassigned - {"stdin"}):
         findings.append(
             Finding(
@@ -410,6 +430,7 @@ def _check_windowed(tree) -> List[Finding]:
                 {"stream": f"sys.{stream}"},
                 (Fix(FIX_CONSOLE),),
                 snippet="silence_streams",
+                alternatives=(runtime_fix("log_redirect"),),
             )
         )
     return findings
@@ -487,3 +508,20 @@ def _check_icon(config) -> List[Finding]:
     if len(sizes) == 1:
         return [Finding("icon_single_size", SEVERITY_INFO, {"icon": name, "size": str(sizes[0])})]
     return []
+
+
+def _check_runtime_kit(config, uses_runtime: bool) -> List[Finding]:
+    """The Runtime Kit's own settings, and code that relies on it."""
+    findings = validate_runtime_kit(config.runtime_kit, config.onefile)
+    if uses_runtime and not config.runtime_kit.enabled:
+        # `from p2e_runtime import ...` with the kit off: the package is not
+        # bundled and the EXE dies with ModuleNotFoundError.
+        findings.append(
+            Finding(
+                "kit_imported_not_enabled",
+                SEVERITY_ERROR,
+                {},
+                (runtime_fix("resource_path"),),
+            )
+        )
+    return findings

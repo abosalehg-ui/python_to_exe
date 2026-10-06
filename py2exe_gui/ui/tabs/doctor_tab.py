@@ -16,7 +16,13 @@ from PyQt5.QtWidgets import (
 
 from py2exe_gui.core.fixes import readiness_score
 from py2exe_gui.strings import S
-from py2exe_gui.ui.finding_text import copy_text, detail_lines, finding_label, origin_label
+from py2exe_gui.ui.finding_text import (
+    copy_text,
+    detail_lines,
+    finding_label,
+    fix_label,
+    origin_label,
+)
 from py2exe_gui.ui.tabs.base import BaseTab
 
 # Data roles on each list item: the Finding itself.
@@ -65,10 +71,19 @@ class DoctorTab(BaseTab):
         self.detail_view.setMinimumHeight(140)
         group_layout.addWidget(self.detail_view, stretch=2)
 
+        detail_buttons = QHBoxLayout()
         self.copy_btn = QPushButton(S.BTN_DOCTOR_COPY)
         self.copy_btn.setEnabled(False)
         self.copy_btn.clicked.connect(self.copy_selected)
-        group_layout.addWidget(self.copy_btn, alignment=Qt.AlignLeading)
+        # The other way to resolve the selected finding (log redirection
+        # instead of the console): applied on its own, never with the default.
+        self.alt_btn = QPushButton()
+        self.alt_btn.setVisible(False)
+        self.alt_btn.clicked.connect(self.apply_alternative)
+        detail_buttons.addWidget(self.copy_btn)
+        detail_buttons.addWidget(self.alt_btn)
+        detail_buttons.addStretch(1)
+        group_layout.addLayout(detail_buttons)
         layout.addWidget(group, stretch=1)
 
         buttons = QHBoxLayout()
@@ -103,6 +118,7 @@ class DoctorTab(BaseTab):
         self.findings_list.clear()
         self.detail_view.clear()
         self.copy_btn.setEnabled(False)
+        self.alt_btn.setVisible(False)
 
         if not has_source:
             self.score_label.setText(S.DOCTOR_SCORE_NONE)
@@ -157,7 +173,13 @@ class DoctorTab(BaseTab):
         if finding is None:
             self.detail_view.clear()
             self.copy_btn.setEnabled(False)
+            self.alt_btn.setVisible(False)
             return
+        if finding.alternatives:
+            label = S.BTN_DOCTOR_ALT_FMT.format(fix=fix_label(finding.alternatives[0]))
+            self.alt_btn.setText(label)
+            self.alt_btn.setAccessibleName(label)
+        self.alt_btn.setVisible(bool(finding.alternatives))
         self.detail_view.setPlainText("\n".join(detail_lines(finding)))
         text = copy_text(finding)
         self.copy_btn.setEnabled(bool(text))
@@ -187,6 +209,11 @@ class DoctorTab(BaseTab):
             return
         QApplication.clipboard().setText(text)
         self.log(S.DOCTOR_COPIED)
+
+    def apply_alternative(self):
+        finding = self.selected_finding()
+        if finding is not None and finding.alternatives and self.window is not None:
+            self.window.apply_doctor_fixes(list(finding.alternatives), rebuild=False)
 
     def _apply(self, rebuild: bool):
         if self.window is not None:

@@ -48,6 +48,8 @@ class ReportData:
     largest_files: List[Tuple[str, int]] = field(default_factory=list)
     #: (severity, title, detail) — already translated.
     findings: List[Tuple[str, str, str]] = field(default_factory=list)
+    #: Runtime Kit services embedded in the EXE — already translated.
+    runtime_services: List[str] = field(default_factory=list)
 
 
 def report_path_for(config: BuildConfig) -> str:
@@ -207,6 +209,10 @@ def render_html(data: ReportData, labels: Dict[str, str], rtl: bool = False,
         for sev, title, detail in data.findings
     ) or f'<tr><td colspan="2" class="muted">{label("none")}</td></tr>'
 
+    service_items = "".join(f"<li>{_e(name)}</li>" for name in data.runtime_services) or (
+        f'<li class="muted">{label("none")}</li>'
+    )
+
     options = options_from_command(data.command)
     option_items = "".join(f"<li><code>{_e(o)}</code></li>" for o in options) or (
         f'<li class="muted">{label("none")}</li>'
@@ -241,6 +247,9 @@ def render_html(data: ReportData, labels: Dict[str, str], rtl: bool = False,
 
 <h2>{label("findings")}</h2>
 <table>{finding_rows}</table>
+
+<h2>{label("runtime_kit")}</h2>
+<ul class="opts">{service_items}</ul>
 
 <h2>{label("options")}</h2>
 <ul class="opts">{option_items}</ul>

@@ -12,7 +12,7 @@ from py2exe_gui.paths import (
 )
 
 APP_NAME = "Python to EXE Converter"
-APP_VERSION = "1.4.0"
+APP_VERSION = "1.5.0"
 DEVELOPER = "عبدالكريم العبود"
 EMAIL = "abo.saleh.g@gmail.com"
 COPYRIGHT = "© 2025 [Python to EXE] - All Rights Reserved"
