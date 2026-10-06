@@ -375,3 +375,33 @@ class MainTab(BaseTab):
             QMessageBox.critical(self, S.MSG_ERROR, S.LOG_EXPORT_FAIL.format(error=str(e)))
             return
         self.log(S.LOG_EXPORT_OK.format(path=path))
+
+    # ── The project model ──────────────────────────────────────────────────
+
+    def read_project(self, project):
+        build = project.build
+        build.source = self.source_input.text()
+        build.output_name = self.output_name.text()
+        build.output_dir = self.output_dir.text()
+        build.icon = self.icon_input.text()
+        build.onefile = self.onefile_check.isChecked()
+        build.windowed = self.windowed_check.isChecked()
+        build.noconsole = self.noconsole_check.isChecked()
+        build.clean = self.clean_check.isChecked()
+        build.noconfirm = self.noconfirm_check.isChecked()
+        build.strip = self.strip_check.isChecked()
+
+    def apply_project(self, project, sections=()):
+        if "build" not in sections:
+            return
+        build = project.build
+        self.source_input.setText(build.source)
+        self.output_name.setText(build.output_name)
+        self.output_dir.setText(build.output_dir)
+        self.icon_input.setText(build.icon)
+        self.onefile_check.setChecked(build.onefile)
+        self.windowed_check.setChecked(build.windowed)
+        self.clean_check.setChecked(build.clean)
+        self.noconsole_check.setChecked(build.noconsole)
+        self.noconfirm_check.setChecked(build.noconfirm)
+        self.strip_check.setChecked(build.strip)

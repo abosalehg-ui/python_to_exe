@@ -72,3 +72,25 @@ class VersionInfoTab(BaseTab):
             product_name=self.vi_product_name.text().strip(),
             product_version=self.vi_product_version.text().strip(),
         )
+
+    def set_version_info(self, info: VersionInfo):
+        self.vi_company_name.setText(info.company_name)
+        self.vi_file_description.setText(info.file_description)
+        self.vi_file_version.setText(info.file_version)
+        self.vi_internal_name.setText(info.internal_name)
+        self.vi_legal_copyright.setText(info.legal_copyright)
+        self.vi_original_filename.setText(info.original_filename)
+        self.vi_product_name.setText(info.product_name)
+        self.vi_product_version.setText(info.product_version)
+        self._language_id = info.language_id
+
+    # ── The project model ──────────────────────────────────────────────────
+
+    def read_project(self, project):
+        info = self.version_info()
+        info.language_id = getattr(self, "_language_id", info.language_id)
+        project.version_info = info
+
+    def apply_project(self, project, sections=()):
+        if "version_info" in sections:
+            self.set_version_info(project.version_info)

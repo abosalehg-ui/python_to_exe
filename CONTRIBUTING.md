@@ -35,6 +35,9 @@ pytest tests/ -m slow               # بناءات PyInstaller حقيقية (د�
 7. **`p2e_runtime/` يعمل داخل برامج المستخدمين**: المكتبة القياسية فقط، Python 3.8+،
    ولا يستورد `py2exe_gui` ولا أي واجهة. الخدمات تُستورد بالاسم، ولا شيء يُفعَّل
    أو يتصل بالشبكة دون إعداد صريح.
+8. **سطر الأوامر (`py2exe_gui/cli.py`) لا يستورد PyQt5** أبداً، ولا أي وحدة تستورده:
+   مهمة CI الأساسية تشغّله بلا PyQt5. وأي خطوة تصل للشبكة أو تثبّت أو تحذف
+   تمر عبر `Console.confirm` (موافقة أو `--yes`).
 
 ### إضافة قالب جديد
 
@@ -94,6 +97,10 @@ pytest tests/ -m slow               # real PyInstaller builds (minutes)
    Python 3.8+, and it never imports `py2exe_gui` or a GUI toolkit. Services
    are imported by name, and nothing turns on or reaches the network without
    explicit configuration.
+8. **The command line (`py2exe_gui/cli.py`) never imports PyQt5**, directly or
+   through another module: the core CI job runs it without Qt. Any step that
+   reaches the network, installs or deletes goes through `Console.confirm`
+   (a yes, or `--yes`).
 
 ### Adding a New Template
 

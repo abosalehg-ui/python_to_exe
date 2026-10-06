@@ -5,6 +5,108 @@ follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### 1.6.0 — From project to product
+
+Fourth release of [PRODUCT_ROADMAP.md](PRODUCT_ROADMAP.md) (pillars 7 and 6):
+a project is one file in your repository, it builds from the command line,
+and it releases with one button — from the version bump to a published
+GitHub release.
+
+#### Added
+- **Project file `p2e.toml`** and **`ProjectConfig`**, the single settings
+  model the roadmap's architectural requirement 2 asked for: build settings,
+  Version Info, manifest, installer, signing (certificate path or store
+  subject and timestamp URL — never the password), `isolated_env`, the Runtime
+  Kit and release settings. Versioned (`schema = 1`) with a migration chain;
+  paths stored relative to the file with `/` and resolved on load. Read with
+  `tomllib` (3.11+) or `tomli` (declared for older Pythons only); written by a
+  small, dedicated writer (`core/toml_writer.py`) that round-trips escapes,
+  arrays, nested tables and Arabic text.
+- **Project menu**: New, Open, Save, Save As, Recent projects (kept in the
+  settings), Init project from this script. The window title shows the
+  project's name and an unsaved-changes marker; dropping a `p2e.toml` opens it;
+  `Ctrl+S` saves the project when one is open.
+- **Command line** — `py2exe-gui init | doctor | build | size | env | release`,
+  each with `--project` (default `./p2e.toml`). With no arguments the window
+  opens as before. Headless, and never imports PyQt5. `doctor --json` and
+  `size --json` for machines; `build` runs the doctor first, streams the
+  PyInstaller log with `==> [stage] NN%` markers (`BuildStageTracker`) and
+  `--strict` stops on doctor errors. Exit codes 0/1/2/3/4/5/130 are documented
+  in `--help` and the READMEs.
+- **Release pipeline** (`core/release/`, new 🚀 **Release** tab): version bump
+  applied to the project, Version Info, the installer and the Runtime Kit
+  together → notes drafted from `git log <last-tag>..HEAD`, grouped by
+  Conventional Commit prefix, editable (or `--notes FILE`) → doctor gate →
+  build → signtool → Inno Setup → reproducible portable ZIP →
+  `SHA256SUMS.txt` → the Runtime Kit's signed `update.json` for the new
+  version → git tag (the bump is committed first; pushing is a separate
+  opt-in) → GitHub release through the REST API (draft/pre-release, assets
+  uploaded) → winget manifests (version, installer, defaultLocale; schema
+  1.28.0, checked against the official schema files' required fields,
+  enums and patterns). Every step is a separate, idempotent unit: running the
+  same release again reuses the tag, the release and the uploaded assets.
+- **Dry run** for the whole pipeline: it reads the project, git and the
+  doctor, predicts every file name and command, and changes nothing. The same
+  action list feeds the final confirmation, which lists exactly what will be
+  written, run, committed, tagged, pushed and uploaded.
+- The Release tab: version with patch/minor/major and **Apply to every tab**
+  (a warning names any tab whose version disagrees), notes editor, GitHub and
+  winget settings, the token field, and the step checklist with live status.
+  Arabic (RTL) and English.
+
+#### Changed
+- Each tab now reads and applies its own part of `ProjectConfig`;
+  `MainWindow._current_config`/`_apply_config` no longer copy fields one by
+  one. Settings files, presets and build history store the project's JSON
+  form, which keeps the old build keys at the top level: every existing JSON
+  file, preset and history entry still loads, and a pre-1.6 file only touches
+  the build settings it holds.
+- Switching language no longer resets the deploy and installer tabs (the
+  project model carries the whole form across the rebuild).
+- The ISCC path is now a per-user setting (it names a program to run).
+- New themed styles for the menu bar and menus.
+
+#### Security
+- A project file is untrusted shared content: opening one goes through the
+  same dangerous-settings confirmation as a JSON file (`builder.find_dangerous_args`),
+  which now also covers a `upx_dir` setting (UPX is an executable). A file
+  that holds a password, a token or a private key — by key name, or a value
+  that looks like a GitHub token or a PEM key — or that names an interpreter
+  or a tool to run, is refused with the key named.
+- The **GitHub token** comes from the OS keyring (`keyring`, optional:
+  `pip install ".[release]"`) or `GITHUB_TOKEN`. It is never stored in the
+  project, the settings, a preset, the history or a log; it is sent only to
+  the API host (and `uploads.github.com` for the official API), redirects are
+  not followed, and every message is redacted. Tests grep logs, outputs,
+  settings and release files for it.
+- **Fixed a 1.5 leak:** a signed installer passes the whole signtool command,
+  `/p <password>` included, as one `/Sbyparam=…` argument to ISCC, and
+  `redact_password` only looked at separate `/p` tokens — the certificate
+  password was written to the log. It now redacts a password embedded in an
+  argument as well.
+- The CLI's consent rules match the GUI's: network, install and delete
+  steps, and a project file whose settings run code, need a yes at the prompt
+  or `--yes`; a non-interactive session without it is refused (exit code 4).
+  No password or token is ever a command-line flag (`P2E_SIGN_PASSWORD`,
+  `GITHUB_TOKEN`, or a prompt).
+
+#### Measured (Linux, Python 3.12, PyInstaller 6.22, a one-line app)
+- `init` 0.02 s · `doctor` 0.01 s · `build` 9.9 s · `release --dry-run` 0.09 s ·
+  full release 10.0 s (the build is almost all of it) with 6 API requests
+  (two lookups, one create, three uploads).
+- Release folder: the 7.1 MiB executable, the 7.0 MiB portable ZIP,
+  `SHA256SUMS.txt`, `RELEASE_NOTES.md` and the three winget files.
+- 1519 fast tests (up from 1217), plus the new slow end-to-end test
+  (`init → build → release --dry-run → release` against a local fake GitHub
+  API, real PyInstaller). Core coverage without PyQt5: 96.7 %.
+
+#### Not verified here (Linux)
+- signtool and Inno Setup run only on Windows: those steps are tested with a
+  recording runner, not the real tools.
+- The winget files are checked against the official 1.28.0 JSON schemas, but
+  not with `winget validate`.
+- Uploads are tested against a local fake of the GitHub API, not GitHub.
+
 ### 1.5.0 — Runtime Kit
 
 Third release of [PRODUCT_ROADMAP.md](PRODUCT_ROADMAP.md) (pillar 5): every

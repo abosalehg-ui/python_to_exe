@@ -24,6 +24,9 @@ version metadata, build history, and a Windows manifest editor.
 | **Windows Sandbox** *(1.4)* | Generates a `.wsb` that runs the build on a clean, throw-away Windows (output mapped read-only) |
 | **Runtime Kit** *(1.5)* | Optional `p2e_runtime` package embedded in *your* EXE, one checkbox per service: `resource_path()`, a rotating log file for windowed apps, a crash reporter (saved report + native dialog, nothing sent), single instance. Standard library only, Python 3.8+, works with tkinter, Qt and console apps. Nothing on by default, no telemetry |
 | **Signed self-updater** *(1.5)* | `update.json` signed with **Ed25519** (pure-Python verifier that passes the RFC 8032 test vectors); HTTPS only, redirects to HTTP refused, size and SHA-256 checked before anything is replaced. One-file EXEs swap in place and restart; folder builds launch a verified installer. Key pair and a *Create signed update.json* helper in the app |
+| **Project file** *(1.6)* | One `p2e.toml` in your repository describes the whole project — build, Version Info, manifest, installer, signing (never the password), Runtime Kit and release settings. Paths are relative to the file, so a fresh checkout builds the same way. The GUI, presets, history and the command line all use this one model |
+| **Command line** *(1.6)* | `py2exe-gui init / doctor / build / size / env / release`, headless, no PyQt5 needed — for CI and scripts. Build logs stream with stage markers |
+| **One-click release** *(1.6)* | Version bump everywhere at once → notes drafted from `git log` → doctor gate → build → sign → installer → portable ZIP → `SHA256SUMS.txt` → signed `update.json` → git tag → GitHub release → winget manifests. A dry run shows every action first; nothing is tagged or uploaded before you confirm |
 | **Icon Studio** *(1.3)* | Real multi-size `.ico` (16–256px) from an image or from letters, drawn with Qt — no Pillow needed |
 | **Smart Analysis** | AST-based import detection (incl. `__import__` and `importlib`), `requirements.txt` import, hidden-imports auto-suggest |
 | **Deployment** | Splash screen, Windows manifest (DPI, UAC, supported OS), Authenticode code signing, post-build smoke test |
@@ -57,8 +60,14 @@ Or via the package entry point:
 
 ```bash
 pip install -e .
-py2exe-gui
+py2exe-gui                 # the window
+py2exe-gui --help          # the command line
 ```
+
+To keep the GitHub token in the operating system's credential store
+(Windows Credential Manager, macOS Keychain, Secret Service), install the
+optional extra: `pip install -e ".[release]"`. Without it, the release reads
+`GITHUB_TOKEN` from the environment.
 
 ## Quick Start
 
@@ -78,7 +87,10 @@ py2exe-gui
 | `Ctrl+P` | Preview PyInstaller command (dry-run) |
 | `Ctrl+L` | Clear log |
 | `Ctrl+E` | Export log |
-| `Ctrl+S` | Save settings |
+| `Ctrl+S` | Save the project (a settings file when no project is open) |
+| `Ctrl+Shift+S` | Save the project as… |
+| `Ctrl+N` | New project |
+| `Ctrl+Shift+O` | Open a project |
 | `Ctrl+T` | Toggle theme (dark/light) |
 | `Ctrl+F` | Focus log search |
 | `Ctrl+M` | Toggle simple/advanced mode |
@@ -94,6 +106,120 @@ because eleven tabs of
 PyInstaller options is a lot to meet when all you want is one `.exe`. The mode
 button (or `Ctrl+M`) reveals the rest, and the choice is remembered. Hidden
 tabs keep their contents: switching modes mid-setup loses nothing.
+
+## Project file (`p2e.toml`)
+
+**Project ▸ Init project from this script** (or `py2exe-gui init app.py`)
+writes `p2e.toml` beside the script from the current settings. Commit it:
+everyone who clones the repository — and every CI job — builds the same way.
+
+```toml
+schema = 1
+
+[project]
+name = "Image Tool"
+version = "1.4.2"
+
+[build]
+source = "app.py"            # relative to this file
+onefile = true
+hidden_imports = ["PIL._tkinter_finder"]
+isolated_env = true          # a flag — never an interpreter path
+
+[installer]
+enabled = true
+app_version = "1.4.2"        # kept in step with [project] by a release
+
+[signing]
+enabled = true
+cert_path = "certs/me.pfx"   # the password is typed at signing time, never stored
+
+[release]
+repository = "me/image-tool"
+
+[release.winget]
+enabled = true
+identifier = "Me.ImageTool"
+```
+
+- **New / Open / Save / Save As** and **Recent projects** are in the
+  **Project** menu (`Ctrl+N`, `Ctrl+Shift+O`, `Ctrl+S`, `Ctrl+Shift+S`). The
+  title shows the project's name and a `*` while there are unsaved changes.
+  Dropping a `p2e.toml` onto the window opens it.
+- The file is **versioned** (`schema = 1`); a file written by a newer app is
+  refused with a clear message instead of being half-read.
+- JSON settings files, presets and history from earlier versions still load.
+
+## Command line
+
+`py2exe-gui` with no arguments opens the window. With a command it runs
+headless and never imports PyQt5. Every command takes `--project PATH`
+(default `./p2e.toml`) and `--lang ar|en`.
+
+| Command | What it does |
+|---|---|
+| `py2exe-gui init app.py [--name N] [--set-version X.Y.Z] [--force]` | Create `p2e.toml` for a script |
+| `py2exe-gui doctor [--json]` | The project doctor; exit code 1 if it finds errors |
+| `py2exe-gui build [--strict] [--yes]` | Run the doctor, then build (in the isolated environment if the project says so). The log streams with `==> [stage] NN%` markers. `--strict` stops on doctor errors |
+| `py2exe-gui size [--json]` | The size lab on the last build |
+| `py2exe-gui env create\|lock\|delete [--yes]` | The isolated build environment |
+| `py2exe-gui release (--set-version X.Y.Z \| --bump major\|minor\|patch) [--notes FILE] [--dry-run] [--push-tag] [--no-tag] [--no-publish] [--allow-doctor-errors] [--yes]` | The release pipeline (below) |
+
+**Consent works as in the window.** A step that reaches the network, installs
+or deletes — and a project file whose settings would run its own code
+(`--runtime-hook`, `--upx-dir`, an update key that is not yours) — asks at the
+prompt, or needs `--yes` given up front. In a non-interactive session without
+`--yes` it is refused with exit code 4; it never happens silently.
+
+| Exit code | Meaning |
+|---|---|
+| 0 | Success |
+| 1 | The doctor found errors, or the build or release failed |
+| 2 | Invalid arguments |
+| 3 | Project file missing, invalid or refused |
+| 4 | A step needed consent that was not given |
+| 5 | A required tool or environment is missing |
+| 130 | Interrupted |
+
+A CI job is three lines (on a Windows runner for a `.exe`; Linux and macOS
+runners build native binaries):
+
+```bash
+pip install git+https://github.com/abosalehg-ui/python_to_exe
+py2exe-gui doctor
+py2exe-gui build --strict --yes
+```
+
+## Release
+
+The **🚀 Release** tab and `py2exe-gui release` run the same pipeline:
+
+1. **Version** — semantic version, written to the project, Version Info
+   (`1.4.2.0`), the installer and the Runtime Kit together.
+2. **Notes** — drafted from `git log <last tag>..HEAD`, grouped by
+   Conventional Commit prefix (`feat:`, `fix:`…); edit them in the tab or pass
+   `--notes FILE`.
+3. **Doctor gate** — errors block the release unless you explicitly override.
+4. **Build** in the configured environment.
+5. **Sign** with signtool (Windows), password never logged.
+6. **Installer** with Inno Setup (Windows).
+7. **Portable ZIP** of the one-file EXE or the folder (reproducible bytes).
+8. **`SHA256SUMS.txt`** for every artifact.
+9. **Signed `update.json`** for the Runtime Kit's updater, pointing at the
+   release asset.
+10. **git tag** `vX.Y.Z` (the version bump is committed first); pushing it is
+    a separate opt-in.
+11. **GitHub release** via the REST API — created or completed, assets
+    uploaded, draft/pre-release as configured.
+12. **winget** — the three manifest files (schema 1.28.0) with the real URL and
+    SHA-256, checked against the schema's required fields. Generated only; you
+    submit them.
+
+Every release is first planned as a **dry run** that changes nothing; the
+final confirmation lists exactly what will be written, run, committed,
+tagged, pushed and uploaded. Each step can be repeated: running the same
+release again reuses the tag, the GitHub release and the assets already
+uploaded.
 
 ## Tabs Overview
 
@@ -124,6 +250,14 @@ update* writes `update.json` and `update.json.sig` next to a new build;
 nothing is uploaded. Your app calls `p2e_runtime.updates.check()` and
 `apply(info)` from its own UI; an opt-in check at start-up asks with a native
 dialog on Windows.
+
+### 🚀 Release
+Version field with patch/minor/major buttons and **Apply to every tab** (a
+warning lists any tab whose version disagrees), the notes editor (*Draft from
+git*, *From file*), GitHub settings (repository, tag prefix, draft,
+pre-release, which files to upload), the token (stored in the OS keyring, shown
+only as "stored"), winget identifiers, and the step checklist with live status.
+*Dry run* is ticked by default.
 
 ### 🩺 Project Doctor
 Readiness score, every predicted and actual problem in one list, and the fix
@@ -267,6 +401,23 @@ including ones you sign and distribute. Only accept it from a source you trust.
   or the log. **If you lose it, programs you shipped can no longer be
   updated** — back it up.
 
+### Project files and the release
+
+- A `p2e.toml` is shared content. Opening one goes through the same
+  confirmation as a JSON settings file (now also for `--upx-dir`).
+- A project file **cannot** hold a password, a token or a private key, and
+  cannot name an interpreter or a tool to run: such a file is refused, with
+  the key named. Tool locations (ISCC, the base Python) are per-user
+  settings.
+- The **GitHub token** is read from the OS keyring or `GITHUB_TOKEN`. It is
+  never written to the project, the settings, a preset, the history or a log,
+  is sent only to the API host (redirects are not followed), and is redacted
+  from every message. The certificate password is likewise kept out of every
+  log — including the `/Sbyparam` argument of a signed installer, where 1.5
+  still printed it.
+- The release never pushes a tag or uploads anything before the final
+  confirmation; `--yes` is that confirmation on the command line.
+
 ### PyInstaller installation
 
 Never installed silently. If it is missing you are shown the exact command
@@ -287,7 +438,7 @@ migrated once on first run.
 
 ```bash
 pip install -r requirements-dev.txt
-pytest tests/ -m "not slow"                  # 1217 tests
+pytest tests/ -m "not slow"                  # 1519 tests
 ruff check py2exe_gui/ p2e_runtime/ tests/   # lint
 ```
 
@@ -303,7 +454,9 @@ p2e_runtime/              # Runtime Kit embedded in EXEs (stdlib only, 3.8+)
 ├── updates.py            # signed self-updater
 └── _ed25519.py           # verify-only Ed25519 (RFC 8032)
 py2exe_gui/
-├── app.py                # Application bootstrap
+├── app.py                # Application bootstrap (GUI, or the CLI with a command)
+├── cli.py                # py2exe-gui init/doctor/build/size/env/release (no PyQt5)
+├── texts.py              # Qt-free locale text for release steps (CLI + GUI)
 ├── constants.py
 ├── strings.py            # All UI strings (Ar/En) + locale proxy
 ├── styles.py             # Dark + light themes
@@ -329,6 +482,11 @@ py2exe_gui/
 │   ├── sandbox.py            # Windows Sandbox .wsb
 │   ├── runtime_kit.py        # hook, p2e_runtime.json and options for the build
 │   ├── update_signing.py     # signing key, Ed25519 signing, update.json
+│   ├── project_file.py       # ProjectConfig + p2e.toml (schema, paths, refusals)
+│   ├── toml_writer.py        # the TOML writer (the stdlib only reads TOML)
+│   ├── build_runner.py       # headless build: prepare, stream, clean up
+│   ├── release/              # versioning, changelog, git, artifacts,
+│   │                         # credentials, github, winget, pipeline
 │   ├── build_history.py
 │   └── log_formatter.py
 └── ui/
@@ -369,7 +527,10 @@ See [IDEAS.md](IDEAS.md) for the full roadmap. Currently:
   slimming suggestions, HTML build report, Windows Sandbox testing
 - ✅ **1.5:** Runtime Kit (`p2e_runtime`): Ed25519-signed self-updater, crash
   reporter, single instance, `resource_path()`, log file for windowed apps
-- 🧭 **Vision (1.5 → 2.0):** see [PRODUCT_ROADMAP.md](PRODUCT_ROADMAP.md)
+- ✅ **1.6:** `p2e.toml` project file as the single settings model, headless
+  command line, one-click release (GitHub Releases, checksums, signed
+  update manifest, winget manifests)
+- 🧭 **Vision (→ 2.0):** see [PRODUCT_ROADMAP.md](PRODUCT_ROADMAP.md)
 - ⏳ **Next:** venv management, multi-file projects, Linux/macOS installers,
   `.spec` editor, VirusTotal, PySide6 migration —
   see [UI_IMPROVEMENT_PLAN.md](UI_IMPROVEMENT_PLAN.md)

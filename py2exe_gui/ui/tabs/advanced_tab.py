@@ -152,3 +152,29 @@ class AdvancedTab(BaseTab):
         path = self._choose_dir(S.UPX_DIR_LABEL)
         if path:
             self.upx_dir.setText(path)
+
+    # ── The project model ──────────────────────────────────────────────────
+
+    def read_project(self, project):
+        build = project.build
+        build.extra_files = self.extra_files()
+        build.hidden_imports = self.hidden_imports()
+        build.optimize = self.optimize_combo.currentIndex()
+        build.upx = self.upx_check.isChecked()
+        build.upx_dir = self.upx_dir.text().strip()
+        build.extra_args = self.extra_args.text()
+
+    def apply_project(self, project, sections=()):
+        if "build" not in sections:
+            return
+        build = project.build
+        self.extra_files_list.clear()
+        for path in build.extra_files:
+            self.extra_files_list.addItem(path)
+        self.hidden_imports_list.clear()
+        for module in build.hidden_imports:
+            self.hidden_imports_list.addItem(module)
+        self.optimize_combo.setCurrentIndex(build.optimize)
+        self.upx_check.setChecked(build.upx)
+        self.upx_dir.setText(build.upx_dir)
+        self.extra_args.setText(build.extra_args)

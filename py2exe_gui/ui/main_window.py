@@ -18,6 +18,7 @@ from dataclasses import replace
 from PyQt5.QtCore import Qt, QTimer, QUrl
 from PyQt5.QtGui import QDesktopServices, QFont, QKeySequence
 from PyQt5.QtWidgets import (
+    QAction,
     QFileDialog,
     QFrame,
     QGroupBox,
@@ -61,7 +62,6 @@ from py2exe_gui.core import (
     diagnostic_config,
     examine,
     filter_non_stdlib,
-    find_dangerous_args,
     find_iscc,
     generate_iss_script,
     generate_manifest,
@@ -97,9 +97,31 @@ from py2exe_gui.core.fixes import (
 )
 from py2exe_gui.core.installer import validate as validate_installer
 from py2exe_gui.core.knowledge import default_is_installed
+from py2exe_gui.core.project_file import (
+    PROJECT_FILE_NAME,
+    SECTIONS,
+    ProjectConfig,
+    ProjectFileError,
+    load_project,
+    new_project_for_script,
+    project_path_for_script,
+    save_project,
+    sections_in,
+    untrusted_flags,
+)
 from py2exe_gui.core.project_scan import project_imports
+from py2exe_gui.core.release import credentials
+from py2exe_gui.core.release.changelog import draft_notes
+from py2exe_gui.core.release.git import remote_slug
+from py2exe_gui.core.release.pipeline import (
+    DONE,
+    ReleaseContext,
+    ReleaseOptions,
+    confirmation,
+    has_blocking_problems,
+)
+from py2exe_gui.core.release.versioning import apply_version, is_semver, version_mismatches
 from py2exe_gui.core.runtime_kit import (
-    TEXT_KEYS,
     preview_options,
     render_hook,
     render_runtime_config,
@@ -160,15 +182,22 @@ from py2exe_gui.styles import (
     themed_stylesheet,
 )
 from py2exe_gui.templates import TEMPLATES, template_name
+from py2exe_gui.texts import notes_titles, project_error_text, runtime_texts
 from py2exe_gui.ui.batch_thread import BatchThread
 from py2exe_gui.ui.conversion_thread import ConversionThread
 from py2exe_gui.ui.diagnostic_thread import DiagnosticThread
-from py2exe_gui.ui.dialogs import CommandPreviewDialog, PresetNameDialog, WelcomeDialog
+from py2exe_gui.ui.dialogs import (
+    CommandPreviewDialog,
+    PresetNameDialog,
+    ReleaseConfirmDialog,
+    WelcomeDialog,
+)
 from py2exe_gui.ui.env_thread import EnvThread
 from py2exe_gui.ui.finding_text import finding_detail, finding_title, fix_label, service_label
 from py2exe_gui.ui.icon_studio_dialog import IconStudioDialog
 from py2exe_gui.ui.installer_thread import InstallerThread
 from py2exe_gui.ui.post_build_thread import PostBuildThread
+from py2exe_gui.ui.release_thread import ReleaseThread
 from py2exe_gui.ui.tabs import (
     AboutTab,
     AdvancedTab,
@@ -178,6 +207,7 @@ from py2exe_gui.ui.tabs import (
     HistoryTab,
     InstallerTab,
     MainTab,
+    ReleaseTab,
     RuntimeTab,
     SizeTab,
     TemplatesTab,
@@ -188,7 +218,7 @@ from py2exe_gui.ui.tray import BuildTray
 
 # Tabs shown in simple mode. Eight tabs at once is a lot to meet when all you
 # want is one .exe; the rest stay one button away.
-SIMPLE_MODE_TABS = ("main", "doctor", "size", "runtime", "templates", "about")
+SIMPLE_MODE_TABS = ("main", "doctor", "size", "runtime", "release", "templates", "about")
 
 # Where isolated build environments are created. A module global so tests can
 # point it at a temporary folder.
@@ -197,6 +227,16 @@ ENVS_ROOT = envs_dir()
 # The Runtime Kit's private update-signing key (per-user config folder).
 # A module global for the same reason.
 SIGNING_KEY_FILE = signing_key_path()
+
+# The OS keyring used for the GitHub token (``credentials.DEFAULT`` = the real
+# ``keyring`` package, if installed). A module global so tests use a fake one.
+KEYRING = credentials.DEFAULT
+
+# Recent projects kept in the settings file.
+RECENT_PROJECTS_MAX = 8
+
+# Every part of a ProjectConfig a tab can apply.
+ALL_SECTIONS = ("build", "project") + SECTIONS
 
 # Wait this long after the last edit before re-examining the project, so the
 # doctor does not re-parse the script on every keystroke in the path field.
@@ -239,6 +279,18 @@ class MainWindow(QMainWindow):
         self._checkers = {}
         self._size_view = None
         self._last_report_path = ""
+        # The open project file ('' = none) and the state it was saved in,
+        # for the window title's unsaved-changes marker.
+        self.project_path = ""
+        self.project_name = ""
+        self._saved_snapshot = None
+        self.release_thread = None
+        self._release_after_plan = False
+        self._last_release_dir = ""
+        self._modified_timer = QTimer(self)
+        self._modified_timer.setSingleShot(True)
+        self._modified_timer.setInterval(150)
+        self._modified_timer.timeout.connect(self._update_modified)
         self._doctor_timer = QTimer(self)
         self._doctor_timer.setSingleShot(True)
         self._doctor_timer.setInterval(DOCTOR_DEBOUNCE_MS)
@@ -256,6 +308,8 @@ class MainWindow(QMainWindow):
         self.check_dependencies()
         self._refresh_history_list()
         self._refresh_presets_list()
+        self._saved_snapshot = self._project_snapshot()
+        self._update_title()
         # The first-run dialog and the update check are NOT started here:
         # both are modal or blocking, and a constructor that blocks cannot be
         # instantiated by a test (or shown before it finishes). ``app.main``
@@ -264,7 +318,7 @@ class MainWindow(QMainWindow):
     # ─── Construction ───────────────────────────────────────────────────
 
     def init_ui(self):
-        self.setWindowTitle(S.WINDOW_TITLE_FMT.format(name=APP_NAME, version=APP_VERSION))
+        self._update_title()
         # A hard 800px minimum did not fit a 1366x768 laptop. Keep the
         # comfortable size as the *default*, not as a floor.
         self.setMinimumSize(900, 600)
@@ -272,6 +326,7 @@ class MainWindow(QMainWindow):
         self._apply_layout_direction()
         self._apply_stylesheet()
         self.setCentralWidget(self._build_central_widget())
+        self._build_menu()
         self.statusBar().showMessage(f"{COPYRIGHT} | {DEVELOPER}")
 
     def _apply_stylesheet(self):
@@ -299,6 +354,7 @@ class MainWindow(QMainWindow):
         self.doctor_tab = DoctorTab(self)
         self.size_tab = SizeTab(self)
         self.runtime_tab = RuntimeTab(self)
+        self.release_tab = ReleaseTab(self)
         self.advanced_tab = AdvancedTab(self)
         self.version_info_tab = VersionInfoTab(self)
         self.deploy_tab = DeployTab(self)
@@ -314,6 +370,7 @@ class MainWindow(QMainWindow):
             ("doctor", self.doctor_tab, S.TAB_DOCTOR),
             ("size", self.size_tab, S.TAB_SIZE),
             ("runtime", self.runtime_tab, S.TAB_RUNTIME),
+            ("release", self.release_tab, S.TAB_RELEASE),
             ("advanced", self.advanced_tab, S.TAB_ADVANCED),
             ("version_info", self.version_info_tab, S.TAB_VERSION_INFO),
             ("deploy", self.deploy_tab, S.TAB_DEPLOY),
@@ -322,6 +379,12 @@ class MainWindow(QMainWindow):
             ("templates", self.templates_tab, S.TAB_TEMPLATES),
             ("history", self.history_tab, S.TAB_HISTORY),
             ("about", self.about_tab, S.TAB_ABOUT),
+        )
+
+        # The tabs that hold a part of the project, in the order they are read.
+        self._project_tabs = (
+            self.main_tab, self.advanced_tab, self.deploy_tab, self.size_tab,
+            self.runtime_tab, self.version_info_tab, self.installer_tab, self.release_tab,
         )
 
         self.tabs = QTabWidget()
@@ -355,6 +418,14 @@ class MainWindow(QMainWindow):
         size.report_auto.toggled.connect(
             lambda on: self.settings.__setitem__("report_auto", bool(on))
         )
+        # The Inno Setup compiler is a program on this machine: a per-user
+        # setting, never part of a project file someone else can write.
+        self.installer_tab.inst_iscc_path.setText(str(self.settings.get("iscc_path", "")))
+        self.installer_tab.inst_iscc_path.textChanged.connect(
+            lambda text: self.settings.__setitem__("iscc_path", text.strip())
+        )
+        self._watch_project_fields()
+        self.refresh_token_status()
 
         layout.addWidget(self._create_progress_group())
         layout.addLayout(self._create_action_buttons())
@@ -527,60 +598,36 @@ class MainWindow(QMainWindow):
 
     # ─── Configuration ──────────────────────────────────────────────────
 
+    def _current_project(self) -> ProjectConfig:
+        """The whole form as one ``ProjectConfig`` — each tab reads its part."""
+        project = ProjectConfig(name=self.project_name)
+        for tab in self._project_tabs:
+            tab.read_project(project)
+        return project
+
+    def _apply_project(self, project: ProjectConfig, sections=ALL_SECTIONS):
+        """Show ``project`` in the form. Only ``sections`` are touched, so a
+        pre-1.6 preset (build settings only) leaves the installer tab alone."""
+        if "project" in sections:
+            self.project_name = project.name
+        for tab in self._project_tabs:
+            tab.apply_project(project, sections)
+        self.refresh_runtime_preview()
+        self._schedule_modified()
+
     def _current_config(self) -> BuildConfig:
-        main, advanced, deploy = self.main_tab, self.advanced_tab, self.deploy_tab
-        return BuildConfig(
-            source=main.source_input.text(),
-            output_name=main.output_name.text(),
-            output_dir=main.output_dir.text(),
-            icon=main.icon_input.text(),
-            onefile=main.onefile_check.isChecked(),
-            windowed=main.windowed_check.isChecked(),
-            noconsole=main.noconsole_check.isChecked(),
-            clean=main.clean_check.isChecked(),
-            noconfirm=main.noconfirm_check.isChecked(),
-            strip=main.strip_check.isChecked(),
-            extra_files=advanced.extra_files(),
-            hidden_imports=advanced.hidden_imports(),
-            optimize=advanced.optimize_combo.currentIndex(),
-            upx=advanced.upx_check.isChecked(),
-            upx_dir=advanced.upx_dir.text().strip(),
-            extra_args=advanced.extra_args.text(),
-            splash_image=deploy.splash_input.text().strip(),
-            isolated_env=self.size_tab.isolated_radio.isChecked(),
-            runtime_kit=self.runtime_tab.kit_config(),
-        )
+        return self._current_project().build
 
     def _apply_config(self, config: BuildConfig):
-        main, advanced, deploy = self.main_tab, self.advanced_tab, self.deploy_tab
-        main.source_input.setText(config.source)
-        main.output_name.setText(config.output_name)
-        main.output_dir.setText(config.output_dir)
-        main.icon_input.setText(config.icon)
-        main.onefile_check.setChecked(config.onefile)
-        main.windowed_check.setChecked(config.windowed)
-        main.clean_check.setChecked(config.clean)
-        main.noconsole_check.setChecked(config.noconsole)
-        main.noconfirm_check.setChecked(config.noconfirm)
-        main.strip_check.setChecked(config.strip)
+        self._apply_project(ProjectConfig(build=config), ("build",))
 
-        advanced.extra_files_list.clear()
-        for path in config.extra_files:
-            advanced.extra_files_list.addItem(path)
-        advanced.hidden_imports_list.clear()
-        for module in config.hidden_imports:
-            advanced.hidden_imports_list.addItem(module)
-        advanced.optimize_combo.setCurrentIndex(config.optimize)
-        advanced.upx_check.setChecked(config.upx)
-        advanced.upx_dir.setText(config.upx_dir)
-        advanced.extra_args.setText(config.extra_args)
-
-        deploy.splash_input.setText(config.splash_image)
-        if config.isolated_env:
-            self.size_tab.isolated_radio.setChecked(True)
-        else:
-            self.size_tab.current_radio.setChecked(True)
-        self.runtime_tab.set_kit_config(config.runtime_kit)
+    @staticmethod
+    def _sections_of(data: dict):
+        """What a JSON settings dict (file, preset, history) actually holds."""
+        present = ["build"] + sections_in(data)
+        if isinstance(data.get("project"), dict):
+            present.append("project")
+        return tuple(present)
 
     def save_current_settings(self):
         file_path, _ = QFileDialog.getSaveFileName(
@@ -590,7 +637,8 @@ class MainWindow(QMainWindow):
             return
         try:
             with open(file_path, "w", encoding="utf-8") as f:
-                json.dump(self._current_config().to_dict(), f, ensure_ascii=False, indent=2)
+                json.dump(self._current_project().to_settings_dict(), f,
+                          ensure_ascii=False, indent=2)
         except (OSError, TypeError) as e:
             QMessageBox.critical(self, S.MSG_ERROR, S.ERR_SAVE_FAIL.format(error=str(e)))
             return
@@ -608,16 +656,16 @@ class MainWindow(QMainWindow):
                 data = json.load(f)
             if not isinstance(data, dict):
                 raise ValueError("settings file must contain a JSON object")
-            config = BuildConfig.from_dict(data)
+            project = ProjectConfig.from_settings_dict(data)
         except (OSError, ValueError, TypeError) as e:
             QMessageBox.critical(self, S.MSG_ERROR, S.ERR_LOAD_FAIL.format(error=str(e)))
             return
 
-        if not self._confirm_untrusted_config(config):
+        if not self._confirm_untrusted_config(project.build):
             self._append_log(S.LOG_SETTINGS_REJECTED.format(path=file_path))
             return
 
-        self._apply_config(config)
+        self._apply_project(project, self._sections_of(data))
         self._append_log(S.LOG_SETTINGS_LOADED.format(path=file_path))
         QMessageBox.information(self, S.MSG_SUCCESS, S.MSG_LOADED_OK)
 
@@ -628,14 +676,17 @@ class MainWindow(QMainWindow):
         code into every EXE the build produces. The user needs to see that
         before it silently becomes part of a signed binary.
         """
-        flags = find_dangerous_args(config.extra_args)
+        flags = untrusted_flags(config)
         if flags:
+            shown = config.extra_args
+            if config.upx and config.upx_dir.strip():
+                shown = f"{shown} --upx-dir={config.upx_dir}".strip()
             reply = QMessageBox.question(
                 self,
                 S.MSG_CONFIRM,
                 S.MSG_DANGEROUS_ARGS_CONFIRM.format(
                     flags="\n".join(f"  • {f}" for f in flags),
-                    args=config.extra_args,
+                    args=shown,
                 ),
                 QMessageBox.Yes | QMessageBox.No,
                 QMessageBox.No,
@@ -686,7 +737,7 @@ class MainWindow(QMainWindow):
             if reply != QMessageBox.Yes:
                 return
 
-        if not self.presets.put(name, self._current_config().to_dict()):
+        if not self.presets.put(name, self._current_project().to_settings_dict()):
             QMessageBox.critical(
                 self, S.MSG_ERROR, S.ERR_PRESET_SAVE_FAIL.format(error=self.presets.last_error)
             )
@@ -702,12 +753,12 @@ class MainWindow(QMainWindow):
         data = self.presets.get(name)
         if data is None:
             return
-        config = BuildConfig.from_dict(data)
+        project = ProjectConfig.from_settings_dict(data)
         # A preset can be imported from elsewhere, so it gets the same
         # dangerous-flag check as a settings file.
-        if not self._confirm_untrusted_config(config):
+        if not self._confirm_untrusted_config(project.build):
             return
-        self._apply_config(config)
+        self._apply_project(project, self._sections_of(data))
         self._append_log(S.PRESET_APPLIED_FMT.format(name=name))
 
     def delete_selected_preset(self):
@@ -826,7 +877,7 @@ class MainWindow(QMainWindow):
                 output_name=job.output_name,
                 success=job.status == "success",
                 duration_seconds=job.duration_seconds,
-                config=self._current_config().to_dict(),
+                config=self._current_project().to_settings_dict(),
             )
             self.history.add(record)
         self._refresh_history_list()
@@ -839,7 +890,8 @@ class MainWindow(QMainWindow):
 
     def _build_in_progress(self) -> bool:
         for thread in (
-            self.conversion_thread, self.batch_thread, self.diagnostic_thread, self.env_thread
+            self.conversion_thread, self.batch_thread, self.diagnostic_thread, self.env_thread,
+            self.release_thread,
         ):
             if thread and thread.isRunning():
                 return True
@@ -962,7 +1014,9 @@ class MainWindow(QMainWindow):
 
         self._build_start_time = time.monotonic()
         self._build_wall_start = time.time()
-        self._build_config_snapshot = config.to_dict()
+        snapshot = self._current_project()
+        snapshot.build = config
+        self._build_config_snapshot = snapshot.to_settings_dict()
         self._build_output = []
 
         # A last look before building: the doctor never blocks a build, but
@@ -1269,8 +1323,11 @@ class MainWindow(QMainWindow):
         re-read its label we snapshot the state, rebuild the central widget
         under the new locale, then restore. This previously required a restart.
         """
-        config = self._current_config()
-        version_info = self.version_info_tab.version_info()
+        project = self._current_project()
+        modified = self.is_project_modified()
+        # In memory only, never in the project: restored by hand below.
+        password = self.deploy_tab.signing_password.text()
+        notes = self.release_tab.notes_edit.toPlainText()
         # Snapshot the buffer, not the rendered HTML: the filter re-renders
         # from the buffer, so restoring HTML alone would lose the severities.
         log_lines = self.main_tab.log_lines()
@@ -1282,20 +1339,18 @@ class MainWindow(QMainWindow):
         self.setStyleSheet(
             themed_stylesheet(self.current_theme, locale_code, self.font_scale)
         )
-        self.setWindowTitle(S.WINDOW_TITLE_FMT.format(name=APP_NAME, version=APP_VERSION))
         self.setCentralWidget(self._build_central_widget())
+        self._build_menu()
         self.statusBar().showMessage(f"{COPYRIGHT} | {DEVELOPER}")
 
-        self._apply_config(config)
-        vi = self.version_info_tab
-        vi.vi_company_name.setText(version_info.company_name)
-        vi.vi_file_description.setText(version_info.file_description)
-        vi.vi_file_version.setText(version_info.file_version)
-        vi.vi_internal_name.setText(version_info.internal_name)
-        vi.vi_legal_copyright.setText(version_info.legal_copyright)
-        vi.vi_original_filename.setText(version_info.original_filename)
-        vi.vi_product_name.setText(version_info.product_name)
-        vi.vi_product_version.setText(version_info.product_version)
+        # Rebuilding the widgets loses nothing: the project model carries the
+        # form across (before 1.6 the deploy and installer tabs were reset).
+        self._apply_project(project)
+        self.deploy_tab.signing_password.setText(password)
+        self.release_tab.notes_edit.setPlainText(notes)
+        if not modified:
+            self._saved_snapshot = self._project_snapshot()
+        self._update_modified()
 
         self.main_tab.restore_log(log_lines)
         self.main_tab.refresh_icon_preview()
@@ -1392,10 +1447,10 @@ class MainWindow(QMainWindow):
         record = self.history.get(row)
         if record is None:
             return
-        config = BuildConfig.from_dict(record.config)
-        if not self._confirm_untrusted_config(config):
+        project = ProjectConfig.from_settings_dict(record.config)
+        if not self._confirm_untrusted_config(project.build):
             return
-        self._apply_config(config)
+        self._apply_project(project, self._sections_of(record.config))
         try:
             label_time = record.short_label().split("@", 1)[1].strip()
         except IndexError:
@@ -1889,17 +1944,7 @@ class MainWindow(QMainWindow):
     # ─── Runtime Kit ────────────────────────────────────────────────────
 
     def _runtime_texts(self) -> dict:
-        """What the built app says (crash dialog, second copy, update prompt),
-        in the language the developer is using now."""
-        names = {
-            "crash_title": "KIT_RT_CRASH_TITLE",
-            "crash_message": "KIT_RT_CRASH_MESSAGE",
-            "support_prompt": "KIT_RT_SUPPORT_PROMPT",
-            "instance_message": "KIT_RT_INSTANCE_MESSAGE",
-            "update_title": "KIT_RT_UPDATE_TITLE",
-            "update_message": "KIT_RT_UPDATE_MESSAGE",
-        }
-        return {key: getattr(S, names[key]) for key in TEXT_KEYS}
+        return runtime_texts()
 
     def _rtl(self) -> bool:
         return LOCALE_LAYOUT.get(current_locale(), "ltr") == "rtl"
@@ -2317,6 +2362,411 @@ class MainWindow(QMainWindow):
                     self, S.MSG_ERROR, S.LOG_INSTALLER_FAIL.format(error=message)
                 )
 
+    # ─── Project file (p2e.toml) ────────────────────────────────────────
+
+    def _build_menu(self):
+        """The Project menu. Rebuilt on a language switch, like the widgets."""
+        bar = self.menuBar()
+        bar.clear()
+        menu = bar.addMenu(S.MENU_PROJECT)
+
+        def item(text, handler, keys=""):
+            # The shortcut is shown in the menu but bound once, as a
+            # QShortcut: binding it here too would make it ambiguous.
+            action = QAction(f"{text}\t{keys}" if keys else text, self)
+            action.triggered.connect(lambda _checked=False: handler())
+            menu.addAction(action)
+            return action
+
+        self.new_project_action = item(S.MENU_NEW_PROJECT, self.new_project, "Ctrl+N")
+        self.open_project_action = item(S.MENU_OPEN_PROJECT, self.open_project_dialog,
+                                        "Ctrl+Shift+O")
+        self.recent_menu = menu.addMenu(S.MENU_RECENT_PROJECTS)
+        menu.addSeparator()
+        self.save_project_action = item(S.MENU_SAVE_PROJECT, self.save_project, "Ctrl+S")
+        self.save_as_action = item(S.MENU_SAVE_PROJECT_AS, self.save_project_as, "Ctrl+Shift+S")
+        menu.addSeparator()
+        self.init_project_action = item(S.MENU_INIT_PROJECT, self.init_project_from_script)
+        self._refresh_recent_menu()
+
+    def recent_projects(self):
+        recent = self.settings.get("recent_projects", [])
+        return [p for p in recent if isinstance(p, str)] if isinstance(recent, list) else []
+
+    def _remember_project(self, path: str):
+        path = os.path.abspath(path)
+        recent = [p for p in self.recent_projects()
+                  if os.path.normcase(p) != os.path.normcase(path)]
+        self.settings["recent_projects"] = [path] + recent[: RECENT_PROJECTS_MAX - 1]
+        self.save_settings()
+        self._refresh_recent_menu()
+
+    def _refresh_recent_menu(self):
+        if not hasattr(self, "recent_menu"):
+            return
+        self.recent_menu.clear()
+        recent = self.recent_projects()
+        if not recent:
+            empty = self.recent_menu.addAction(S.MENU_RECENT_EMPTY)
+            empty.setEnabled(False)
+            return
+        for path in recent:
+            action = self.recent_menu.addAction(path)
+            action.triggered.connect(lambda _c=False, p=path: self.open_project_path(p))
+
+    def _project_snapshot(self) -> dict:
+        return self._current_project().to_settings_dict()
+
+    def is_project_modified(self) -> bool:
+        return self._saved_snapshot is not None and self._project_snapshot() != self._saved_snapshot
+
+    def _mark_saved(self):
+        self._saved_snapshot = self._project_snapshot()
+        self._update_modified()
+
+    def _watch_project_fields(self):
+        """Re-check the unsaved-changes marker whenever any project field changes."""
+        from PyQt5.QtWidgets import (
+            QAbstractButton,
+            QComboBox,
+            QLineEdit,
+            QListWidget,
+            QPlainTextEdit,
+            QSpinBox,
+        )
+
+        for tab in self._project_tabs:
+            for widget in tab.findChildren(QLineEdit):
+                widget.textChanged.connect(self._schedule_modified)
+            for widget in tab.findChildren(QAbstractButton):
+                if widget.isCheckable():
+                    widget.toggled.connect(self._schedule_modified)
+            for widget in tab.findChildren(QComboBox):
+                widget.currentIndexChanged.connect(self._schedule_modified)
+            for widget in tab.findChildren(QSpinBox):
+                widget.valueChanged.connect(self._schedule_modified)
+            for widget in tab.findChildren(QListWidget):
+                if widget is not self.release_tab.steps_list:
+                    model = widget.model()
+                    model.rowsInserted.connect(self._schedule_modified)
+                    model.rowsRemoved.connect(self._schedule_modified)
+            for widget in tab.findChildren(QPlainTextEdit):
+                if widget is not self.release_tab.notes_edit:
+                    widget.textChanged.connect(self._schedule_modified)
+
+    def _schedule_modified(self, *_args):
+        if hasattr(self, "_modified_timer"):
+            self._modified_timer.start()
+
+    def _update_modified(self):
+        if not hasattr(self, "release_tab"):
+            return
+        self.setWindowModified(bool(self.project_path) and self.is_project_modified())
+        self.release_tab.show_mismatches(version_mismatches(self._current_project()))
+        self._update_title()
+
+    def _update_title(self):
+        base = S.WINDOW_TITLE_FMT.format(name=APP_NAME, version=APP_VERSION)
+        if self.project_path:
+            name = self.project_name or (
+                self._current_project().display_name() if hasattr(self, "release_tab") else ""
+            ) or os.path.basename(os.path.dirname(self.project_path))
+            # "[*]" is where Qt draws the unsaved-changes marker.
+            self.setWindowTitle(S.WINDOW_TITLE_PROJECT_FMT.format(project=name, app=base))
+        else:
+            self.setWindowTitle(base)
+
+    def _maybe_save_changes(self) -> bool:
+        """Offer to save unsaved project changes. False means "cancel"."""
+        if not self.project_path or not self.isVisible() or not self.is_project_modified():
+            return True
+        reply = QMessageBox.question(
+            self, S.MSG_CONFIRM,
+            S.MSG_PROJECT_UNSAVED.format(path=self.project_path),
+            QMessageBox.Save | QMessageBox.Discard | QMessageBox.Cancel, QMessageBox.Save,
+        )
+        if reply == QMessageBox.Cancel:
+            return False
+        if reply == QMessageBox.Save:
+            return self.save_project()
+        return True
+
+    def _set_project(self, path: str, project: ProjectConfig):
+        self.project_path = os.path.abspath(path) if path else ""
+        self.project_name = project.name
+        if path:
+            self._remember_project(path)
+        self._mark_saved()
+
+    def new_project(self):
+        """Start over with defaults and no project file."""
+        if not self._maybe_save_changes():
+            return
+        password = self.deploy_tab.signing_password.text()
+        self._apply_project(ProjectConfig())
+        self.deploy_tab.signing_password.setText(password)
+        self.release_tab.notes_edit.clear()
+        self._set_project("", ProjectConfig())
+        self._append_log(S.LOG_PROJECT_NEW)
+
+    def open_project_dialog(self):
+        start = os.path.dirname(self.project_path) if self.project_path else ""
+        path, _ = QFileDialog.getOpenFileName(
+            self, S.DIALOG_OPEN_PROJECT, start, S.DIALOG_FILTER_PROJECT
+        )
+        if path:
+            self.open_project_path(path)
+
+    def open_project_path(self, path: str) -> bool:
+        """Open ``path`` — after the same checks as a shared settings file."""
+        if not self._maybe_save_changes():
+            return False
+        try:
+            loaded = load_project(path)
+        except ProjectFileError as e:
+            message = project_error_text(e)
+            self._append_log(S.LOG_PROJECT_OPEN_FAIL.format(path=path, error=message))
+            QMessageBox.critical(self, S.MSG_ERROR,
+                                 S.ERR_PROJECT_OPEN.format(path=path, error=message))
+            if e.code == "unreadable":
+                self.settings["recent_projects"] = [
+                    p for p in self.recent_projects() if p != path]
+                self._refresh_recent_menu()
+            return False
+        # A project file is shared content: someone else may have written it.
+        if not self._confirm_untrusted_config(loaded.project.build):
+            self._append_log(S.LOG_SETTINGS_REJECTED.format(path=path))
+            return False
+        self._apply_project(loaded.project)
+        self.release_tab.notes_edit.clear()
+        self._set_project(loaded.path, loaded.project)
+        for warning in loaded.warnings:
+            self._append_log(S.LOG_PROJECT_WARNING.format(warning=warning))
+        self._append_log(S.LOG_PROJECT_OPENED.format(path=loaded.path))
+        return True
+
+    def save_shortcut(self):
+        """Ctrl+S: the project when one is open, otherwise a settings file."""
+        if self.project_path:
+            self.save_project()
+        else:
+            self.save_current_settings()
+
+    def save_project(self) -> bool:
+        if not self.project_path:
+            return self.save_project_as()
+        return self._write_project(self.project_path)
+
+    def save_project_as(self) -> bool:
+        source = self.main_tab.source_input.text().strip()
+        start = self.project_path or (
+            project_path_for_script(source) if source else PROJECT_FILE_NAME
+        )
+        path, _ = QFileDialog.getSaveFileName(
+            self, S.DIALOG_SAVE_PROJECT, start, S.DIALOG_FILTER_PROJECT
+        )
+        if not path:
+            return False
+        return self._write_project(path)
+
+    def _write_project(self, path: str) -> bool:
+        project = self._current_project()
+        try:
+            written = save_project(project, path)
+        except (OSError, TypeError, ValueError) as e:
+            QMessageBox.critical(self, S.MSG_ERROR, S.ERR_SAVE_FAIL.format(error=str(e)))
+            return False
+        self._set_project(written, project)
+        self._append_log(S.LOG_PROJECT_SAVED.format(path=written))
+        return True
+
+    def init_project_from_script(self):
+        """Write a p2e.toml beside the script, from the current settings."""
+        source = self.main_tab.source_input.text().strip()
+        if not source or not os.path.isfile(source):
+            QMessageBox.warning(self, S.MSG_WARNING, S.ERR_NO_SOURCE)
+            return
+        path = project_path_for_script(source)
+        if os.path.exists(path):
+            reply = QMessageBox.question(
+                self, S.MSG_CONFIRM, S.MSG_PROJECT_OVERWRITE.format(path=path),
+                QMessageBox.Yes | QMessageBox.No, QMessageBox.No,
+            )
+            if reply != QMessageBox.Yes:
+                return
+        current = self._current_project()
+        version = current.version if is_semver(current.version) else ""
+        project = new_project_for_script(source, current, version)
+        if not project.release.repository:
+            project.release.repository = remote_slug(os.path.dirname(path))
+        self._apply_project(project)
+        if self._write_project(path):
+            self._append_log(S.LOG_PROJECT_INIT.format(path=path))
+
+    # ─── Release ────────────────────────────────────────────────────────
+
+    def apply_release_version(self):
+        """Put the release tab's version into every tab that records one."""
+        project = self._current_project()
+        try:
+            changes = apply_version(project, project.version)
+        except ValueError:
+            QMessageBox.warning(self, S.MSG_WARNING,
+                                S.ERR_RELEASE_VERSION.format(version=project.version or "—"))
+            return
+        self._apply_project(project, ("project", "version_info", "installer", "build"))
+        self._append_log(S.LOG_RELEASE_VERSION_APPLIED.format(
+            version=project.version, count=len(changes)))
+
+    def _release_cwd(self) -> str:
+        if self.project_path:
+            return os.path.dirname(self.project_path)
+        source = self.main_tab.source_input.text().strip()
+        return os.path.dirname(os.path.abspath(source)) if source else ""
+
+    def draft_release_notes(self):
+        cwd = self._release_cwd()
+        notes = draft_notes(cwd, self.release_tab.tag_prefix.text().strip() or "v",
+                            notes_titles()) if cwd else ""
+        if not notes:
+            self._append_log(S.LOG_RELEASE_NO_GIT)
+            return
+        self.release_tab.notes_edit.setPlainText(notes)
+
+    def detect_release_repository(self):
+        cwd = self._release_cwd()
+        slug = remote_slug(cwd) if cwd else ""
+        if slug:
+            self.release_tab.repository.setText(slug)
+        else:
+            self._append_log(S.LOG_RELEASE_NO_REMOTE)
+
+    def refresh_token_status(self):
+        token = credentials.find_token(keyring_module=KEYRING)
+        self.release_tab.show_token_status(token.source)
+
+    def save_github_token(self):
+        """Into the OS keyring — never the settings, the project or the log."""
+        token = self.release_tab.token_input.text().strip()
+        self.release_tab.token_input.clear()
+        if not token:
+            return
+        try:
+            credentials.store_token(token, KEYRING)
+        except credentials.CredentialError as e:
+            QMessageBox.warning(self, S.MSG_WARNING, S.ERR_TOKEN_STORE.format(error=str(e)))
+            return
+        self._append_log(S.LOG_TOKEN_SAVED)
+        self.refresh_token_status()
+
+    def forget_github_token(self):
+        if credentials.delete_token(KEYRING):
+            self._append_log(S.LOG_TOKEN_FORGOTTEN)
+        self.refresh_token_status()
+
+    def _release_context(self, project: ProjectConfig, dry_run: bool) -> ReleaseContext:
+        tab = self.release_tab
+        python = self.build_python(project.build)
+        checker = self._installed_checker(project.build)
+
+        def doctor(ctx):
+            return examine(ctx.project.build.source, ctx.project.build, is_installed=checker)
+
+        options = ReleaseOptions(
+            version=project.version,
+            notes=tab.notes_edit.toPlainText(),
+            dry_run=dry_run,
+            allow_doctor_errors=tab.allow_errors_check.isChecked(),
+            create_tag=tab.create_tag_check.isChecked(),
+            push_tag=tab.create_tag_check.isChecked() and tab.push_tag_check.isChecked(),
+            publish=tab.publish_check.isChecked(),
+            sign_password=self.deploy_tab.signing_password.text(),
+            iscc_path=self.installer_tab.inst_iscc_path.text().strip(),
+            signing_key_path=SIGNING_KEY_FILE,
+            notes_titles=notes_titles(),
+        )
+        return ReleaseContext(
+            project, options, project_path=self.project_path, python=python,
+            doctor=doctor, texts=runtime_texts(), rtl=self._rtl(),
+            token_provider=lambda: credentials.find_token(keyring_module=KEYRING),
+        )
+
+    def start_release(self):
+        """Plan the release (a dry run); then, unless only a preview was asked
+        for, confirm the full list of actions and run it."""
+        if self._build_in_progress():
+            QMessageBox.warning(self, S.MSG_WARNING, S.MSG_DIAG_BUSY)
+            return
+        project = self._current_project()
+        if not is_semver(project.version):
+            QMessageBox.warning(self, S.MSG_WARNING,
+                                S.ERR_RELEASE_VERSION.format(version=project.version or "—"))
+            return
+        if not project.build.source or not os.path.isfile(project.build.source):
+            QMessageBox.warning(self, S.MSG_WARNING, S.ERR_NO_SOURCE)
+            return
+        if project.build.isolated_env and not env_exists(self._env_dir(project.build.source)):
+            QMessageBox.warning(self, S.MSG_WARNING, S.ERR_RELEASE_ENV)
+            return
+        self._release_after_plan = not self.release_tab.dry_run_check.isChecked()
+        self._append_log(S.LOG_RELEASE_PLANNING.format(version=project.version))
+        self._run_release(self._release_context(project, dry_run=True))
+
+    def _run_release(self, context: ReleaseContext):
+        self.release_tab.reset_steps()
+        self.release_tab.set_running(True)
+        self.release_tab.show_result("", bool(self._last_release_dir))
+        self.convert_btn.setEnabled(False)
+        self.release_thread = ReleaseThread(context)
+        self.release_thread.log_signal.connect(self._append_log)
+        self.release_thread.step_signal.connect(self.release_tab.show_step)
+        self.release_thread.finished_signal.connect(self._on_release_finished)
+        self.release_thread.start()
+
+    def _on_release_finished(self, context, results):
+        self.release_tab.set_running(False)
+        self.convert_btn.setEnabled(True)
+        if context.dry_run:
+            if not self.release_tab.notes_edit.toPlainText().strip() and context.notes:
+                # The drafted notes, ready to edit before anything is published.
+                self.release_tab.notes_edit.setPlainText(context.notes)
+            if has_blocking_problems(results):
+                self.release_tab.show_result(S.RELEASE_RESULT_BLOCKED, False)
+                QMessageBox.warning(self, S.MSG_WARNING, S.RELEASE_RESULT_BLOCKED)
+                return
+            if not self._release_after_plan:
+                self.release_tab.show_result(S.RELEASE_RESULT_PLANNED, False)
+                return
+            dialog = ReleaseConfirmDialog(confirmation(results), context.version, self)
+            if not dialog.exec_():
+                self._append_log(S.LOG_RELEASE_CANCELLED)
+                return
+            self._append_log(S.LOG_RELEASE_STARTED.format(version=context.version))
+            self._run_release(self._release_context(self._current_project(), dry_run=False))
+            return
+
+        self._last_release_dir = context.out_dir if os.path.isdir(context.out_dir) else ""
+        version_step = results[0]
+        if version_step.status == DONE and version_step.actions:
+            # Show the bumped version everywhere; the pipeline saved the file.
+            self._apply_project(context.project, ("project", "version_info", "installer",
+                                                  "build"))
+            if context.project_changed:
+                self._mark_saved()
+        if has_blocking_problems(results):
+            self.release_tab.show_result(S.RELEASE_RESULT_FAILED, bool(self._last_release_dir))
+            self._notify_build_result(False, context.tag)
+            return
+        text = S.RELEASE_RESULT_DONE.format(version=context.version, path=context.out_dir,
+                                            url=context.release_url or "—")
+        self.release_tab.show_result(text, bool(self._last_release_dir))
+        self._append_log(text)
+        self._notify_build_result(True, context.tag)
+
+    def open_release_folder(self):
+        if self._last_release_dir and os.path.isdir(self._last_release_dir):
+            QDesktopServices.openUrl(QUrl.fromLocalFile(self._last_release_dir))
+
     # ─── Shortcuts ──────────────────────────────────────────────────────
 
     def _register_shortcuts(self):
@@ -2334,7 +2784,10 @@ class MainWindow(QMainWindow):
             ("Ctrl+P", self.preview_command),
             ("Ctrl+L", self.main_tab.clear_log),
             ("Ctrl+E", self.main_tab.export_log),
-            ("Ctrl+S", self.save_current_settings),
+            ("Ctrl+S", self.save_shortcut),
+            ("Ctrl+Shift+S", self.save_project_as),
+            ("Ctrl+N", self.new_project),
+            ("Ctrl+Shift+O", self.open_project_dialog),
             ("Ctrl+T", self.toggle_theme),
             ("F5", self.detect_imports_action),
             ("Ctrl+F", self.main_tab.log_search.setFocus),
@@ -2375,6 +2828,9 @@ class MainWindow(QMainWindow):
             return
 
         ext = os.path.splitext(path)[1].lower()
+        if ext == ".toml":
+            self.open_project_path(path)
+            return
         if ext in (".py", ".pyw"):
             self.main_tab.source_input.setText(path)
             self._append_log(S.LOG_DROPPED_SOURCE.format(path=path))
@@ -2388,6 +2844,9 @@ class MainWindow(QMainWindow):
     # ─── Shutdown ───────────────────────────────────────────────────────
 
     def closeEvent(self, event):
+        if not self._maybe_save_changes():
+            event.ignore()
+            return
         self.save_settings()
         if self._build_in_progress():
             reply = QMessageBox.question(
@@ -2408,6 +2867,8 @@ class MainWindow(QMainWindow):
                 if thread and thread.isRunning():
                     thread.cancel()
                     thread.wait()
+            if self.release_thread and self.release_thread.isRunning():
+                self.release_thread.wait()
 
         self._cleanup_temp_files()
         self.tray.hide()

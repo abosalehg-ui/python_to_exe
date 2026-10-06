@@ -271,3 +271,46 @@ class InstallerTab(BaseTab):
             associate_extension=self.inst_assoc.text().strip(),
             sign_installer=self.inst_sign.isChecked(),
         )
+
+    def set_installer_config(self, config: InstallerConfig):
+        self.installer_enable.setChecked(config.enabled)
+        self.inst_app_name.setText(config.app_name)
+        self.inst_version.setText(config.app_version)
+        self.inst_publisher.setText(config.publisher)
+        self.inst_url.setText(config.publisher_url)
+        self._support_url = config.support_url
+        self.inst_app_id.setText(config.app_id)
+        self.inst_out_dir.setText(config.output_dir)
+        self.inst_out_name.setText(config.output_base_filename)
+        self.inst_license.setText(config.license_file)
+        self.inst_readme.setText(config.readme_file)
+        self.inst_setup_icon.setText(config.setup_icon_file)
+        for code, check in self.inst_languages.items():
+            check.setChecked(code in config.languages)
+        self.inst_arabic_isl.setText(config.arabic_isl_path)
+        for combo, value in ((self.inst_privileges, config.privileges),
+                             (self.inst_arch, config.architecture)):
+            index = combo.findData(value)
+            if index >= 0:
+                combo.setCurrentIndex(index)
+        index = self.inst_compression.findText(config.compression)
+        if index >= 0:
+            self.inst_compression.setCurrentIndex(index)
+        self.inst_desktop_icon.setChecked(config.desktop_icon)
+        self.inst_launch_after.setChecked(config.launch_after_install)
+        self.inst_allow_dir_change.setChecked(config.allow_dir_change)
+        self.inst_uninstall_icon.setChecked(config.create_uninstall_icon)
+        self.inst_assoc.setText(config.associate_extension)
+        self.inst_sign.setChecked(config.sign_installer)
+
+    # ── The project model ──────────────────────────────────────────────────
+
+    def read_project(self, project):
+        """The form as typed — no fallbacks from other tabs (those are for a build)."""
+        config = self.installer_config()
+        config.support_url = getattr(self, "_support_url", "")
+        project.installer = config
+
+    def apply_project(self, project, sections=()):
+        if "installer" in sections:
+            self.set_installer_config(project.installer)

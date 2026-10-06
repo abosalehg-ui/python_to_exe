@@ -163,3 +163,59 @@ class PresetNameDialog(QDialog):
 
     def get_value(self) -> str:
         return self.input.text().strip()
+
+
+class ReleaseConfirmDialog(QDialog):
+    """The last word before a release: everything it will create, run,
+    commit, tag, push and upload, listed in full."""
+
+    def __init__(self, summary, version: str, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle(S.RELEASE_CONFIRM_TITLE)
+        self.setMinimumSize(640, 460)
+        self.setLayoutDirection(_inherited_direction(parent))
+
+        layout = QVBoxLayout(self)
+        heading = QLabel(S.RELEASE_CONFIRM_HEADING.format(version=_ltr(version)))
+        heading.setWordWrap(True)
+        heading.setObjectName("aboutHeading")
+        layout.addWidget(heading)
+
+        self.text_view = QTextEdit()
+        self.text_view.setReadOnly(True)
+        self.text_view.setPlainText(self.summary_text(summary))
+        layout.addWidget(self.text_view)
+
+        note = QLabel(S.RELEASE_CONFIRM_NOTE)
+        note.setWordWrap(True)
+        layout.addWidget(note)
+
+        buttons = QDialogButtonBox()
+        self.release_btn = buttons.addButton(S.BTN_CONFIRM_RELEASE, QDialogButtonBox.AcceptRole)
+        self.release_btn.setObjectName("successBtn")
+        buttons.addButton(S.BTN_CANCEL_RELEASE, QDialogButtonBox.RejectRole)
+        buttons.accepted.connect(self.accept)
+        buttons.rejected.connect(self.reject)
+        layout.addWidget(buttons)
+
+    @staticmethod
+    def summary_text(summary) -> str:
+        sections = (
+            (S.RELEASE_CONFIRM_CREATED, summary.created),
+            (S.RELEASE_CONFIRM_COMMANDS, summary.commands),
+            (S.RELEASE_CONFIRM_COMMITS, summary.commits),
+            (S.RELEASE_CONFIRM_TAGS, summary.tags),
+            (S.RELEASE_CONFIRM_PUSHES, summary.pushes),
+            (S.RELEASE_CONFIRM_RELEASES, summary.releases),
+            (S.RELEASE_CONFIRM_UPLOADS, summary.uploads),
+        )
+        blocks = []
+        for title, items in sections:
+            if items:
+                # Paths, commands and URLs read left to right inside RTL text.
+                blocks.append("\n".join([title] + [f"  • {_ltr(item)}" for item in items]))
+        return "\n\n".join(blocks) or S.RELEASE_CONFIRM_NOTHING
+
+
+def _ltr(text: str) -> str:
+    return f"⁦{text}⁩"

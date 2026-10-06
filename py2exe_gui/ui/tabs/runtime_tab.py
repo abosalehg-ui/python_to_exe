@@ -361,3 +361,12 @@ class RuntimeTab(BaseTab):
         handler = getattr(self.window, "on_runtime_kit_changed", None)
         if handler is not None:
             handler()
+
+    # ── The project model ──────────────────────────────────────────────────
+
+    def read_project(self, project):
+        project.build.runtime_kit = self.kit_config()
+
+    def apply_project(self, project, sections=()):
+        if "build" in sections:
+            self.set_kit_config(project.build.runtime_kit)

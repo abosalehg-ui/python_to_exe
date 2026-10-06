@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "py2exe-gui"
-version = "1.5.0"
+version = "1.6.0"
 description = "Arabic-localized PyQt5 GUI to convert Python scripts to Windows executables via PyInstaller"
 readme = "README.md"
 requires-python = ">=3.8"
@@ -29,13 +29,21 @@ dependencies = [
     # 6.0 is the floor: --optimize only exists from 6.0 onwards, and 6.0 also
     # carries the fix for the onefile temp-dir privilege issue in earlier lines.
     "pyinstaller>=6.0",
+    # The project file is TOML: tomllib is in the standard library from 3.11.
+    "tomli>=1.1; python_version < '3.11'",
 ]
 
 [project.optional-dependencies]
+# Stores the GitHub token in the OS credential store (Windows Credential
+# Manager, macOS Keychain, Secret Service). Without it, GITHUB_TOKEN is used.
+release = [
+    "keyring>=23",
+]
 dev = [
     "pytest>=7.0",
     "pytest-cov>=4.0",
     "ruff>=0.1",
+    "PyYAML>=6.0",
 ]
 
 [project.scripts]
