@@ -567,3 +567,11 @@ def test_default_build_and_doctor_wiring(repo, monkeypatch):
     assert calls["command"][1:3] == ["-m", "PyInstaller"]
     assert "==> [analyzing] 5%" in log
     assert results[2].reason == "doctor_ok"
+
+
+@pytest.mark.parametrize("platform,name", [("win32", "MyApp-1.1.0.exe"), ("linux", "MyApp-1.1.0"),
+                                           ("darwin", "MyApp-1.1.0")])
+def test_dry_run_predicts_the_executable_name_of_the_platform(repo, platform, name):
+    ctx = context(repo, dry_run=True, publish=False, platform=platform)
+    summary = confirmation(run_release(ctx))
+    assert os.path.join(ctx.out_dir, name) in summary.created

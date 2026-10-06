@@ -141,11 +141,11 @@ class ReleaseContext:
 
     # Predicted names, valid in a dry run too.
     def exe_target(self, built: str = "") -> str:
+        # Before the build (a dry run), predict the extension: PyInstaller
+        # writes "app.exe" on Windows and plain "app" elsewhere.
+        ext = ".exe" if self.options.platform == "win32" else ""
         return os.path.join(self.out_dir, artifacts.exe_asset_name(
-            self.project.build, self.version, built or self._predicted_exe()))
-
-    def _predicted_exe(self) -> str:
-        return ".exe" if self.options.platform == "win32" else ""
+            self.project.build, self.version, built, ext))
 
     def zip_target(self) -> str:
         return os.path.join(self.out_dir, artifacts.zip_asset_name(self.project.build, self.version))
@@ -578,7 +578,9 @@ def step_winget(ctx: ReleaseContext, results: Dict[str, StepResult]) -> StepResu
     sha = artifacts.sha256_of(path) if not ctx.dry_run else "0" * 64
     nested = ""
     if kind == "zip":
-        inner = build_name(project.build) + ".exe"
+        # The file as it is inside the ZIP (see artifacts.make_portable_zip).
+        main = _main_exe(ctx)
+        inner = os.path.basename(main) if main else build_name(project.build) + ".exe"
         nested = inner if project.build.onefile else f"{build_name(project.build)}/{inner}"
     docs = winget.build_manifests(
         identifier=identifier,

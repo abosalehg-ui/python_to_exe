@@ -33,8 +33,11 @@ def release_dir(config: BuildConfig, version: str) -> str:
     return os.path.join(build_root(config), "release", version)
 
 
-def exe_asset_name(config: BuildConfig, version: str, built_path: str = "") -> str:
-    ext = os.path.splitext(built_path)[1] if built_path else ".exe"
+def exe_asset_name(config: BuildConfig, version: str, built_path: str = "",
+                   ext: str = ".exe") -> str:
+    """``<name>-<version><ext>``; the extension of ``built_path`` when given."""
+    if built_path:
+        ext = os.path.splitext(built_path)[1]
     return f"{safe_name(build_name(config))}-{version}{ext}"
 
 

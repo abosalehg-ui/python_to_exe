@@ -39,6 +39,8 @@ def test_names_and_folders(tmp_path):
     assert artifacts.release_dir(config, "1.2.3") == str(tmp_path / "release" / "1.2.3")
     assert artifacts.exe_asset_name(config, "1.2.3", "/x/MyApp.exe") == "MyApp-1.2.3.exe"
     assert artifacts.exe_asset_name(config, "1.2.3", "/x/MyApp") == "MyApp-1.2.3"
+    assert artifacts.exe_asset_name(config, "1.2.3") == "MyApp-1.2.3.exe"
+    assert artifacts.exe_asset_name(config, "1.2.3", ext="") == "MyApp-1.2.3"
     assert artifacts.zip_asset_name(config, "1.2.3") == "MyApp-1.2.3-portable.zip"
     assert artifacts.installer_basename(config, "1.2.3") == "MyApp-1.2.3-setup"
     assert artifacts.safe_name("My App (تجريبي)") == "My-App"

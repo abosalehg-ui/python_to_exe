@@ -292,7 +292,7 @@ def test_release_from_the_window_against_the_fake_api(qapp, window, repo, monkey
 
     # The confirmation listed what would be created, tagged and uploaded.
     summary = confirmed[0]
-    for expected in ("v1.1.0", "Hi-1.1.0.exe", "SHA256SUMS.txt", "me/app@v1.1.0",
+    for expected in ("v1.1.0", "Hi-1.1.0-portable.zip", "SHA256SUMS.txt", "me/app@v1.1.0",
                      str(repo / "p2e.toml")):
         assert expected in summary
     assert uploads == ["Hi-1.1.0-portable.zip", "Hi-1.1.0.exe", "SHA256SUMS.txt"]
