@@ -37,3 +37,33 @@ def _restore_locale():
     before = current_locale()
     yield
     set_locale(before)
+
+
+@pytest.fixture(autouse=True)
+def _isolate_credentials(monkeypatch):
+    """No test may read the developer's real token, keyring or password.
+
+    The keyring package (optional) is pointed at a backend that refuses
+    everything; tests that need a keyring pass an in-memory one.
+    """
+    for name in ("GITHUB_TOKEN", "P2E_SIGN_PASSWORD", "P2E_LANG"):
+        monkeypatch.delenv(name, raising=False)
+    monkeypatch.setenv("PYTHON_KEYRING_BACKEND", "keyring.backends.fail.Keyring")
+
+
+class MemoryKeyring:
+    """An in-memory stand-in for the ``keyring`` module."""
+
+    def __init__(self):
+        self.store = {}
+
+    def get_password(self, service, user):
+        return self.store.get((service, user))
+
+    def set_password(self, service, user, value):
+        self.store[(service, user)] = value
+
+    def delete_password(self, service, user):
+        if (service, user) not in self.store:
+            raise KeyError(user)
+        del self.store[(service, user)]
