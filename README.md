@@ -478,6 +478,10 @@ else:
 - ⏳ **المستقبل:** إدارة venv، مشاريع متعددة الملفات، مثبّتات Linux/macOS،
   محرر `.spec`، VirusTotal، الانتقال إلى PySide6 —
   التفاصيل في [UI_IMPROVEMENT_PLAN.md](UI_IMPROVEMENT_PLAN.md)
+- 🧭 **الرؤية القادمة (1.3 → 2.0):** تحويل الأداة إلى استوديو تسليم كامل —
+  طبيب المشروع، تشخيص وإصلاح تلقائي للأعطال، بيئة بناء معزولة، محرك Nuitka،
+  مكتبة تشغيل مدمجة (تحديث ذاتي + تقارير انهيار)، ونشر بنقرة —
+  التفاصيل في [PRODUCT_ROADMAP.md](PRODUCT_ROADMAP.md)
 
 ---
 
@@ -501,6 +505,7 @@ else:
 - 📋 [CHANGELOG.md](CHANGELOG.md) — تاريخ التغييرات لكل مرحلة
 - 💡 [IDEAS.md](IDEAS.md) — خارطة الطريق الشاملة والأفكار المستقبلية
 - 🗺️ [UI_IMPROVEMENT_PLAN.md](UI_IMPROVEMENT_PLAN.md) — خطة تحسين الواجهة والميزات
+- 🧭 [PRODUCT_ROADMAP.md](PRODUCT_ROADMAP.md) — خطة تطوير المنتج والخدمات المميِّزة
 
 ---
 
