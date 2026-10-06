@@ -245,7 +245,7 @@ PALETTES: Dict[str, Dict[str, str]] = {
 # ``{pt_*}`` from the scaled font sizes.
 
 _TEMPLATE = """
-QMainWindow {{
+QMainWindow, QDialog {{
     background-color: {window_bg};
 }}
 QWidget {{

@@ -15,6 +15,10 @@ version metadata, build history, and a Windows manifest editor.
 |----------|-------------|
 | **Core** | One-file or onedir builds, custom icon, hidden imports, extra data files, UPX compression, optimization levels |
 | **Templates** | 11 pre-configured project types (GUI, Console, Flask, FastAPI, Streamlit, Pandas, Pygame, Kivy, Discord, Click CLI, Custom) |
+| **Project Doctor** *(1.3)* | Pre-build checkup for code that runs under Python but breaks once frozen: uninstalled imports, unbundled data files, relative paths, `multiprocessing` without `freeze_support()`, `input()`/`sys.stdout` in windowed apps, no entry point, fake `.ico` files. Readiness score out of 100, one-click fixes, copyable code snippets |
+| **Diagnostics** *(1.3)* | Reads the build log, the user-relevant part of `warn-*.txt`, and the built EXE's own traceback; explains it and offers fixes. **Diagnostic run** builds a console copy of a windowed app to read the error it would otherwise hide. "Apply and rebuild" button |
+| **Knowledge base** *(1.3)* | `py2exe_gui/knowledge/packages.json`: what 45 popular packages need to survive PyInstaller (collect flags, hidden imports, data folders, pip names, size notes) |
+| **Icon Studio** *(1.3)* | Real multi-size `.ico` (16–256px) from an image or from letters, drawn with Qt — no Pillow needed |
 | **Smart Analysis** | AST-based import detection (incl. `__import__` and `importlib`), `requirements.txt` import, hidden-imports auto-suggest |
 | **Deployment** | Splash screen, Windows manifest (DPI, UAC, supported OS), Authenticode code signing, post-build smoke test |
 | **Installer** | Full Inno Setup pipeline: generated `.iss`, stable upgrade-safe AppId, 13 languages, shortcuts, file association, signed `Setup.exe` |
@@ -79,7 +83,7 @@ py2exe-gui
 
 ## Simple and Advanced Modes
 
-A first run shows three tabs — Main, Templates, About — because nine tabs of
+A first run shows four tabs — Main, Project Doctor, Templates, About — because ten tabs of
 PyInstaller options is a lot to meet when all you want is one `.exe`. The mode
 button (or `Ctrl+M`) reveals the rest, and the choice is remembered. Hidden
 tabs keep their contents: switching modes mid-setup loses nothing.
@@ -92,6 +96,15 @@ File pickers for source, output directory, icon (with a live preview at
 gives itself away). Core PyInstaller flags (`--onefile`, `--windowed`,
 `--clean`, `--noconfirm`, `--strip`), plus the build log with text search and
 a severity filter.
+
+### 🩺 Project Doctor
+Readiness score, every predicted and actual problem in one list, and the fix
+for each. Tick the fixes you want, then **Apply** or **Apply and rebuild**.
+Problems that need a change in your code come with a snippet to copy (for
+example `resource_path()` for bundled data files); missing packages come with
+the `pip install` command. **🧪 Diagnostic run** builds a console copy of a
+windowed app into `<output>/p2e_diagnostic`, runs it from a neutral folder,
+and reads the traceback the windowed build would have hidden.
 
 ### 📚 Batch
 Queue several `.py` files and build them all with the current settings. Runs
@@ -242,6 +255,7 @@ py2exe_gui/
 ├── strings.py            # All UI strings (Ar/En) + locale proxy
 ├── styles.py             # Dark + light themes
 ├── templates.py          # Build templates registry
+├── knowledge/packages.json  # what popular packages need to be frozen
 ├── core/                 # UI-independent, fully tested
 │   ├── builder.py
 │   ├── config.py
@@ -250,6 +264,11 @@ py2exe_gui/
 │   ├── manifest_generator.py
 │   ├── code_signer.py
 │   ├── smoke_test.py
+│   ├── project_doctor.py     # pre-build checks
+│   ├── diagnostics.py        # build log, warn file, EXE traceback
+│   ├── fixes.py              # shared Finding/Fix model
+│   ├── knowledge.py          # package knowledge base loader
+│   ├── icon_studio.py        # .ico writer/reader
 │   ├── build_history.py
 │   └── log_formatter.py
 └── ui/
@@ -283,6 +302,9 @@ See [IDEAS.md](IDEAS.md) for the full roadmap. Currently:
 - ✅ **Phase 9:** Simple mode, 4 themes + auto, font zoom, tray notifications,
   log filtering, real stage-based progress, batch conversion, presets,
   opt-in update check
+- ✅ **1.3:** Project doctor, build/runtime diagnostics with one-click fixes,
+  diagnostic run, package knowledge base, Icon Studio
+- 🧭 **Vision (1.4 → 2.0):** see [PRODUCT_ROADMAP.md](PRODUCT_ROADMAP.md)
 - ⏳ **Next:** venv management, multi-file projects, Linux/macOS installers,
   `.spec` editor, VirusTotal, PySide6 migration —
   see [UI_IMPROVEMENT_PLAN.md](UI_IMPROVEMENT_PLAN.md)

@@ -1,0 +1,214 @@
+{
+  "schema": 1,
+  "description": "What popular packages need to survive PyInstaller. Keyed by IMPORT name. Fields: pip (distribution name when it differs from the import name), hidden_imports, collect_data, collect_submodules, collect_all, copy_metadata, data_dirs (project folders the package expects next to the script), console_streams (writes to sys.stdout/sys.stderr directly, so it crashes in a windowed EXE), qt_binding, large (adds tens of MB or more), notes {ar, en}.",
+  "packages": {
+    "PIL": {"pip": "Pillow"},
+    "cv2": {
+      "pip": "opencv-python",
+      "large": true,
+      "notes": {
+        "ar": "OpenCV يضيف عشرات الميغابايت. إن لم تحتج الواجهات الرسومية فاستخدم opencv-python-headless في بيئة البناء.",
+        "en": "OpenCV adds tens of MB. If you do not need its GUI functions, build with opencv-python-headless instead."
+      }
+    },
+    "yaml": {"pip": "PyYAML"},
+    "bs4": {"pip": "beautifulsoup4"},
+    "dateutil": {"pip": "python-dateutil"},
+    "dotenv": {
+      "pip": "python-dotenv",
+      "notes": {
+        "ar": "ملف .env لا يُضمَّن تلقائياً، ولا يُنصح بتضمين أسرار داخل الـ EXE أصلاً.",
+        "en": "The .env file is not bundled automatically, and secrets should not be shipped inside an EXE anyway."
+      }
+    },
+    "win32api": {"pip": "pywin32"},
+    "win32con": {"pip": "pywin32"},
+    "win32gui": {"pip": "pywin32"},
+    "pythoncom": {"pip": "pywin32"},
+    "pywintypes": {"pip": "pywin32"},
+    "serial": {"pip": "pyserial"},
+    "usb": {"pip": "pyusb"},
+    "magic": {"pip": "python-magic"},
+    "Crypto": {"pip": "pycryptodome"},
+    "jwt": {"pip": "PyJWT"},
+    "fitz": {"pip": "PyMuPDF"},
+    "telebot": {"pip": "pyTelegramBotAPI"},
+    "telegram": {"pip": "python-telegram-bot"},
+    "discord": {"pip": "discord.py"},
+    "webview": {"pip": "pywebview"},
+    "googleapiclient": {
+      "pip": "google-api-python-client",
+      "collect_data": ["googleapiclient"]
+    },
+    "sklearn": {
+      "pip": "scikit-learn",
+      "large": true,
+      "notes": {
+        "ar": "scikit-learn يجرّ معه numpy وscipy، فتوقّع حجماً كبيراً.",
+        "en": "scikit-learn pulls in numpy and scipy; expect a large bundle."
+      }
+    },
+    "skimage": {"pip": "scikit-image", "large": true},
+    "docx": {
+      "pip": "python-docx",
+      "collect_data": ["docx"],
+      "notes": {
+        "ar": "python-docx يحتاج قالب المستند الافتراضي المرفق مع المكتبة، وإلا يفشل Document() داخل الـ EXE.",
+        "en": "python-docx needs its bundled default template, or Document() fails inside the EXE."
+      }
+    },
+    "pptx": {
+      "pip": "python-pptx",
+      "collect_data": ["pptx"],
+      "notes": {
+        "ar": "python-pptx يحتاج قالب العرض الافتراضي المرفق مع المكتبة.",
+        "en": "python-pptx needs its bundled default presentation template."
+      }
+    },
+    "escpos": {
+      "pip": "python-escpos",
+      "collect_data": ["escpos"]
+    },
+    "customtkinter": {
+      "collect_data": ["customtkinter"],
+      "notes": {
+        "ar": "ملفات السمات (JSON) والخطوط الخاصة بـ customtkinter يجب أن تُضمَّن مع الـ EXE.",
+        "en": "customtkinter's theme JSON files and fonts must be bundled with the EXE."
+      }
+    },
+    "sv_ttk": {"pip": "sv-ttk", "collect_data": ["sv_ttk"]},
+    "pyfiglet": {"collect_data": ["pyfiglet"]},
+    "tkcalendar": {
+      "hidden_imports": ["babel.numbers"],
+      "notes": {
+        "ar": "tkcalendar يستورد babel.numbers ديناميكياً فلا يراه PyInstaller.",
+        "en": "tkcalendar imports babel.numbers dynamically, so PyInstaller misses it."
+      }
+    },
+    "pyttsx3": {
+      "hidden_imports": ["pyttsx3.drivers", "pyttsx3.drivers.sapi5"],
+      "notes": {
+        "ar": "pyttsx3 يحمّل محرك الصوت بالاسم وقت التشغيل.",
+        "en": "pyttsx3 loads its speech driver by name at runtime."
+      }
+    },
+    "plyer": {
+      "hidden_imports": ["plyer.platforms.win.notification"],
+      "notes": {
+        "ar": "plyer يختار تنفيذ المنصة وقت التشغيل؛ أضف وحدات المنصات الأخرى التي تستخدمها بنفس الطريقة.",
+        "en": "plyer picks the platform implementation at runtime; add other platform modules you use the same way."
+      }
+    },
+    "passlib": {
+      "collect_submodules": ["passlib.handlers"],
+      "notes": {
+        "ar": "passlib يحمّل خوارزميات التشفير بالاسم من سجلّه الداخلي.",
+        "en": "passlib loads hash handlers by name from its registry."
+      }
+    },
+    "apscheduler": {
+      "pip": "APScheduler",
+      "collect_submodules": ["apscheduler"],
+      "copy_metadata": ["APScheduler"],
+      "notes": {
+        "ar": "APScheduler يكتشف المشغّلات والمخازن عبر entry points التي تحتاج بيانات الحزمة الوصفية.",
+        "en": "APScheduler discovers triggers and job stores through entry points, which need the package metadata."
+      }
+    },
+    "uvicorn": {
+      "collect_submodules": ["uvicorn"],
+      "console_streams": true,
+      "notes": {
+        "ar": "uvicorn يختار بروتوكولاته بالاسم، ومنسّق سجلاته يستدعي sys.stdout.isatty() فينهار في EXE بلا Console.",
+        "en": "uvicorn picks its protocols by name, and its log formatter calls sys.stdout.isatty(), which crashes in a windowed EXE."
+      }
+    },
+    "tqdm": {
+      "console_streams": true,
+      "notes": {
+        "ar": "شريط تقدم tqdm يكتب إلى sys.stderr الذي يكون None في EXE بلا Console.",
+        "en": "tqdm writes its progress bar to sys.stderr, which is None in a windowed EXE."
+      }
+    },
+    "eel": {
+      "pip": "Eel",
+      "hidden_imports": ["bottle_websocket"],
+      "data_dirs": ["web"],
+      "notes": {
+        "ar": "Eel يحتاج مجلد الواجهة (web) مضمّناً مع الـ EXE.",
+        "en": "Eel needs its front-end folder (web) bundled with the EXE."
+      }
+    },
+    "flask": {
+      "data_dirs": ["templates", "static"],
+      "notes": {
+        "ar": "Flask يبحث عن templates وstatic بجوار السكربت؛ يجب تضمينهما وإلا تظهر TemplateNotFound.",
+        "en": "Flask looks for templates and static next to the script; bundle them or you get TemplateNotFound."
+      }
+    },
+    "streamlit": {
+      "collect_all": ["streamlit"],
+      "copy_metadata": ["streamlit"],
+      "large": true,
+      "notes": {
+        "ar": "تطبيق Streamlit لا يُشغَّل مباشرة: يحتاج سكربت تشغيل يستدعي streamlit.web.cli، ومن الأفضل البناء بوضع المجلد.",
+        "en": "A Streamlit app cannot be run directly: it needs a launcher script that calls streamlit.web.cli, and builds better as a folder."
+      }
+    },
+    "whisper": {
+      "pip": "openai-whisper",
+      "collect_data": ["whisper"],
+      "console_streams": true,
+      "large": true,
+      "notes": {
+        "ar": "Whisper يحتاج ملفات assets المرفقة، ويجرّ معه torch، ويعرض تقدمه بـ tqdm.",
+        "en": "Whisper needs its bundled assets, pulls in torch, and reports progress through tqdm."
+      }
+    },
+    "torch": {
+      "large": true,
+      "notes": {
+        "ar": "PyTorch قد يضيف مئات الميغابايت. استخدم نسخة CPU في بيئة البناء إن لم تحتج CUDA، وفضّل وضع المجلد.",
+        "en": "PyTorch can add hundreds of MB. Use the CPU-only build in your build environment if you do not need CUDA, and prefer folder mode."
+      }
+    },
+    "tensorflow": {
+      "large": true,
+      "notes": {
+        "ar": "TensorFlow ضخم جداً؛ فضّل وضع المجلد مع مثبّت بدل الملف الواحد.",
+        "en": "TensorFlow is very large; prefer folder mode with an installer over a single file."
+      }
+    },
+    "transformers": {
+      "large": true,
+      "notes": {
+        "ar": "transformers يجرّ torch أو tensorflow، ونماذجه تُحمَّل عادةً وقت التشغيل لا وقت البناء.",
+        "en": "transformers pulls in torch or tensorflow, and its models are usually downloaded at runtime, not bundled."
+      }
+    },
+    "pandas": {
+      "large": true,
+      "notes": {
+        "ar": "pandas يضيف قرابة 30-60MB مع numpy. تأكد أن بيئة البناء لا تحوي مكتبات ثقيلة لا يستخدمها مشروعك.",
+        "en": "pandas adds roughly 30-60 MB with numpy. Make sure the build environment does not contain heavy libraries your project does not use."
+      }
+    },
+    "matplotlib": {
+      "large": true,
+      "notes": {
+        "ar": "matplotlib قد يجرّ واجهات رسومية متعددة؛ حدّد backend واحداً صراحةً في الكود.",
+        "en": "matplotlib can drag in several GUI toolkits; select one backend explicitly in your code."
+      }
+    },
+    "kivy": {
+      "notes": {
+        "ar": "Kivy على Windows يحتاج ملف .spec يضيف kivy_deps (sdl2/glew) — راجع توثيق Kivy الخاص بالتعبئة.",
+        "en": "Kivy on Windows needs a .spec that adds kivy_deps (sdl2/glew) — see Kivy's packaging documentation."
+      }
+    },
+    "PyQt5": {"qt_binding": true, "large": true},
+    "PyQt6": {"qt_binding": true, "large": true},
+    "PySide2": {"qt_binding": true, "large": true},
+    "PySide6": {"qt_binding": true, "large": true}
+  }
+}

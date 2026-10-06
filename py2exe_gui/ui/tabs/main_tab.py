@@ -42,6 +42,14 @@ class MainTab(BaseTab):
         source_btn = browse_button(S.DIALOG_CHOOSE_PY, self.browse_source)
         source_layout.addWidget(self.source_input, stretch=4)
         source_layout.addWidget(source_btn, stretch=1)
+        # Readiness badge: the doctor's score at a glance, one click to the
+        # details. Hidden until there is a script to examine.
+        self.readiness_btn = QPushButton("")
+        self.readiness_btn.setToolTip(S.DOCTOR_READINESS_TIP)
+        self.readiness_btn.setAccessibleDescription(S.DOCTOR_READINESS_TIP)
+        self.readiness_btn.clicked.connect(self.window_action("show_doctor_tab"))
+        self.readiness_btn.setVisible(False)
+        source_layout.addWidget(self.readiness_btn)
         layout.addWidget(source_group)
 
         output_group = QGroupBox(S.GROUP_OUTPUT)
@@ -64,8 +72,15 @@ class MainTab(BaseTab):
         self.icon_input.setPlaceholderText(S.ICON_PLACEHOLDER)
         self.icon_input.textChanged.connect(self.refresh_icon_preview)
         icon_btn = browse_button(S.DIALOG_CHOOSE_ICON, self.browse_icon)
+        studio_btn = QPushButton(S.BTN_ICON_STUDIO)
+        studio_btn.setToolTip(S.ICON_STUDIO_TITLE)
+        studio_btn.setAccessibleName(S.ICON_STUDIO_TITLE)
+        studio_btn.clicked.connect(self.window_action("open_icon_studio"))
+        icon_buttons = QHBoxLayout()
+        icon_buttons.addWidget(icon_btn)
+        icon_buttons.addWidget(studio_btn)
         output_layout.addWidget(self.icon_input, 2, 1)
-        output_layout.addWidget(icon_btn, 2, 2)
+        output_layout.addLayout(icon_buttons, 2, 2)
 
         # Icon preview: a bad .ico is one of the documented failure modes, and
         # the path alone gives no clue which sizes the file actually contains.
@@ -174,6 +189,21 @@ class MainTab(BaseTab):
         self._log_lines = []
         self._log_theme = "dark"
 
+
+    def set_readiness(self, score):
+        """Show the doctor's score on the badge, or hide it (``None``)."""
+        if score is None:
+            self.readiness_btn.setVisible(False)
+            return
+        self.readiness_btn.setText(S.DOCTOR_READINESS_BTN_FMT.format(score=score))
+        self.readiness_btn.setAccessibleName(self.readiness_btn.text())
+        self.readiness_btn.setObjectName(
+            "successBtn" if score >= 80 else "dangerBtn" if score < 50 else ""
+        )
+        # Re-polish so the objectName change picks up its stylesheet rule.
+        self.readiness_btn.style().unpolish(self.readiness_btn)
+        self.readiness_btn.style().polish(self.readiness_btn)
+        self.readiness_btn.setVisible(True)
 
     # ── Browsing ───────────────────────────────────────────────────────────
 

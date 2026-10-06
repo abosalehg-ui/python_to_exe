@@ -4,16 +4,16 @@
 
 ### أداة احترافية لتحويل تطبيقات بايثون إلى ملفات تنفيذية
 
-![Version](https://img.shields.io/badge/الإصدار-1.2.0-blue?style=for-the-badge)
+![Version](https://img.shields.io/badge/الإصدار-1.3.0-blue?style=for-the-badge)
 ![Python](https://img.shields.io/badge/Python-3.8+-green?style=for-the-badge&logo=python&logoColor=white)
 ![PyQt5](https://img.shields.io/badge/PyQt5-GUI-orange?style=for-the-badge&logo=qt&logoColor=white)
-![Tests](https://img.shields.io/badge/الاختبارات-666_passing-brightgreen?style=for-the-badge)
+![Tests](https://img.shields.io/badge/الاختبارات-827_passing-brightgreen?style=for-the-badge)
 ![Languages](https://img.shields.io/badge/اللغات-عربي_+_English-purple?style=for-the-badge)
 ![License](https://img.shields.io/badge/الرخصة-All%20Rights%20Reserved-red?style=for-the-badge)
 
 <br>
 
-**حوّل أي ملف Python إلى ملف EXE بضغطة زر — بواجهة عربية كاملة، وضع مبسّط للمبتدئين، تحويل دفعي، 4 سمات، 11 قالب جاهز، توقيع رقمي، ومحرر metadata.**
+**حوّل أي ملف Python إلى ملف EXE بضغطة زر — مع طبيب مشروع يكتشف ما سيكسر الـ EXE قبل البناء ويصلحه بنقرة، تشخيص تلقائي لأعطال التشغيل، استوديو أيقونات، واجهة عربية كاملة، تحويل دفعي، توقيع رقمي، ومثبّت كامل.**
 
 [الميزات](#-الميزات) •
 [التثبيت](#-التثبيت) •
@@ -108,6 +108,28 @@
 
 </td>
 </tr>
+<tr>
+<td width="50%">
+
+### 🩺 طبيب المشروع (جديد في 1.3)
+- ✅ **فحص قبل البناء** لما يعمل في بايثون وينكسر بعد التحويل
+- ✅ **درجة جاهزية** من 100 وإصلاح بنقرة
+- ✅ مكتبات غير مثبتة، ملفات بيانات غير مضمّنة، مسارات نسبية،
+  `multiprocessing` بلا `freeze_support`، `input()` في تطبيق بلا Console
+- ✅ **قاعدة معرفة** لـ 45 مكتبة شائعة وما تحتاجه (ملف JSON مفتوح)
+
+</td>
+<td width="50%">
+
+### 🔁 التشخيص والإصلاح التلقائي (جديد في 1.3)
+- ✅ قراءة أخطاء **سجل البناء** و`warn-*.txt` (ما يخص كودك فقط)
+- ✅ قراءة **الـ traceback من الـ EXE** نفسه وشرحه بالعربية
+- ✅ **تشغيل تشخيصي** يكشف الخطأ المخفي في التطبيقات بلا Console
+- ✅ زر **«طبّق وأعد البناء»**
+- ✅ **🎨 استوديو الأيقونات**: `.ico` حقيقي بـ 7 أحجام من صورة أو حروف
+
+</td>
+</tr>
 </table>
 
 ---
@@ -186,7 +208,8 @@ py2exe-gui
 
 | التبويب | المحتوى |
 |--------|---------|
-| **⚙️ الإعدادات الرئيسية** | ملف المصدر، الإخراج، الأيقونة + معاينتها، الخيارات، السجل |
+| **⚙️ الإعدادات الرئيسية** | ملف المصدر + شارة الجاهزية، الإخراج، الأيقونة + معاينتها + 🎨 استوديو الأيقونات، الخيارات، السجل |
+| **🩺 طبيب المشروع** | درجة الجاهزية، المشاكل المتوقعة والفعلية، الإصلاحات بنقرة، نسخ الكود المقترح، التشغيل التشخيصي |
 | **🔧 إعدادات متقدمة** | ملفات إضافية، Hidden Imports، استيراد من requirements، UPX، أوامر مخصصة |
 | **📝 معلومات الإصدار** | CompanyName، FileDescription، FileVersion، ProductVersion، Copyright، إلخ |
 | **🚀 النشر** | Splash، Manifest (DPI/UAC/OS)، التوقيع الرقمي، Smoke Test |
@@ -350,9 +373,17 @@ python_to_exe/
 │   │   ├── manifest_generator.py     # XML للويندوز
 │   │   ├── code_signer.py            # signtool (ملف .pfx أو مخزن الشهادات)
 │   │   ├── installer.py              # توليد سكربت Inno Setup + ISCC
-│   │   ├── smoke_test.py             # post-build
+│   │   ├── smoke_test.py             # post-build (يلتقط مخرجات الـ EXE كاملة)
+│   │   ├── project_doctor.py         # 🩺 فحوص ما قبل البناء
+│   │   ├── diagnostics.py            # 🩺 سجل البناء + warn-*.txt + traceback الـ EXE
+│   │   ├── fixes.py                  # نموذج Finding/Fix المشترك + تطبيق الإصلاحات
+│   │   ├── knowledge.py              # قارئ قاعدة معرفة المكتبات
+│   │   ├── icon_studio.py            # كتابة وقراءة .ico بلا مكتبات صور
 │   │   ├── build_history.py
 │   │   └── log_formatter.py
+│   │
+│   ├── knowledge/
+│   │   └── packages.json       # ما تحتاجه كل مكتبة لتنجو من التحويل
 │   │
 │   └── ui/                     # واجهة PyQt5
 │       ├── main_window.py            # التنسيق فقط (~1050 سطر)
@@ -362,9 +393,13 @@ python_to_exe/
 │       ├── installer_thread.py       # ISCC في خيط منفصل
 │       ├── tray.py                   # أيقونة شريط النظام + الإشعارات
 │       ├── dialogs.py
+│       ├── icon_studio_dialog.py     # 🎨 استوديو الأيقونات
+│       ├── diagnostic_thread.py      # التشغيل التشخيصي
+│       ├── finding_text.py           # نصوص المشاكل والإصلاحات حسب اللغة
 │       └── tabs/               # كل تبويب widget مستقل يملك عناصره
 │           ├── base.py
 │           ├── main_tab.py
+│           ├── doctor_tab.py
 │           ├── advanced_tab.py
 │           ├── version_info_tab.py
 │           ├── deploy_tab.py
@@ -478,7 +513,9 @@ else:
 - ⏳ **المستقبل:** إدارة venv، مشاريع متعددة الملفات، مثبّتات Linux/macOS،
   محرر `.spec`، VirusTotal، الانتقال إلى PySide6 —
   التفاصيل في [UI_IMPROVEMENT_PLAN.md](UI_IMPROVEMENT_PLAN.md)
-- 🧭 **الرؤية القادمة (1.3 → 2.0):** تحويل الأداة إلى استوديو تسليم كامل —
+- ✅ **الإصدار 1.3:** طبيب المشروع، تشخيص أعطال البناء والتشغيل مع الإصلاح
+  بنقرة، التشغيل التشخيصي، قاعدة معرفة المكتبات، استوديو الأيقونات
+- 🧭 **الرؤية القادمة (1.4 → 2.0):** تحويل الأداة إلى استوديو تسليم كامل —
   طبيب المشروع، تشخيص وإصلاح تلقائي للأعطال، بيئة بناء معزولة، محرك Nuitka،
   مكتبة تشغيل مدمجة (تحديث ذاتي + تقارير انهيار)، ونشر بنقرة —
   التفاصيل في [PRODUCT_ROADMAP.md](PRODUCT_ROADMAP.md)

@@ -1,5 +1,6 @@
 """Tests for the post-build smoke test runner."""
 
+import os
 import stat
 import sys
 
@@ -104,3 +105,63 @@ def test_smoke_result_clean_exit_zero_passes():
 def test_smoke_result_clean_exit_nonzero_fails():
     r = SmokeResult(ran=True, exited_cleanly=True, returncode=1)
     assert r.passed is False
+
+
+# ─── Output capture and working directory (1.3) ─────────────────────────
+
+
+@pytest.mark.skipif(sys.platform == "win32", reason="POSIX-only shebang test")
+def test_run_smoke_test_captures_the_traceback(tmp_path):
+    script = tmp_path / "crash.sh"
+    script.write_text(
+        "#!/bin/sh\n"
+        "echo starting\n"
+        "echo \"ModuleNotFoundError: No module named 'x'\" >&2\n"
+        "exit 1\n"
+    )
+    script.chmod(script.stat().st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
+    result = run_smoke_test(str(script), timeout=2.0)
+    assert "starting" in result.output
+    assert "No module named 'x'" in result.output
+
+
+@pytest.mark.skipif(sys.platform == "win32", reason="POSIX-only shebang test")
+def test_run_smoke_test_keeps_output_on_timeout(tmp_path):
+    script = tmp_path / "slow.sh"
+    script.write_text("#!/bin/sh\necho alive\nsleep 30\n")
+    script.chmod(script.stat().st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
+    result = run_smoke_test(str(script), timeout=1.0)
+    assert result.passed is True
+    assert "alive" in result.output
+
+
+@pytest.mark.skipif(sys.platform == "win32", reason="POSIX-only shebang test")
+def test_run_smoke_test_runs_in_the_given_folder(tmp_path):
+    script = tmp_path / "where.sh"
+    script.write_text("#!/bin/sh\npwd\n")
+    script.chmod(script.stat().st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
+    elsewhere = tmp_path / "elsewhere"
+    elsewhere.mkdir()
+    result = run_smoke_test(str(script), timeout=2.0, cwd=str(elsewhere))
+    assert os.path.realpath(result.output.strip()) == os.path.realpath(str(elsewhere))
+
+
+def test_combined_output_decodes_bytes_and_caps_length():
+    from py2exe_gui.core.smoke_test import MAX_OUTPUT_CHARS, _combined
+
+    assert _combined(b"out", "err") == "out\nerr"
+    assert _combined(None, None) == ""
+    assert len(_combined("x" * (MAX_OUTPUT_CHARS + 50), "")) == MAX_OUTPUT_CHARS
+
+
+@pytest.mark.skipif(sys.platform == "win32", reason="POSIX-only shebang test")
+def test_run_from_neutral_folder_cleans_up(tmp_path):
+    from py2exe_gui.core.smoke_test import run_from_neutral_folder
+
+    script = tmp_path / "where.sh"
+    script.write_text("#!/bin/sh\npwd\n")
+    script.chmod(script.stat().st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
+    result = run_from_neutral_folder(str(script), timeout=2.0)
+    folder = result.output.strip()
+    assert "p2e_run_" in folder
+    assert not os.path.exists(folder)
