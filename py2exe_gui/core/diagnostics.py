@@ -20,6 +20,7 @@ from dataclasses import dataclass, replace
 from typing import Callable, Iterable, List, Optional, Sequence, Set, Tuple
 
 from py2exe_gui.core.config import BuildConfig
+from py2exe_gui.core.engines import get_engine
 from py2exe_gui.core.fixes import (
     FIX_ADD_DATA,
     FIX_CONSOLE,
@@ -37,7 +38,6 @@ from py2exe_gui.core.fixes import (
     sort_findings,
 )
 from py2exe_gui.core.knowledge import (
-    QT_BINDINGS,
     default_is_installed,
     lookup,
     pip_name_for,
@@ -58,13 +58,6 @@ _RE_STREAM_NONE = re.compile(
 )
 _RE_DLL = re.compile(r"DLL load failed while importing (\w+)")
 _RE_FRAME = re.compile(r'File "([^"]+)"')
-_RE_QT = re.compile(
-    r"attempting to run hook for '(\w+)', while hook for '(\w+)' has already been run"
-)
-_RE_UNABLE_TO_FIND = re.compile(r'Unable to find "(.+?)" when adding binary and data files')
-_RE_ICON_FORMAT = re.compile(
-    r"Received icon image '(.+?)' which exists but is not in the correct format"
-)
 _RE_PERMISSION = re.compile(
     r"PermissionError: \[(?:WinError 5|WinError 32|Errno 13)\][^']*'(.+?)'"
 )
@@ -86,16 +79,22 @@ def diagnose_output(
     source_imports: Iterable[str] = (),
     knowledge_path: Optional[str] = None,
     is_installed: Callable[[str], bool] = default_is_installed,
+    engine: str = "pyinstaller",
 ) -> List[Finding]:
-    """Recognise known failures in a build log or an EXE's output."""
+    """Recognise known failures in a build log or an EXE's output.
+
+    ``engine`` names the engine that produced the build: its own log patterns
+    (``Engine.log_findings``) are added to the ones every build shares.
+    """
     if not text:
         return []
+    eng = get_engine(engine)
     project_dir = os.path.dirname(os.path.abspath(source)) if source else ""
     imports = set(source_imports)
     findings: List[Finding] = []
 
-    if "No module named PyInstaller" in text or "No module named 'PyInstaller'" in text:
-        findings.append(Finding("pyinstaller_missing", SEVERITY_ERROR, origin=origin))
+    if any(marker in text for marker in eng.missing_markers):
+        findings.append(Finding(eng.missing_code, SEVERITY_ERROR, origin=origin))
 
     # A build log is full of hook chatter ("Failed to collect submodules ...
     # No module named 'x'") about optional extras; those patterns only mean
@@ -105,24 +104,8 @@ def diagnose_output(
             text, origin, source, project_dir, knowledge_path, is_installed
         )
 
-    for running, already in _RE_QT.findall(text):
-        drop = running if running not in imports or already in imports else already
-        if drop not in QT_BINDINGS:
-            continue
-        findings.append(
-            Finding("multiple_qt_bindings_build", SEVERITY_ERROR,
-                    {"bindings": f"{already}, {running}", "drop": drop},
-                    (flag_fix("--exclude-module", drop),), origin=origin)
-        )
-
-    for path in _RE_UNABLE_TO_FIND.findall(text):
-        findings.append(Finding("add_data_missing", SEVERITY_ERROR, {"path": path}, origin=origin))
-
-    for path in _RE_ICON_FORMAT.findall(text):
-        findings.append(
-            Finding("icon_wrong_format", SEVERITY_ERROR, {"icon": os.path.basename(path)},
-                    origin=origin)
-        )
+    # What only this engine's log says (Qt hook collisions, a bad icon...).
+    findings += eng.log_findings(text, origin, imports)
 
     for path in _RE_PERMISSION.findall(text):
         findings.append(

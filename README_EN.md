@@ -114,7 +114,7 @@ writes `p2e.toml` beside the script from the current settings. Commit it:
 everyone who clones the repository — and every CI job — builds the same way.
 
 ```toml
-schema = 1
+schema = 2
 
 [project]
 name = "Image Tool"
@@ -122,6 +122,7 @@ version = "1.4.2"
 
 [build]
 source = "app.py"            # relative to this file
+engine = "pyinstaller"       # the build engine (new in 2.0)
 onefile = true
 hidden_imports = ["PIL._tkinter_finder"]
 isolated_env = true          # a flag — never an interpreter path
@@ -146,8 +147,11 @@ identifier = "Me.ImageTool"
   **Project** menu (`Ctrl+N`, `Ctrl+Shift+O`, `Ctrl+S`, `Ctrl+Shift+S`). The
   title shows the project's name and a `*` while there are unsaved changes.
   Dropping a `p2e.toml` onto the window opens it.
-- The file is **versioned** (`schema = 1`); a file written by a newer app is
-  refused with a clear message instead of being half-read.
+- The file is **versioned** (`schema = 2` since 2.0); a file written by a newer
+  app is refused with a clear message instead of being half-read. A 1.6 file
+  (`schema = 1`) is migrated on load to `engine = "pyinstaller"`, and a file
+  that names an engine this version does not know is refused, never built
+  with another engine.
 - JSON settings files, presets and history from earlier versions still load.
 
 ## Command line
@@ -463,7 +467,10 @@ py2exe_gui/
 ├── templates.py          # Build templates registry
 ├── knowledge/packages.json  # what popular packages need to be frozen
 ├── core/                 # UI-independent, fully tested
-│   ├── builder.py
+│   ├── engines/          # build engines behind one Engine interface (2.0)
+│   │   ├── base.py       #   interface, feature matrix, stage tracker
+│   │   └── pyinstaller.py#   command, phases, output, log patterns
+│   ├── builder.py        # command-line helpers (+ compatibility shim)
 │   ├── config.py
 │   ├── dependency_analyzer.py
 │   ├── version_info.py
@@ -530,7 +537,9 @@ See [IDEAS.md](IDEAS.md) for the full roadmap. Currently:
 - ✅ **1.6:** `p2e.toml` project file as the single settings model, headless
   command line, one-click release (GitHub Releases, checksums, signed
   update manifest, winget manifests)
-- 🧭 **Vision (→ 2.0):** see [PRODUCT_ROADMAP.md](PRODUCT_ROADMAP.md)
+- 🚧 **2.0 (in progress):** ✅ engine layer `core/engines/` (milestone 1);
+  next Nuitka, compare mode, CI for all platforms, licensing, projects
+  workspace, PySide6 — see [PRODUCT_ROADMAP.md](PRODUCT_ROADMAP.md)
 - ⏳ **Next:** venv management, multi-file projects, Linux/macOS installers,
   `.spec` editor, VirusTotal, PySide6 migration —
   see [UI_IMPROVEMENT_PLAN.md](UI_IMPROVEMENT_PLAN.md)

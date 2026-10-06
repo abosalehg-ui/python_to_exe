@@ -54,6 +54,14 @@ pytest tests/ -m slow               # بناءات PyInstaller حقيقية (د�
 `copy_metadata`، `data_dirs`، `console_streams`، `large`، `notes` (`ar` + `en`).
 أضف فقط ما جرّبته فعلاً على بناء حقيقي، ثم شغّل `pytest tests/test_knowledge.py`.
 
+### إضافة محرك بناء
+
+1. اكتب صنفاً يرث `Engine` في `py2exe_gui/core/engines/<name>.py`: `build_command`،
+   `locate_output`، `stages`، `feature_matrix` (كل مفاتيح `FEATURES`)، وأنماط سجله.
+2. سجّله في `_ENGINES` في `core/engines/__init__.py` وفي `KNOWN_ENGINES` في `core/config.py`.
+3. لا تمرّر لمحرك خياراً لا يملكه: ما لا يدعمه يُعلَن في مصفوفة الميزات.
+4. `pytest tests/test_engines.py` يجب أن يمرّ.
+
 ### إضافة لغة جديدة
 
 1. أنشئ `class Xx` في `strings.py` بكل المفاتيح الموجودة في `Ar`/`En`
@@ -118,6 +126,17 @@ The project doctor's knowledge base is a data file:
 `data_dirs`, `console_streams`, `large`, `notes` (`ar` + `en`). Only add what
 you have verified against a real build, then run
 `pytest tests/test_knowledge.py`.
+
+### Adding a Build Engine
+
+1. Subclass `Engine` in `py2exe_gui/core/engines/<name>.py`: `build_command`,
+   `locate_output`, `stages`, `feature_matrix` (every key of `FEATURES`) and
+   its log patterns.
+2. Register it in `_ENGINES` (`core/engines/__init__.py`) and in
+   `KNOWN_ENGINES` (`core/config.py`).
+3. Never pass an engine an option it does not have: declare what it lacks in
+   the feature matrix.
+4. `pytest tests/test_engines.py` must pass.
 
 ### Adding a New Language
 

@@ -1,6 +1,9 @@
-"""Pure logic: turn a BuildConfig into a PyInstaller command list."""
+"""Shared command-line helpers, and the PyInstaller command (a 2.0 shim).
 
-import os
+The PyInstaller command itself moved to ``core/engines/pyinstaller.py``;
+``build_pyinstaller_command`` stays here so every existing import works.
+"""
+
 import shlex
 import sys
 from typing import List, Optional, Sequence, Tuple
@@ -66,81 +69,17 @@ def build_pyinstaller_command(
 ) -> Tuple[Optional[List[str]], Optional[str]]:
     """Construct the PyInstaller command for the given config.
 
-    ``extra_options`` are options the app generated itself at build time —
-    the Runtime Kit's ``--runtime-hook`` and friends. They are passed here
-    rather than stored in the config, so no settings file can supply them.
+    Kept for backward compatibility: the command now lives in
+    ``core/engines/pyinstaller.py``. This always builds a *PyInstaller*
+    command, whatever ``config.engine`` says; use
+    ``engines.engine_for(config).build_command(...)`` to honour it.
 
     Returns a (command, error) tuple. On success error is None; on failure
     command is None and error contains a user-facing message.
     """
-    if not config.source or not os.path.isfile(config.source):
-        return None, "اختر ملف المصدر أولاً!"
+    from py2exe_gui.core.engines import get_engine
 
-    py_exe = python_executable or sys.executable
-    cmd: List[str] = [py_exe, "-m", "PyInstaller"]
-
-    if config.onefile:
-        cmd.append("--onefile")
-    if config.windowed:
-        cmd.append("--windowed")
-    if config.noconsole:
-        cmd.append("--noconsole")
-    if config.clean:
-        cmd.append("--clean")
-    if config.noconfirm:
-        cmd.append("--noconfirm")
-    if config.strip:
-        cmd.append("--strip")
-
-    if config.output_name:
-        cmd.extend(["--name", config.output_name])
-
-    if config.icon and os.path.isfile(config.icon):
-        cmd.extend(["--icon", config.icon])
-
-    if config.version_file and os.path.isfile(config.version_file):
-        cmd.extend(["--version-file", config.version_file])
-
-    if config.splash_image and os.path.isfile(config.splash_image):
-        cmd.extend(["--splash", config.splash_image])
-
-    if config.manifest_file and os.path.isfile(config.manifest_file):
-        cmd.extend(["--manifest", config.manifest_file])
-
-    if config.output_dir:
-        cmd.extend(["--distpath", os.path.join(config.output_dir, "dist")])
-        cmd.extend(["--workpath", os.path.join(config.output_dir, "build")])
-        cmd.extend(["--specpath", config.output_dir])
-
-    sep = _add_data_separator(platform)
-    for path in config.extra_files:
-        if not os.path.exists(path):
-            continue
-        # PyInstaller's DEST is a *directory* inside the bundle. Files go to
-        # the bundle root ("."); a directory keeps its own name as the target.
-        dest = os.path.basename(path.rstrip("\\/")) if os.path.isdir(path) else "."
-        cmd.extend(["--add-data", f"{path}{sep}{dest}"])
-
-    for imp in config.hidden_imports:
-        cmd.extend(["--hidden-import", imp])
-
-    if config.optimize > 0:
-        # PyInstaller has no -O flag; the bytecode level is --optimize (6.0+).
-        cmd.extend(["--optimize", str(config.optimize)])
-
-    if config.upx:
-        # PyInstaller searches PATH for UPX by default; --upx-dir only narrows
-        # that search. There is no --upx-level option.
-        if config.upx_dir:
-            cmd.append(f"--upx-dir={config.upx_dir}")
-    else:
-        cmd.append("--noupx")
-
-    cmd.extend(extra_options)
-
-    if config.extra_args:
-        cmd.extend(split_extra_args(config.extra_args, platform))
-
-    cmd.append(config.source)
-
-    return cmd, None
+    return get_engine("pyinstaller").build_command(
+        config, python_executable=python_executable, platform=platform,
+        extra_options=extra_options,
+    )

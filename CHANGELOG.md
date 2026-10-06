@@ -5,6 +5,43 @@ follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### 2.0.0-dev — Every platform, every engine (milestone 1: engine abstraction)
+
+First milestone of the 2.0 release of [PRODUCT_ROADMAP.md](PRODUCT_ROADMAP.md)
+(pillar 4, architectural requirement 1). A pure refactor: no build changes.
+Every test that existed before passes unchanged, and so do the real
+PyInstaller builds (`pytest -m slow`).
+
+#### Added
+- **`core/engines/`**: the `Engine` interface (`base.py`) — `name`,
+  `is_available(python)`/`version(python)`, `build_command(config, python)`,
+  a stage tracker for progress, `locate_output(config)`/`locate_executable`,
+  engine-specific build-log patterns (`log_findings`), the files a build
+  leaves behind (`build_findings`), the size lab (`analyze_size`) and a
+  **feature matrix** (onefile, onedir, windowed, icon, Version Info, splash,
+  manifest, UPX, strip, optimize, data files, hidden imports, excluded
+  modules, Runtime Kit, size report, warn file). `features_used(config)` and
+  `Engine.unsupported_features(config)` say what a project asks for that an
+  engine cannot do.
+- **`core/engines/pyinstaller.py`**: today's PyInstaller logic, moved — the
+  command, its phases, where its output lands, and its own log patterns
+  (two Qt bindings, a missing `--add-data` source, an icon in the wrong
+  format).
+- `get_engine(name)` / `engine_for(config)`; nothing else names an engine class.
+- **`BuildConfig.engine`** (default `"pyinstaller"`), in settings, presets,
+  history and `p2e.toml`.
+
+#### Changed
+- `p2e.toml` is now **schema 2**. A 1.6 file (schema 1) is migrated on load
+  with `build.engine = "pyinstaller"`; the bump makes 1.6 refuse a 2.0 file
+  ("written by a newer version") instead of silently building a project meant
+  for another engine with PyInstaller. A project that names an engine this
+  version does not know is refused with the name, never replaced.
+- `builder.build_pyinstaller_command` and `build_stages.BuildStageTracker`/
+  `STAGES`/`stage_keys`/`stage_for` are thin backward-compatible shims over
+  the engine; `diagnose_output(..., engine=)` and the headless build runner go
+  through the engine the config selects.
+
 ### 1.6.0 — From project to product
 
 Fourth release of [PRODUCT_ROADMAP.md](PRODUCT_ROADMAP.md) (pillars 7 and 6):

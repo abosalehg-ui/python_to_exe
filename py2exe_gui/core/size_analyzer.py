@@ -169,16 +169,10 @@ def _file_size(path: str) -> int:
 
 
 def output_path_for(config: BuildConfig) -> str:
-    """The EXE (one-file) or the app folder (folder mode) under dist/."""
-    name = build_name(config)
-    dist = os.path.join(build_root(config), "dist")
-    if config.onefile:
-        for candidate in (os.path.join(dist, name + ".exe"), os.path.join(dist, name)):
-            if os.path.isfile(candidate):
-                return candidate
-        return ""
-    folder = os.path.join(dist, name)
-    return folder if os.path.isdir(folder) else ""
+    """The EXE (one-file) or the app folder (folder mode) the engine produced."""
+    from py2exe_gui.core.engines import engine_for
+
+    return engine_for(config).locate_output(config)
 
 
 def path_size(path: str) -> int:

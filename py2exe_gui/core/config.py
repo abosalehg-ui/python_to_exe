@@ -9,6 +9,18 @@ RUNTIME_SERVICES = (
 )
 
 
+#: The engine a build uses unless it names another (``core/engines``).
+DEFAULT_ENGINE = "pyinstaller"
+#: Engine names this version knows. Kept here, not imported from
+#: ``core/engines``, so the config stays a leaf module with no imports.
+KNOWN_ENGINES = ("pyinstaller",)
+
+
+def _engine_name(value: Any) -> str:
+    """A known engine name, or the default for anything else (pre-2.0 files)."""
+    return value if isinstance(value, str) and value in KNOWN_ENGINES else DEFAULT_ENGINE
+
+
 @dataclass
 class RuntimeKitConfig:
     """Which ``p2e_runtime`` services to embed in the EXE, and their settings.
@@ -62,7 +74,7 @@ class RuntimeKitConfig:
 
 @dataclass
 class BuildConfig:
-    """All parameters needed to construct a PyInstaller command."""
+    """All parameters needed to construct a build command (PyInstaller by default)."""
 
     source: str = ""
     output_name: str = ""
@@ -99,6 +111,10 @@ class BuildConfig:
     # 1.5: Runtime Kit services embedded in the EXE (see RuntimeKitConfig).
     runtime_kit: RuntimeKitConfig = field(default_factory=RuntimeKitConfig)
 
+    # 2.0: which engine builds it (``core/engines``). A name from a fixed
+    # list, never a path; an unknown name falls back to the default.
+    engine: str = DEFAULT_ENGINE
+
     def to_dict(self) -> dict:
         return {
             "source": self.source,
@@ -123,6 +139,7 @@ class BuildConfig:
             "manifest_file": self.manifest_file,
             "isolated_env": self.isolated_env,
             "runtime_kit": self.runtime_kit.to_dict(),
+            "engine": self.engine,
         }
 
     @classmethod
@@ -150,4 +167,5 @@ class BuildConfig:
             manifest_file=data.get("manifest_file", ""),
             isolated_env=bool(data.get("isolated_env", False)),
             runtime_kit=RuntimeKitConfig.from_dict(data.get("runtime_kit")),
+            engine=_engine_name(data.get("engine")),
         )
