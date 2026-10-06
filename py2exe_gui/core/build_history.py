@@ -21,6 +21,8 @@ class BuildRecord:
     success: bool = False
     duration_seconds: float = 0.0
     config: dict = field(default_factory=dict)
+    # 1.4: bytes on disk of the output, for the size lab's before/after.
+    size_bytes: int = 0
 
     @classmethod
     def from_dict(cls, data: dict) -> "BuildRecord":
@@ -135,6 +137,7 @@ def make_record(
     duration_seconds: float,
     config: dict,
     timestamp: Optional[str] = None,
+    size_bytes: int = 0,
 ) -> BuildRecord:
     """Factory that fills in the timestamp by default."""
     return BuildRecord(
@@ -144,4 +147,5 @@ def make_record(
         success=success,
         duration_seconds=duration_seconds,
         config=dict(config),
+        size_bytes=int(size_bytes or 0),
     )

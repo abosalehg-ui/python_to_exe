@@ -81,7 +81,11 @@ class DoctorTab(BaseTab):
         self.diagnose_btn.setToolTip(S.BTN_DOCTOR_DIAGNOSE_TIP)
         self.diagnose_btn.setAccessibleDescription(S.BTN_DOCTOR_DIAGNOSE_TIP)
         self.diagnose_btn.clicked.connect(self.window_action("start_diagnostic_run"))
-        for button in (self.apply_btn, self.rebuild_btn, self.diagnose_btn):
+        self.sandbox_btn = QPushButton(S.BTN_SANDBOX)
+        self.sandbox_btn.setToolTip(S.BTN_SANDBOX_TIP)
+        self.sandbox_btn.setAccessibleDescription(S.BTN_SANDBOX_TIP)
+        self.sandbox_btn.clicked.connect(self.window_action("open_in_sandbox"))
+        for button in (self.apply_btn, self.rebuild_btn, self.diagnose_btn, self.sandbox_btn):
             button.setAccessibleName(button.text())
             buttons.addWidget(button)
         layout.addLayout(buttons)

@@ -37,6 +37,34 @@ def config_dir(platform: Optional[str] = None, env: Optional[dict] = None) -> st
     return os.path.join(base, APP_DIR_NAME)
 
 
+def cache_dir(platform: Optional[str] = None, env: Optional[dict] = None) -> str:
+    """Return the per-user cache directory, for large re-creatable data.
+
+    Build environments run to hundreds of MB, so they must not sit in the
+    Windows *roaming* profile (synced on every logon) like the settings do.
+
+    Windows : %LOCALAPPDATA%\\py2exe_gui
+    macOS   : ~/Library/Caches/py2exe_gui
+    Linux   : $XDG_CACHE_HOME/py2exe_gui (or ~/.cache/py2exe_gui)
+    """
+    plat = platform if platform is not None else sys.platform
+    environ = os.environ if env is None else env
+    home = os.path.expanduser("~")
+
+    if plat == "win32":
+        base = environ.get("LOCALAPPDATA") or os.path.join(home, "AppData", "Local")
+    elif plat == "darwin":
+        base = os.path.join(home, "Library", "Caches")
+    else:
+        base = environ.get("XDG_CACHE_HOME") or os.path.join(home, ".cache")
+    return os.path.join(base, APP_DIR_NAME)
+
+
+def envs_dir(platform: Optional[str] = None, env: Optional[dict] = None) -> str:
+    """Where isolated per-project build environments live."""
+    return os.path.join(cache_dir(platform, env), "build_envs")
+
+
 def ensure_config_dir() -> str:
     """Create the config directory if needed and return it.
 

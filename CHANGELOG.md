@@ -5,6 +5,74 @@ follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### 1.4.0 — Isolated build environment, size lab, build report
+
+Second release of [PRODUCT_ROADMAP.md](PRODUCT_ROADMAP.md): smaller EXEs,
+reproducible builds, and a record of what went into each one.
+
+#### Added
+- **Isolated build environment per project** (new ⚖️ *Size & Environment* tab,
+  shown in simple mode). PyInstaller bundles whatever its hooks find installed,
+  so building from a Python full of libraries bloats the EXE. The environment
+  holds only what the project imports — following imports through its own
+  helper modules and packages (`core/project_scan.py`), mapped to PyPI names
+  through the knowledge base — or, when present, `requirements.txt`, or the new
+  `p2e-build.lock`. Created with `uv` when installed (seconds) or `venv` + pip;
+  if a guessed package name fails, the rest are retried one at a time and the
+  failures named. **Nothing runs before the exact commands are shown and
+  approved.** Environments live in the per-user *cache* folder
+  (`%LOCALAPPDATA%` on Windows, not the roaming profile). Building, the
+  diagnostic run, batch builds, the command preview and the PyInstaller check
+  all use the environment's interpreter; building with an environment that does
+  not exist yet offers to create it first.
+- **Lock file** — `🔒 Save lock file` writes `p2e-build.lock` (exact versions,
+  build tooling left out) next to the project; environments are then rebuilt
+  from it.
+- **The doctor checks the build interpreter**, not the app's own Python: an
+  environment is asked in one subprocess what it can import. Its checks also
+  follow local helper modules now, so a package imported only by `helpers.py`
+  is reported missing too. With an environment not yet created, one
+  `env_not_created` finding replaces a flood of "missing package" errors.
+- **Size lab.** After each build, what is inside — library by library — read
+  from PyInstaller's own TOC files (`ast.literal_eval`, never executed). The
+  compressed module archive's real size is spread over its modules, so the
+  figures add up to what is on disk (verified: 64.8 MB inventoried for a
+  64.8 MB folder build). Distribution-named folders (`pillow.libs`) are counted
+  with their package (`PIL`). Shows the change against the previous build of
+  the same script (sizes are now stored in build history), and hints when
+  libraries the code never imports take up space or when a one-file EXE is big
+  enough to start slowly.
+- **Slimming suggestions** — curated `--exclude-module` candidates (tkinter,
+  unused Qt bindings, matplotlib, IPython, pytest…) present in the bundle but
+  never imported by the project; *Exclude* or *Exclude and rebuild*. The doctor
+  loop catches it if a library did need one.
+- **HTML build report** after each successful build (on by default):
+  `<name>-build-report.html` beside `dist/` with sizes, breakdown, largest
+  files, SHA-256, Python/PyInstaller/platform versions, doctor notes and the
+  PyInstaller options. One self-contained file — no scripts, no external
+  resources — with every value escaped; RTL in Arabic, light and dark.
+- **🧊 Test in Windows Sandbox** (Doctor tab) — writes a `.wsb` that maps the
+  output read-only into a clean, throw-away Windows and runs the EXE. Where
+  Sandbox is unavailable it says so and how to test on a clean machine instead.
+
+#### Fixed
+- The `&` in a tab title was eaten as a keyboard mnemonic ("Size _Environment").
+- Tree widgets and scroll areas had no theme rules (white table, pale text).
+- Sizes and percentages read "MB 41.6" in right-to-left text; they are now
+  isolated as left-to-right runs in the app and in the report.
+
+#### Measured
+- A Pillow-only app: **30.1 MB** built from the system Python (which pulled in
+  numpy) → **14.2 MB** from its isolated environment (**−53%**).
+
+#### Tests
+- 116 new tests (943 total): import scanning, environment planning, lock files,
+  safe deletion (never outside the environments folder), the import checker,
+  TOC parsing (including that it never executes), grouping, size accounting,
+  suggestions, history sizes, the report (escaping, RTL, empty sections), the
+  `.wsb` XML, and the tab's wiring. Core tests still pass without PyQt5 and on
+  Python 3.9.
+
 ### 1.3.0 — Project doctor and diagnostics
 
 First release of [PRODUCT_ROADMAP.md](PRODUCT_ROADMAP.md): the tool now

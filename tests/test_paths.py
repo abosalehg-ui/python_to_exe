@@ -82,3 +82,28 @@ def test_migration_noop_without_legacy_file(tmp_path, monkeypatch):
     target = tmp_path / "cfg" / "settings.json"
     assert resolve_with_migration(str(target), "absent.json") == str(target)
     assert not target.exists()
+
+
+# ── 1.4: cache directory for build environments ────────────────────────────
+
+
+def test_windows_cache_uses_localappdata_not_roaming():
+    from py2exe_gui.paths import cache_dir
+
+    env = {"APPDATA": r"C:\Users\me\AppData\Roaming",
+           "LOCALAPPDATA": r"C:\Users\me\AppData\Local"}
+    assert cache_dir("win32", env).startswith(r"C:\Users\me\AppData\Local")
+
+
+def test_linux_cache_honours_xdg_cache_home(tmp_path):
+    from py2exe_gui.paths import cache_dir, envs_dir
+
+    env = {"XDG_CACHE_HOME": str(tmp_path)}
+    assert cache_dir("linux", env) == os.path.join(str(tmp_path), "py2exe_gui")
+    assert envs_dir("linux", env) == os.path.join(str(tmp_path), "py2exe_gui", "build_envs")
+
+
+def test_macos_cache_uses_library_caches():
+    from py2exe_gui.paths import cache_dir
+
+    assert os.path.join("Library", "Caches") in cache_dir("darwin", {})

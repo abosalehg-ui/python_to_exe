@@ -60,3 +60,16 @@ def test_phase5_fields_default_empty():
     cfg = BuildConfig()
     assert cfg.splash_image == ""
     assert cfg.manifest_file == ""
+
+
+def test_isolated_env_round_trips_and_defaults_off():
+    assert BuildConfig().isolated_env is False
+    assert BuildConfig.from_dict(BuildConfig(isolated_env=True).to_dict()).isolated_env is True
+    # Older settings files have no such key.
+    assert BuildConfig.from_dict({"source": "a.py"}).isolated_env is False
+
+
+def test_a_shared_config_cannot_name_an_interpreter():
+    """The environment is a flag; its path is derived locally, never loaded."""
+    data = BuildConfig(isolated_env=True).to_dict()
+    assert not any("python" in key for key in data)

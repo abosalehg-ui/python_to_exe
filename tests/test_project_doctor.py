@@ -326,3 +326,28 @@ def test_multi_size_icon_is_fine(tmp_path):
     icon.write_bytes(pack_ico({16: PNG_SIGNATURE, 32: PNG_SIGNATURE}))
     report = run(tmp_path, "print(1)\n", icon=str(icon))
     assert report.findings == []
+
+
+# ── 1.4: imports of local helper modules ──────────────────────────────────
+
+
+def test_missing_package_imported_only_by_a_helper(tmp_path):
+    (tmp_path / "helpers.py").write_text("import yaml\n")
+    report = run(tmp_path, "import helpers\nprint(helpers)\n",
+                 installed=lambda m: m != "yaml")
+    assert by_code(report, "missing_package").params["module"] == "yaml"
+
+
+def test_a_prefetching_checker_is_asked_once(tmp_path):
+    asked = []
+
+    class Checker:
+        def prefetch(self, modules):
+            asked.append(set(modules))
+
+        def __call__(self, module):
+            return True
+
+    run(tmp_path, "import yaml\nimport requests\n", installed=Checker())
+    assert len(asked) == 1
+    assert {"yaml", "requests"} <= asked[0]

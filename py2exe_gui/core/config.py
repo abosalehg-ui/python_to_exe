@@ -35,6 +35,11 @@ class BuildConfig:
     splash_image: str = ""
     manifest_file: str = ""
 
+    # 1.4: build in this project's isolated environment instead of the
+    # interpreter running the app. A flag, never a path: a shared settings
+    # file must not be able to name an executable for the build to run.
+    isolated_env: bool = False
+
     def to_dict(self) -> dict:
         return {
             "source": self.source,
@@ -57,6 +62,7 @@ class BuildConfig:
             "version_file": self.version_file,
             "splash_image": self.splash_image,
             "manifest_file": self.manifest_file,
+            "isolated_env": self.isolated_env,
         }
 
     @classmethod
@@ -82,4 +88,5 @@ class BuildConfig:
             version_file=data.get("version_file", ""),
             splash_image=data.get("splash_image", ""),
             manifest_file=data.get("manifest_file", ""),
+            isolated_env=bool(data.get("isolated_env", False)),
         )

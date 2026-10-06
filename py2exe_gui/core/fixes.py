@@ -54,6 +54,8 @@ FINDING_CODES = (
     "missing_data_file", "template_not_found", "streams_none", "dll_load_failed",
     "multiple_qt_bindings_build", "add_data_missing", "icon_wrong_format",
     "file_locked", "runtime_unhandled", "warn_missing_module",
+    # 1.4: size lab and build environment
+    "size_exclude_candidate", "env_not_created",
 )
 
 # Penalty per finding when computing the readiness score.
