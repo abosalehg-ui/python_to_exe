@@ -239,6 +239,7 @@ class Ar:
         "استوديو أيقونات .ico بكل الأحجام",
         "بيئة بناء معزولة + مختبر الحجم + تقرير البناء",
         "مكتبة تشغيل مدمجة: محدِّث موقَّع، مُبلِّغ انهيار، نسخة واحدة",
+        "ملف مشروع p2e.toml + سطر أوامر + إصدار بنقرة على GitHub",
     ]
 
     # Language selector (Phase 3)
@@ -1642,6 +1643,7 @@ class En:
         "Icon Studio for multi-size .ico files",
         "Isolated build environment, size lab and build report",
         "Runtime Kit: signed updater, crash reporter, single instance",
+        "p2e.toml project file + command line + one-click GitHub release",
     ]
 
     # Language selector
