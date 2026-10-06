@@ -37,7 +37,7 @@ jobs:
       - name: Run core tests
         run: >
           pytest tests/ -v -m "not slow"
-          --cov=py2exe_gui.core --cov-report=term
+          --cov=py2exe_gui.core --cov=p2e_runtime --cov-report=term
           --cov-fail-under=90
 
   gui:
@@ -86,7 +86,7 @@ jobs:
         run: pip install ruff
 
       - name: Run ruff
-        run: ruff check py2exe_gui/ tests/
+        run: ruff check py2exe_gui/ p2e_runtime/ tests/
 
   audit:
     name: Dependency audit

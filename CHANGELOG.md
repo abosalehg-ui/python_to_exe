@@ -5,6 +5,120 @@ follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### 1.5.0 — Runtime Kit
+
+Third release of [PRODUCT_ROADMAP.md](PRODUCT_ROADMAP.md) (pillar 5): every
+other packaging tool stops once the EXE exists; this one now makes the
+*produced program* better after it ships.
+
+#### Added
+- **Runtime Kit** (new 🧰 tab, shown in simple mode). `p2e_runtime`, a separate
+  package — standard library only, Python 3.8+, no GUI toolkit, so it works in
+  tkinter, Qt, wx and console apps — that the converter embeds in the EXE,
+  **one checkbox per service, all off by default**:
+  - **`resource_path()`** — bundled files found the same way in development,
+    one-file and folder builds (`from p2e_runtime import resource_path`).
+  - **Log file for windowed apps** — when `sys.stdout`/`sys.stderr` are `None`
+    they go to a rotating log in `%LOCALAPPDATA%\<App>\logs` (XDG state /
+    `~/Library/Logs` elsewhere). A console app keeps its console.
+  - **Crash reporter** — `sys.excepthook` and `threading.excepthook` save a
+    report (traceback, app version, OS, Python, time; no environment, user or
+    machine name) to `…\<App>\crashes` and say where in a native dialog
+    (`MessageBoxW`, stderr elsewhere). An optional support page opens **only if
+    the user clicks Yes**; nothing is sent.
+  - **Single instance** — a named mutex on Windows, an `fcntl` lock elsewhere;
+    a second copy shows a message and exits.
+  - **Signed self-updater** — `update.json` plus `update.json.sig`, an
+    **Ed25519** signature over the manifest's exact bytes, checked against the
+    public key embedded in the app *before* the JSON is read. HTTPS only;
+    redirects are re-checked, so HTTPS → HTTP is refused. The download's size
+    and SHA-256 must match before anything is replaced. One-file builds: the
+    running EXE is renamed to `.old`, the new one moved in, the app restarted
+    with PyInstaller's environment reset, and `.old` removed on the next start.
+    Folder builds: the manifest points to an installer, which is verified and
+    launched with the configured arguments. `p2e_runtime.updates.check()` /
+    `apply(info)` are synchronous and UI-free; an opt-in start-up check asks
+    with a native Yes/No dialog on Windows and never installs without one.
+- **Verify-only Ed25519 in pure Python**, after the RFC 8032 reference code,
+  with the checks it requires (`S < L`, canonical points). The converter signs
+  with the same point arithmetic; the runtime cannot sign.
+- **Signing key management** — *Generate key pair*, *Back up* (after a warning;
+  refused inside the project or output folder) and *Import*. The private key
+  lives in `<config>/signing/` with owner-only permissions and is never
+  written to the project, a build, a settings or preset file, or the log.
+  Replacing a key asks first and keeps the old one.
+- **Publish an update** — writes and signs `update.json` next to a new build
+  (the result is re-verified by the runtime's own code first). Nothing is
+  uploaded; GitHub Releases is 1.6.
+- **Preview** of exactly what is embedded: the two-line runtime hook and
+  `p2e_runtime.json`. The command preview, the diagnostic run (crash dialog and
+  start-up check left out so it never blocks or reaches the network) and batch
+  builds (one kit per job) embed it too.
+- **Doctor**: with `resource_path` on, the relative-paths finding offers the
+  one-line `from p2e_runtime import resource_path` instead of a function to
+  paste. `stream_in_windowed`, `package_console_streams` and the runtime
+  `streams_none` gain an **alternative fix** — *redirect output to a log file*
+  — next to *turn the console back on* (new `runtime` fix kind, a 🔀 button on
+  the Doctor tab). New findings: code importing `p2e_runtime` with the kit off,
+  and every updater misconfiguration (no/insecure URL, no/invalid key, unusable
+  version, bad support link, folder build needs an installer).
+- **Build report** lists the Runtime Kit services embedded.
+
+#### Security
+- The kit is configured through **structured `BuildConfig` fields** (booleans
+  and text, strictly typed on load), never through `extra_args`. The converter
+  writes the runtime hook itself at build time and passes it to PyInstaller
+  without storing it, so it does not trip the untrusted-settings warning,
+  while a `--runtime-hook` inside `extra_args` still does.
+- A settings file, preset or history entry that sets an update key **other than
+  your own** is shown before it is applied (it would let that key's owner
+  install programs on your users' machines), as is a crash-dialog support link.
+- `http://localhost` is accepted only behind a test-only flag that the UI and
+  settings files cannot set.
+- The converter's smoke test and diagnostic run start the EXE with
+  `P2E_RUNTIME_NO_DIALOGS=1`: on Windows a crash dialog would otherwise keep a
+  crashed app "alive" until the timeout and the test would pass. Dialogs fall
+  back to stderr, and the start-up update check is skipped (nobody to ask).
+
+#### Fixed (found by the real build)
+- PyInstaller's bootloader calls `sys.__stdout__.flush()` at exit whenever
+  `sys.stdout` was replaced; with `__stdout__` still `None` that raised, and the
+  crash reporter would have filed a crash on every normal exit. The log
+  redirection fills `__stdout__`/`__stderr__` too.
+- After an update, the restarted copy could find the single-instance lock still
+  held by the exiting one and quit; the lock is now released before the
+  restart.
+- `QPlainTextEdit` had no theme rule (a white box in the dark theme).
+- In Arabic, code inside sentences (`print()`, `/SILENT`) and the key
+  fingerprint came out reordered. Qt 5.15 did not keep `print()` intact inside
+  an LRI/PDI isolate, so this tab brackets such runs with left-to-right marks;
+  checkbox labels, which reorder mixed text regardless, are pure Arabic.
+
+#### Measured
+- A one-file "hello" build: **7.08 MiB** without the kit, **7.26 MiB** with
+  four services, **7.81 MiB** with all five — services are imported by name, so
+  the updater's `ssl`/`urllib` are only bundled when it is on.
+- Signature verification: about 4 ms per check in CPython.
+
+#### Tests
+- 280 new tests (1223 total, 6 of them `slow`): all five RFC 8032 §7.1 vectors
+  for the verifier *and* the signer; tampered manifest, tampered or truncated
+  signature, wrong key, malleable `S`, non-canonical points; SHA-256 and size
+  mismatches (the old EXE untouched); HTTP, HTTP-redirect and non-localhost
+  refusals; version ordering; `resource_path` frozen (one-file and folder) and
+  not; report content; the lock (including after its holder dies); the
+  rename/swap/rollback on this OS and the Windows branches through injected
+  functions; an updater integration test against `http.server`. A `slow`
+  test builds a real EXE with every service and checks, from a neutral
+  folder: bundled data found, a crash report written, a second copy exits,
+  `print`/`sys.stdout.write` reach the log with no descriptors 1 and 2, and a
+  signed update from a local server replaces the running EXE, restarts it and
+  removes `.old`. Core tests pass without PyQt5 and on Python 3.9; the
+  runtime's tests also on 3.8.
+- **Not verified here (Linux CI):** the real Windows rename of a running
+  `.exe`, `MessageBoxW`, and the named mutex. Their logic is tested through
+  injected functions only.
+
 ### 1.4.0 — Isolated build environment, size lab, build report
 
 Second release of [PRODUCT_ROADMAP.md](PRODUCT_ROADMAP.md): smaller EXEs,
