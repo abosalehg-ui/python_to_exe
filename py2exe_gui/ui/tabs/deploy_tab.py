@@ -13,6 +13,7 @@ from PyQt5.QtWidgets import (
 
 from py2exe_gui.core import SigningConfig
 from py2exe_gui.core.platform_support import CODE_SIGNING, MANIFEST
+from py2exe_gui.core.project_file import ManifestSettings, SigningSettings
 from py2exe_gui.strings import S
 from py2exe_gui.ui.tabs.base import BaseTab, browse_button, platform_notice
 
@@ -168,3 +169,44 @@ class DeployTab(BaseTab):
 
     def selected_supported_os(self):
         return [code for code, cb in self.manifest_os.items() if cb.isChecked()]
+
+    def manifest_settings(self) -> ManifestSettings:
+        return ManifestSettings(
+            enabled=self.manifest_enable.isChecked(),
+            dpi_aware=self.manifest_dpi.isChecked(),
+            require_admin=self.manifest_admin.isChecked(),
+            supported_os=self.selected_supported_os(),
+        )
+
+    def set_manifest_settings(self, manifest: ManifestSettings):
+        self.manifest_enable.setChecked(manifest.enabled)
+        self.manifest_dpi.setChecked(manifest.dpi_aware)
+        self.manifest_admin.setChecked(manifest.require_admin)
+        for code, check in self.manifest_os.items():
+            check.setChecked(code in manifest.supported_os)
+
+    def set_signing_settings(self, signing: SigningSettings):
+        """Apply the shared part; the password field is left as it is."""
+        self.signing_enable.setChecked(signing.enabled)
+        self.signing_use_store.setChecked(signing.use_cert_store)
+        self._on_signing_mode_changed(signing.use_cert_store)
+        self.signing_subject.setText(signing.cert_subject)
+        self.signing_cert.setText(signing.cert_path)
+        self.signing_timestamp.setText(signing.timestamp_url)
+        self.signing_description.setText(signing.description)
+
+    # ── The project model ──────────────────────────────────────────────────
+
+    def read_project(self, project):
+        project.build.splash_image = self.splash_input.text().strip()
+        project.manifest = self.manifest_settings()
+        # Never the password: SigningSettings has no field for it.
+        project.signing = SigningSettings.from_signing_config(self.signing_config())
+
+    def apply_project(self, project, sections=()):
+        if "build" in sections:
+            self.splash_input.setText(project.build.splash_image)
+        if "manifest" in sections:
+            self.set_manifest_settings(project.manifest)
+        if "signing" in sections:
+            self.set_signing_settings(project.signing)

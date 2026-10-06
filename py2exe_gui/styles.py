@@ -424,6 +424,36 @@ QStatusBar {{
     background-color: {statusbar_bg};
     color: {muted};
 }}
+/* The Project menu (1.6). Unstyled, the platform's light menu bar sat above
+   the dark window with light text on it. */
+QMenuBar {{
+    background-color: {statusbar_bg};
+    color: {text};
+}}
+QMenuBar::item {{
+    background: transparent;
+    padding: 4px 10px;
+}}
+QMenuBar::item:selected, QMenu::item:selected {{
+    background-color: {accent};
+    color: {on_accent};
+}}
+QMenu {{
+    background-color: {surface};
+    color: {text};
+    border: 1px solid {border};
+}}
+QMenu::item {{
+    padding: 5px 24px;
+}}
+QMenu::item:disabled {{
+    color: {disabled_text};
+}}
+QMenu::separator {{
+    height: 1px;
+    background: {border};
+    margin: 4px 8px;
+}}
 QLabel#titleLabel {{
     font-size: {pt_title};
     font-weight: bold;

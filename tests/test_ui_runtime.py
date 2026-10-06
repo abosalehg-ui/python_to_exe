@@ -21,6 +21,7 @@ from py2exe_gui.core.update_signing import (  # noqa: E402
 )
 from py2exe_gui.strings import Ar, En, S, set_locale  # noqa: E402
 from py2exe_gui.ui.main_window import SIMPLE_MODE_TABS  # noqa: E402
+from tests.conftest import MemoryKeyring  # noqa: E402
 
 pytestmark = pytest.mark.gui
 
@@ -30,6 +31,7 @@ def window(qapp, tmp_path, monkeypatch):
     monkeypatch.setattr("py2exe_gui.ui.main_window.SETTINGS_FILE", str(tmp_path / "s.json"))
     monkeypatch.setattr("py2exe_gui.ui.main_window.HISTORY_FILE", str(tmp_path / "h.json"))
     monkeypatch.setattr("py2exe_gui.ui.main_window.PRESETS_FILE", str(tmp_path / "p.json"))
+    monkeypatch.setattr("py2exe_gui.ui.main_window.KEYRING", MemoryKeyring())
     monkeypatch.setattr("py2exe_gui.ui.main_window.ENVS_ROOT", str(tmp_path / "envs"))
     monkeypatch.setattr("py2exe_gui.ui.main_window.SIGNING_KEY_FILE",
                         str(tmp_path / "config" / "signing" / "key.json"))

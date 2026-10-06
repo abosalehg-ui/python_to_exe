@@ -309,3 +309,16 @@ class SizeTab(BaseTab):
     def set_report_path(self, path: str):
         self.report_open_btn.setEnabled(bool(path) and os.path.isfile(path))
         self.report_open_btn.setToolTip(path or "")
+
+    # ── The project model ──────────────────────────────────────────────────
+
+    def read_project(self, project):
+        project.build.isolated_env = self.isolated_radio.isChecked()
+
+    def apply_project(self, project, sections=()):
+        if "build" not in sections:
+            return
+        if project.build.isolated_env:
+            self.isolated_radio.setChecked(True)
+        else:
+            self.current_radio.setChecked(True)
