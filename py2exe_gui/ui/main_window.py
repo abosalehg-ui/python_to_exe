@@ -88,10 +88,24 @@ from py2exe_gui.core.build_report import (
     write_report,
 )
 from py2exe_gui.core.diagnostics import build_name, build_root
-from py2exe_gui.core.fixes import ORIGIN_BUILD, ORIGIN_RUNTIME, Finding, fix_is_applied
+from py2exe_gui.core.fixes import (
+    ORIGIN_BUILD,
+    ORIGIN_RUNTIME,
+    Finding,
+    finding_resolved,
+    fix_is_applied,
+)
 from py2exe_gui.core.installer import validate as validate_installer
 from py2exe_gui.core.knowledge import default_is_installed
 from py2exe_gui.core.project_scan import project_imports
+from py2exe_gui.core.runtime_kit import (
+    TEXT_KEYS,
+    preview_options,
+    render_hook,
+    render_runtime_config,
+    untrusted_risks,
+    write_kit,
+)
 from py2exe_gui.core.sandbox import generate_wsb, sandbox_available, wsb_for_output
 from py2exe_gui.core.size_analyzer import (
     analyze_build,
@@ -102,6 +116,17 @@ from py2exe_gui.core.size_analyzer import (
     onefile_too_big,
     output_path_for,
     previous_size,
+)
+from py2exe_gui.core.update_signing import (
+    backup_existing,
+    fingerprint,
+    is_inside,
+    key_to_json,
+    new_signing_key,
+    publish_update,
+    read_key_file,
+    read_public_key,
+    write_key_file,
 )
 from py2exe_gui.core.venv_manager import (
     InstalledChecker,
@@ -120,7 +145,7 @@ from py2exe_gui.core.venv_manager import (
     quote_command,
     write_metadata,
 )
-from py2exe_gui.paths import envs_dir
+from py2exe_gui.paths import envs_dir, signing_key_path
 from py2exe_gui.strings import (
     LOCALE_LAYOUT,
     S,
@@ -140,7 +165,7 @@ from py2exe_gui.ui.conversion_thread import ConversionThread
 from py2exe_gui.ui.diagnostic_thread import DiagnosticThread
 from py2exe_gui.ui.dialogs import CommandPreviewDialog, PresetNameDialog, WelcomeDialog
 from py2exe_gui.ui.env_thread import EnvThread
-from py2exe_gui.ui.finding_text import finding_detail, finding_title, fix_label
+from py2exe_gui.ui.finding_text import finding_detail, finding_title, fix_label, service_label
 from py2exe_gui.ui.icon_studio_dialog import IconStudioDialog
 from py2exe_gui.ui.installer_thread import InstallerThread
 from py2exe_gui.ui.post_build_thread import PostBuildThread
@@ -153,6 +178,7 @@ from py2exe_gui.ui.tabs import (
     HistoryTab,
     InstallerTab,
     MainTab,
+    RuntimeTab,
     SizeTab,
     TemplatesTab,
     VersionInfoTab,
@@ -162,11 +188,15 @@ from py2exe_gui.ui.tray import BuildTray
 
 # Tabs shown in simple mode. Eight tabs at once is a lot to meet when all you
 # want is one .exe; the rest stay one button away.
-SIMPLE_MODE_TABS = ("main", "doctor", "size", "templates", "about")
+SIMPLE_MODE_TABS = ("main", "doctor", "size", "runtime", "templates", "about")
 
 # Where isolated build environments are created. A module global so tests can
 # point it at a temporary folder.
 ENVS_ROOT = envs_dir()
+
+# The Runtime Kit's private update-signing key (per-user config folder).
+# A module global for the same reason.
+SIGNING_KEY_FILE = signing_key_path()
 
 # Wait this long after the last edit before re-examining the project, so the
 # doctor does not re-parse the script on every keystroke in the path field.
@@ -268,6 +298,7 @@ class MainWindow(QMainWindow):
         self.main_tab = MainTab(self)
         self.doctor_tab = DoctorTab(self)
         self.size_tab = SizeTab(self)
+        self.runtime_tab = RuntimeTab(self)
         self.advanced_tab = AdvancedTab(self)
         self.version_info_tab = VersionInfoTab(self)
         self.deploy_tab = DeployTab(self)
@@ -282,6 +313,7 @@ class MainWindow(QMainWindow):
             ("main", self.main_tab, S.TAB_MAIN),
             ("doctor", self.doctor_tab, S.TAB_DOCTOR),
             ("size", self.size_tab, S.TAB_SIZE),
+            ("runtime", self.runtime_tab, S.TAB_RUNTIME),
             ("advanced", self.advanced_tab, S.TAB_ADVANCED),
             ("version_info", self.version_info_tab, S.TAB_VERSION_INFO),
             ("deploy", self.deploy_tab, S.TAB_DEPLOY),
@@ -304,6 +336,12 @@ class MainWindow(QMainWindow):
         main.icon_input.textChanged.connect(self._schedule_doctor)
         main.windowed_check.toggled.connect(self._schedule_doctor)
         main.noconsole_check.toggled.connect(self._schedule_doctor)
+        # The Runtime Kit preview names the app and its build kind.
+        main.source_input.textChanged.connect(self.refresh_runtime_preview)
+        main.output_name.textChanged.connect(self.refresh_runtime_preview)
+        main.onefile_check.toggled.connect(self.refresh_runtime_preview)
+        self.refresh_signing_key()
+        self.refresh_runtime_preview()
 
         # Per-user preferences that live in settings, not in shared configs:
         # the interpreter path in particular must never come from a JSON file
@@ -510,6 +548,7 @@ class MainWindow(QMainWindow):
             extra_args=advanced.extra_args.text(),
             splash_image=deploy.splash_input.text().strip(),
             isolated_env=self.size_tab.isolated_radio.isChecked(),
+            runtime_kit=self.runtime_tab.kit_config(),
         )
 
     def _apply_config(self, config: BuildConfig):
@@ -541,6 +580,7 @@ class MainWindow(QMainWindow):
             self.size_tab.isolated_radio.setChecked(True)
         else:
             self.size_tab.current_radio.setChecked(True)
+        self.runtime_tab.set_kit_config(config.runtime_kit)
 
     def save_current_settings(self):
         file_path, _ = QFileDialog.getSaveFileName(
@@ -589,15 +629,31 @@ class MainWindow(QMainWindow):
         before it silently becomes part of a signed binary.
         """
         flags = find_dangerous_args(config.extra_args)
-        if not flags:
+        if flags:
+            reply = QMessageBox.question(
+                self,
+                S.MSG_CONFIRM,
+                S.MSG_DANGEROUS_ARGS_CONFIRM.format(
+                    flags="\n".join(f"  • {f}" for f in flags),
+                    args=config.extra_args,
+                ),
+                QMessageBox.Yes | QMessageBox.No,
+                QMessageBox.No,
+            )
+            if reply != QMessageBox.Yes:
+                return False
+        # The Runtime Kit cannot inject code (it is flags and text), but an
+        # updater trusting someone else's key would install what they sign.
+        risks = untrusted_risks(config.runtime_kit, read_public_key(SIGNING_KEY_FILE))
+        if not risks:
             return True
+        lines = [
+            getattr(S, f"KIT_RISK_{risk.code.upper()}").format(**risk.params) for risk in risks
+        ]
         reply = QMessageBox.question(
             self,
             S.MSG_CONFIRM,
-            S.MSG_DANGEROUS_ARGS_CONFIRM.format(
-                flags="\n".join(f"  • {f}" for f in flags),
-                args=config.extra_args,
-            ),
+            S.MSG_KIT_RISKS_CONFIRM.format(risks="\n\n".join(lines)),
             QMessageBox.Yes | QMessageBox.No,
             QMessageBox.No,
         )
@@ -731,7 +787,8 @@ class MainWindow(QMainWindow):
         self.progress_bar.setFormat(S.PROGRESS_CONVERTING)
 
         self.batch_thread = BatchThread(
-            jobs, self._current_config(), python_for=self.build_python
+            jobs, self._current_config(), python_for=self.build_python,
+            options_for=self._runtime_kit_options,
         )
         self.batch_thread.log_signal.connect(self._append_log)
         self.batch_thread.progress_signal.connect(self.progress_bar.setValue)
@@ -873,6 +930,18 @@ class MainWindow(QMainWindow):
             self._cleanup_temp_files()
             QMessageBox.warning(self, S.MSG_WARNING, error)
             return
+        kit_options, kit_error = self._runtime_kit_options(config)
+        if kit_error:
+            self._cleanup_temp_files()
+            QMessageBox.warning(self, S.MSG_WARNING, kit_error)
+            return
+        if kit_options:
+            cmd, _error = build_pyinstaller_command(
+                config, python_executable=python, extra_options=kit_options
+            )
+            self._append_log(S.LOG_KIT_EMBEDDED_FMT.format(
+                services=", ".join(self._runtime_service_labels(config))
+            ))
 
         if config.isolated_env and not env_exists(self._env_dir(config.source)):
             self._cleanup_temp_files()
@@ -1020,7 +1089,8 @@ class MainWindow(QMainWindow):
         """Show the PyInstaller command that would be executed."""
         config = self._current_config()
         cmd, error = build_pyinstaller_command(
-            config, python_executable=self.build_python(config)
+            config, python_executable=self.build_python(config),
+            extra_options=preview_options(config),
         )
         if error:
             QMessageBox.warning(self, S.MSG_WARNING, error)
@@ -1205,6 +1275,7 @@ class MainWindow(QMainWindow):
         # from the buffer, so restoring HTML alone would lose the severities.
         log_lines = self.main_tab.log_lines()
         batch_sources = self.batch_tab.sources()
+        publish_fields = self.runtime_tab.publish_fields()
 
         set_locale(locale_code)
         self._apply_layout_direction()
@@ -1233,6 +1304,9 @@ class MainWindow(QMainWindow):
         self.refresh_env_view()
         self.size_tab.set_report_path(self._last_report_path)
         self.batch_tab.set_sources(batch_sources)
+        self.runtime_tab.set_publish_fields(publish_fields)
+        self.refresh_signing_key()
+        self.refresh_runtime_preview()
         self.mode_btn.setText(self._mode_button_label())
         self._refresh_history_list()
         self._refresh_presets_list()
@@ -1404,7 +1478,11 @@ class MainWindow(QMainWindow):
         # advice, drop the no-op fix so it isn't offered again.
         config = self._current_config()
         findings = [
-            replace(f, fixes=tuple(x for x in f.fixes if not fix_is_applied(config, x)))
+            replace(
+                f,
+                fixes=tuple(x for x in f.fixes if not fix_is_applied(config, x)),
+                alternatives=tuple(x for x in f.alternatives if not fix_is_applied(config, x)),
+            )
             for f in findings
         ]
         self._build_findings = sort_findings(dedupe_findings(findings))
@@ -1428,10 +1506,10 @@ class MainWindow(QMainWindow):
         for fix in applied:
             self._append_log(S.LOG_DOCTOR_FIX_APPLIED.format(fix=fix_label(fix)))
 
-        # Build/runtime findings whose fixes are now all in place are resolved.
+        # Build/runtime findings whose fixes (or alternative) are now all in
+        # place are resolved.
         self._build_findings = [
-            f for f in self._build_findings
-            if not f.fixes or not all(fix_is_applied(new_config, x) for x in f.fixes)
+            f for f in self._build_findings if not finding_resolved(new_config, f)
         ]
         self.run_doctor()
         self._refresh_size_view()
@@ -1487,7 +1565,13 @@ class MainWindow(QMainWindow):
             return
         diag = diagnostic_config(config)
         python = self.build_python(config)
-        cmd, error = build_pyinstaller_command(diag, python_executable=python)
+        # The same services as the real app (its code may import them), minus
+        # anything that would stop on a dialog or reach the network.
+        kit_options, error = self._runtime_kit_options(diag, diagnostic=True)
+        if not error:
+            cmd, error = build_pyinstaller_command(
+                diag, python_executable=python, extra_options=kit_options
+            )
         if error:
             QMessageBox.warning(self, S.MSG_WARNING, error)
             return
@@ -1742,7 +1826,7 @@ class MainWindow(QMainWindow):
             "contents", "duration", "previous", "app", "date", "source", "output",
             "mode", "onefile", "onedir", "environment", "python", "pyinstaller",
             "platform", "breakdown", "package", "size", "share", "largest_files",
-            "findings", "options", "none",
+            "findings", "options", "none", "runtime_kit",
         )
         return {key: getattr(S, f"REPORT_{key.upper()}") for key in keys}
 
@@ -1780,6 +1864,7 @@ class MainWindow(QMainWindow):
             groups=groups,
             largest_files=report.largest_files,
             findings=findings,
+            runtime_services=self._runtime_service_labels(config),
         )
         document = render_html(
             data,
@@ -1800,6 +1885,189 @@ class MainWindow(QMainWindow):
     def open_last_report(self):
         if self._last_report_path and os.path.isfile(self._last_report_path):
             QDesktopServices.openUrl(QUrl.fromLocalFile(self._last_report_path))
+
+    # ─── Runtime Kit ────────────────────────────────────────────────────
+
+    def _runtime_texts(self) -> dict:
+        """What the built app says (crash dialog, second copy, update prompt),
+        in the language the developer is using now."""
+        names = {
+            "crash_title": "KIT_RT_CRASH_TITLE",
+            "crash_message": "KIT_RT_CRASH_MESSAGE",
+            "support_prompt": "KIT_RT_SUPPORT_PROMPT",
+            "instance_message": "KIT_RT_INSTANCE_MESSAGE",
+            "update_title": "KIT_RT_UPDATE_TITLE",
+            "update_message": "KIT_RT_UPDATE_MESSAGE",
+        }
+        return {key: getattr(S, names[key]) for key in TEXT_KEYS}
+
+    def _rtl(self) -> bool:
+        return LOCALE_LAYOUT.get(current_locale(), "ltr") == "rtl"
+
+    def _runtime_service_labels(self, config: BuildConfig):
+        return [service_label(name) for name in config.runtime_kit.enabled_services()]
+
+    def _runtime_kit_options(self, config: BuildConfig, diagnostic: bool = False):
+        """Write the kit for ``config``; returns (PyInstaller options, error text)."""
+        try:
+            options, errors = write_kit(
+                config, self._runtime_texts(), rtl=self._rtl(), diagnostic=diagnostic
+            )
+        except OSError as e:
+            return [], S.MSG_KIT_INVALID_FMT.format(problems=str(e))
+        if errors:
+            problems = "\n".join(f"• {finding_title(f)}" for f in errors)
+            return [], S.MSG_KIT_INVALID_FMT.format(problems=problems)
+        return options, None
+
+    def on_runtime_kit_changed(self):
+        self.refresh_runtime_preview()
+        self._schedule_doctor()
+
+    def refresh_runtime_preview(self, *_args):
+        if not hasattr(self, "runtime_tab"):
+            return
+        config = self._current_config()
+        if not config.runtime_kit.enabled:
+            self.runtime_tab.show_preview("", "")
+            return
+        text = render_runtime_config(
+            config.runtime_kit, build_name(config) if config.source or config.output_name
+            else "app", config.onefile, self._runtime_texts(), self._rtl(),
+        )
+        self.runtime_tab.show_preview(render_hook(), text)
+
+    def refresh_signing_key(self):
+        self.runtime_tab.show_key(read_public_key(SIGNING_KEY_FILE), SIGNING_KEY_FILE)
+
+    def use_my_public_key(self):
+        public = read_public_key(SIGNING_KEY_FILE)
+        if public:
+            self.runtime_tab.public_key.setText(public)
+
+    def generate_signing_key(self):
+        """Create the developer's key pair. Replacing one needs a hard yes."""
+        existing = read_public_key(SIGNING_KEY_FILE)
+        if existing or os.path.exists(SIGNING_KEY_FILE):
+            reply = QMessageBox.question(
+                self, S.MSG_CONFIRM,
+                S.MSG_KIT_KEY_REPLACE_CONFIRM.format(fingerprint=fingerprint(existing) or "?"),
+                QMessageBox.Yes | QMessageBox.No, QMessageBox.No,
+            )
+            if reply != QMessageBox.Yes:
+                return
+        key = new_signing_key()
+        try:
+            backup = backup_existing(SIGNING_KEY_FILE)
+            write_key_file(SIGNING_KEY_FILE, key)
+        except OSError as e:
+            QMessageBox.critical(self, S.MSG_ERROR, S.ERR_KIT_KEY_WRITE.format(error=str(e)))
+            return
+        if backup:
+            self._append_log(S.LOG_KIT_KEY_REPLACED.format(path=backup))
+        # Only the public half is ever shown or logged.
+        self._append_log(S.LOG_KIT_KEY_GENERATED.format(fingerprint=fingerprint(key.public_hex)))
+        self.refresh_signing_key()
+        if self.runtime_tab.service_checks["updater"].isChecked():
+            self.runtime_tab.public_key.setText(key.public_hex)
+
+    def _forbidden_key_folders(self):
+        config = self._current_config()
+        folders = []
+        if config.source:
+            folders.append(os.path.dirname(os.path.abspath(config.source)))
+        if config.output_dir:
+            folders.append(config.output_dir)
+        return folders
+
+    def export_signing_key(self):
+        """Back up the private key — after a warning, and never into the project."""
+        try:
+            key = read_key_file(SIGNING_KEY_FILE)
+        except (OSError, ValueError) as e:
+            QMessageBox.warning(self, S.MSG_WARNING, S.ERR_KIT_KEY_READ.format(error=str(e)))
+            return
+        reply = QMessageBox.warning(
+            self, S.MSG_CONFIRM, S.MSG_KIT_KEY_EXPORT_WARNING,
+            QMessageBox.Yes | QMessageBox.No, QMessageBox.No,
+        )
+        if reply != QMessageBox.Yes:
+            return
+        path, _ = QFileDialog.getSaveFileName(
+            self, S.DIALOG_KIT_KEY_EXPORT, "update_signing_key.json", S.DIALOG_FILTER_KEY
+        )
+        if not path:
+            return
+        if any(is_inside(path, folder) for folder in self._forbidden_key_folders()):
+            QMessageBox.warning(self, S.MSG_WARNING, S.ERR_KIT_KEY_EXPORT_IN_PROJECT)
+            return
+        try:
+            fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+            with os.fdopen(fd, "w", encoding="utf-8") as f:
+                f.write(key_to_json(key))
+        except OSError as e:
+            QMessageBox.critical(self, S.MSG_ERROR, S.ERR_KIT_KEY_WRITE.format(error=str(e)))
+            return
+        self._append_log(S.LOG_KIT_KEY_EXPORTED.format(path=path))
+
+    def import_signing_key(self):
+        path, _ = QFileDialog.getOpenFileName(
+            self, S.DIALOG_KIT_KEY_IMPORT, "", S.DIALOG_FILTER_KEY
+        )
+        if not path:
+            return
+        try:
+            key = read_key_file(path)
+        except (OSError, ValueError) as e:
+            QMessageBox.warning(self, S.MSG_WARNING, S.ERR_KIT_KEY_READ.format(error=str(e)))
+            return
+        existing = read_public_key(SIGNING_KEY_FILE)
+        if existing == key.public_hex:
+            self._append_log(S.LOG_KIT_KEY_IMPORTED.format(fingerprint=fingerprint(existing)))
+            return
+        if existing or os.path.exists(SIGNING_KEY_FILE):
+            reply = QMessageBox.question(
+                self, S.MSG_CONFIRM,
+                S.MSG_KIT_KEY_REPLACE_CONFIRM.format(fingerprint=fingerprint(existing) or "?"),
+                QMessageBox.Yes | QMessageBox.No, QMessageBox.No,
+            )
+            if reply != QMessageBox.Yes:
+                return
+        try:
+            backup = backup_existing(SIGNING_KEY_FILE)
+            write_key_file(SIGNING_KEY_FILE, key)
+        except OSError as e:
+            QMessageBox.critical(self, S.MSG_ERROR, S.ERR_KIT_KEY_WRITE.format(error=str(e)))
+            return
+        if backup:
+            self._append_log(S.LOG_KIT_KEY_REPLACED.format(path=backup))
+        self._append_log(S.LOG_KIT_KEY_IMPORTED.format(fingerprint=fingerprint(key.public_hex)))
+        self.refresh_signing_key()
+
+    def publish_update(self):
+        """Write and sign update.json for a new build. Uploads nothing."""
+        try:
+            key = read_key_file(SIGNING_KEY_FILE)
+        except (OSError, ValueError):
+            QMessageBox.warning(self, S.MSG_WARNING, S.ERR_KIT_NO_KEY)
+            return
+        fields = self.runtime_tab.publish_fields()
+        config = self._current_config()
+        app_name = build_name(config) if config.source or config.output_name else ""
+        try:
+            result = publish_update(
+                fields["file"], fields["version"], fields["url"], key,
+                notes=fields["notes"], min_version=fields["min_version"], app_name=app_name,
+            )
+        except (OSError, ValueError) as e:
+            QMessageBox.warning(self, S.MSG_WARNING, S.ERR_KIT_PUBLISH_FMT.format(error=str(e)))
+            return
+        self._append_log(S.LOG_KIT_PUBLISHED.format(
+            manifest=result.manifest_path, signature=result.signature_path
+        ))
+        QMessageBox.information(self, S.MSG_SUCCESS, S.MSG_KIT_PUBLISHED_FMT.format(
+            manifest=result.manifest_path, signature=result.signature_path
+        ))
 
     # ─── Windows Sandbox ────────────────────────────────────────────────
 

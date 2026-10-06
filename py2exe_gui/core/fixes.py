@@ -15,7 +15,7 @@ from dataclasses import dataclass, field, replace
 from typing import Dict, Iterable, List, Sequence, Tuple
 
 from py2exe_gui.core.builder import split_extra_args
-from py2exe_gui.core.config import BuildConfig
+from py2exe_gui.core.config import RUNTIME_SERVICES, BuildConfig
 
 SEVERITY_ERROR = "error"
 SEVERITY_WARNING = "warning"
@@ -37,7 +37,12 @@ FIX_ADD_DATA = "add_data"
 FIX_FLAG = "flag"
 FIX_CONSOLE = "console"
 FIX_SET_SOURCE = "set_source"
-FIX_KINDS = (FIX_HIDDEN_IMPORT, FIX_ADD_DATA, FIX_FLAG, FIX_CONSOLE, FIX_SET_SOURCE)
+# 1.5: turn on a Runtime Kit service (value: its name in RUNTIME_SERVICES),
+# e.g. log redirection instead of bringing the console back.
+FIX_RUNTIME = "runtime"
+FIX_KINDS = (
+    FIX_HIDDEN_IMPORT, FIX_ADD_DATA, FIX_FLAG, FIX_CONSOLE, FIX_SET_SOURCE, FIX_RUNTIME,
+)
 
 # Every finding code the doctor and the diagnostics can emit. The UI looks up
 # ``FINDING_<CODE>_TITLE`` / ``_DETAIL`` for each; a test keeps them in step.
@@ -56,6 +61,10 @@ FINDING_CODES = (
     "file_locked", "runtime_unhandled", "warn_missing_module",
     # 1.4: size lab and build environment
     "size_exclude_candidate", "env_not_created",
+    # 1.5: Runtime Kit
+    "kit_imported_not_enabled", "kit_update_url_missing", "kit_update_url_insecure",
+    "kit_update_key_missing", "kit_update_key_invalid", "kit_update_version_invalid",
+    "kit_support_url_invalid", "kit_update_needs_installer", "kit_source_missing",
 )
 
 # Penalty per finding when computing the readiness score.
@@ -72,6 +81,7 @@ class Fix:
       flag          → "--flag argument" (a single PyInstaller option)
       console       → unused (turns the console back on)
       set_source    → absolute path of the script to build instead
+      runtime       → the Runtime Kit service to turn on ("log_redirect", ...)
     """
 
     kind: str
@@ -80,6 +90,8 @@ class Fix:
     def __post_init__(self):
         if self.kind not in FIX_KINDS:
             raise ValueError(f"unknown fix kind: {self.kind}")
+        if self.kind == FIX_RUNTIME and self.value not in RUNTIME_SERVICES:
+            raise ValueError(f"unknown Runtime Kit service: {self.value}")
 
 
 @dataclass(frozen=True)
@@ -93,6 +105,9 @@ class Finding:
     origin: str = ORIGIN_DOCTOR
     # Key into SNIPPETS when the remedy is a code change the user makes.
     snippet: str = ""
+    # Another way to resolve it, offered instead of ``fixes`` (never applied
+    # together with them): log redirection instead of the console, say.
+    alternatives: Tuple[Fix, ...] = ()
 
     @property
     def auto_fixable(self) -> bool:
@@ -105,6 +120,10 @@ class Finding:
 
 def flag_fix(flag: str, argument: str) -> Fix:
     return Fix(FIX_FLAG, f"{flag} {argument}")
+
+
+def runtime_fix(service: str) -> Fix:
+    return Fix(FIX_RUNTIME, service)
 
 
 def readiness_score(findings: Iterable[Finding]) -> int:
@@ -155,6 +174,16 @@ def fix_is_applied(config: BuildConfig, fix: Fix) -> bool:
         return not config.windowed and not config.noconsole
     if fix.kind == FIX_SET_SOURCE:
         return _same_path(fix.value, config.source)
+    if fix.kind == FIX_RUNTIME:
+        return bool(getattr(config.runtime_kit, fix.value, False))
+    return False
+
+
+def finding_resolved(config: BuildConfig, finding: Finding) -> bool:
+    """True once every fix of the finding — or of its alternative — is in place."""
+    for group in (finding.fixes, finding.alternatives):
+        if group and all(fix_is_applied(config, fix) for fix in group):
+            return True
     return False
 
 
@@ -171,6 +200,7 @@ def apply_fixes(
     extra_args = config.extra_args or ""
     windowed, noconsole = config.windowed, config.noconsole
     source = config.source
+    kit = replace(config.runtime_kit)
     applied: List[Fix] = []
 
     for fix in fixes:
@@ -182,6 +212,7 @@ def apply_fixes(
             windowed=windowed,
             noconsole=noconsole,
             source=source,
+            runtime_kit=kit,
         )
         if fix_is_applied(current, fix):
             continue
@@ -195,6 +226,8 @@ def apply_fixes(
             windowed = noconsole = False
         elif fix.kind == FIX_SET_SOURCE:
             source = fix.value
+        elif fix.kind == FIX_RUNTIME:
+            kit = replace(kit, **{fix.value: True})
         applied.append(fix)
 
     new_config = replace(
@@ -205,6 +238,7 @@ def apply_fixes(
         windowed=windowed,
         noconsole=noconsole,
         source=source,
+        runtime_kit=kit,
     )
     return new_config, applied
 
@@ -230,6 +264,13 @@ SNIPPETS = {
         "\n"
         "\n"
         '# Use: open(resource_path("data/config.json"))\n'
+    ),
+    # With the Runtime Kit's resource_path on, nothing to define: import it.
+    "runtime_resource_path": (
+        "from p2e_runtime import resource_path\n"
+        "\n"
+        'with open(resource_path("data/config.json"), encoding="utf-8") as f:\n'
+        "    ...\n"
     ),
     "freeze_support": (
         "import multiprocessing\n"

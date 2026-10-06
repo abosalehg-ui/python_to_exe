@@ -33,6 +33,7 @@ from py2exe_gui.core.fixes import (
     Fix,
     dedupe_findings,
     flag_fix,
+    runtime_fix,
     sort_findings,
 )
 from py2exe_gui.core.knowledge import (
@@ -180,7 +181,8 @@ def _runtime_findings(
     for attr in _RE_STREAM_NONE.findall(text):
         findings.append(
             Finding("streams_none", SEVERITY_ERROR, {"attr": attr}, (Fix(FIX_CONSOLE),),
-                    origin=origin, snippet="silence_streams")
+                    origin=origin, snippet="silence_streams",
+                    alternatives=(runtime_fix("log_redirect"),))
         )
 
     for module in _RE_DLL.findall(text):

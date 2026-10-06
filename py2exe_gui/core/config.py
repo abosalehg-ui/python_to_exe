@@ -1,7 +1,63 @@
 """Build configuration dataclass — decouples UI state from command construction."""
 
-from dataclasses import dataclass, field
-from typing import List
+from dataclasses import dataclass, field, fields
+from typing import Any, List
+
+# Runtime Kit services, in the order the UI lists them.
+RUNTIME_SERVICES = (
+    "resource_path", "log_redirect", "crash_reporter", "single_instance", "updater",
+)
+
+
+@dataclass
+class RuntimeKitConfig:
+    """Which ``p2e_runtime`` services to embed in the EXE, and their settings.
+
+    Plain data only — booleans and strings — for the same reason
+    ``isolated_env`` is a flag: a settings file shared by someone else must
+    not be able to name a hook, a script or an executable. The converter
+    writes the runtime hook itself at build time.
+    """
+
+    resource_path: bool = False
+    log_redirect: bool = False
+    crash_reporter: bool = False
+    single_instance: bool = False
+    updater: bool = False
+
+    app_version: str = ""
+    support_url: str = ""
+    instance_message: str = ""
+    update_url: str = ""
+    update_public_key: str = ""
+    update_check_on_start: bool = False
+    #: Arguments for a folder build's installer, e.g. "/SILENT".
+    installer_args: str = ""
+
+    def enabled_services(self) -> List[str]:
+        return [name for name in RUNTIME_SERVICES if getattr(self, name)]
+
+    @property
+    def enabled(self) -> bool:
+        return bool(self.enabled_services())
+
+    def to_dict(self) -> dict:
+        return {f.name: getattr(self, f.name) for f in fields(self)}
+
+    @classmethod
+    def from_dict(cls, data: Any) -> "RuntimeKitConfig":
+        """Lenient on missing keys, strict on types: a wrong type is dropped."""
+        if not isinstance(data, dict):
+            return cls()
+        values = {}
+        for f in fields(cls):
+            value = data.get(f.name)
+            default = getattr(cls(), f.name)
+            if isinstance(default, bool):
+                values[f.name] = value if isinstance(value, bool) else default
+            elif isinstance(value, str):
+                values[f.name] = value
+        return cls(**values)
 
 
 @dataclass
@@ -40,6 +96,9 @@ class BuildConfig:
     # file must not be able to name an executable for the build to run.
     isolated_env: bool = False
 
+    # 1.5: Runtime Kit services embedded in the EXE (see RuntimeKitConfig).
+    runtime_kit: RuntimeKitConfig = field(default_factory=RuntimeKitConfig)
+
     def to_dict(self) -> dict:
         return {
             "source": self.source,
@@ -63,6 +122,7 @@ class BuildConfig:
             "splash_image": self.splash_image,
             "manifest_file": self.manifest_file,
             "isolated_env": self.isolated_env,
+            "runtime_kit": self.runtime_kit.to_dict(),
         }
 
     @classmethod
@@ -89,4 +149,5 @@ class BuildConfig:
             splash_image=data.get("splash_image", ""),
             manifest_file=data.get("manifest_file", ""),
             isolated_env=bool(data.get("isolated_env", False)),
+            runtime_kit=RuntimeKitConfig.from_dict(data.get("runtime_kit")),
         )

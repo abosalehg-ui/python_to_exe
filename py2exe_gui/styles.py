@@ -331,6 +331,21 @@ QTextEdit {{
     font-size: {pt_log};
     color: {log_text};
 }}
+/* 1.5: release notes (input) and the Runtime Kit's code preview. */
+QPlainTextEdit {{
+    background-color: {input_bg};
+    border: 2px solid {input_border};
+    border-radius: 6px;
+    padding: 6px;
+    color: {text};
+}}
+QPlainTextEdit#codeView {{
+    background-color: {log_bg};
+    border: 2px solid {border};
+    font-family: 'Consolas', 'Courier New', monospace;
+    font-size: {pt_log};
+    color: {log_text};
+}}
 QListWidget, QTreeWidget {{
     background-color: {input_bg};
     border: 2px solid {input_border};

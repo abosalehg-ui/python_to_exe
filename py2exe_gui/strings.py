@@ -238,6 +238,7 @@ class Ar:
         "تشخيص أعطال البناء والتشغيل",
         "استوديو أيقونات .ico بكل الأحجام",
         "بيئة بناء معزولة + مختبر الحجم + تقرير البناء",
+        "مكتبة تشغيل مدمجة: محدِّث موقَّع، مُبلِّغ انهيار، نسخة واحدة",
     ]
 
     # Language selector (Phase 3)
@@ -963,6 +964,186 @@ class Ar:
         "حتى ذلك الحين لا يمكن التحقق من المكتبات المثبتة فيها."
     )
 
+    # ── 1.5: Runtime Kit ──
+    TAB_RUNTIME = "🧰 مكتبة التشغيل"
+    KIT_HINT = (
+        "خدمات تُضمَّن داخل البرنامج الناتج نفسه، وكل خدمة تُفعَّل وحدها. لا شيء مفعّل "
+        "افتراضياً، ولا قياس استخدام من أي نوع، ولا اتصال بالشبكة إلا إن ضبطت رابط تحديث "
+        "بنفسك. لا يُعدَّل كودك: ما يحتاج سطراً منك يظهر ككود جاهز للنسخ."
+    )
+    GROUP_KIT_SERVICES = "🧩 الخدمات"
+    KIT_NAME_RESOURCE_PATH = "📁 مسارات الملفات المضمّنة"
+    KIT_NAME_LOG_REDIRECT = "📝 ملف سجل للتطبيق بلا نافذة أوامر"
+    KIT_NAME_CRASH_REPORTER = "🧯 مُبلِّغ الانهيار"
+    KIT_NAME_SINGLE_INSTANCE = "🔒 نسخة واحدة فقط"
+    KIT_NAME_UPDATER = "🔄 محدِّث ذاتي موقَّع"
+    KIT_DESC_RESOURCE_PATH = (
+        "الدالة resource_path() تجد الملفات المضمّنة في التطوير وبعد التحويل: "
+        "from p2e_runtime import resource_path"
+    )
+    KIT_DESC_LOG_REDIRECT = (
+        "في التطبيق بلا Console يذهب print() وsys.stdout.write والأخطاء إلى ملف سجل دوّار "
+        "في مجلد بيانات المستخدم بدل أن تضيع أو تُسقط البرنامج."
+    )
+    KIT_DESC_CRASH_REPORTER = (
+        "بدل الإغلاق الصامت: يُحفظ تقرير (الخطأ، الإصدار، النظام) وتظهر رسالة تقول أين حُفظ. "
+        "لا يُرسل شيء تلقائياً."
+    )
+    KIT_DESC_SINGLE_INSTANCE = "إن فتح المستخدم البرنامج مرة ثانية تظهر رسالة وتُغلق النسخة الثانية."
+    KIT_DESC_UPDATER = (
+        "يفحص ملف update.json على رابطك، ويرفض أي تحديث غير موقَّع بمفتاحك أو غير HTTPS، "
+        "ويتحقق من SHA-256 قبل الاستبدال."
+    )
+    KIT_SUPPORT_URL_LABEL = "رابط الدعم (اختياري):"
+    KIT_SUPPORT_URL_PLACEHOLDER = "https://… — يُفتح فقط إن ضغط المستخدم «نعم»"
+    KIT_INSTANCE_MESSAGE_LABEL = "رسالة النسخة الثانية:"
+    KIT_INSTANCE_MESSAGE_PLACEHOLDER = "اتركها فارغة لرسالة «{app} يعمل بالفعل»"
+
+    GROUP_KIT_UPDATER = "🔄 المحدِّث الموقَّع"
+    KIT_UPDATE_URL_LABEL = "رابط update.json:"
+    KIT_UPDATE_URL_PLACEHOLDER = "https://example.com/myapp/update.json"
+    KIT_APP_VERSION_LABEL = "إصدار هذا البناء:"
+    KIT_APP_VERSION_PLACEHOLDER = "مثال: 1.2.0 (يُقارَن بإصدار التحديث)"
+    KIT_CHECK_ON_START = "افحص عند بدء البرنامج واسأل المستخدم (معطّل افتراضياً)"
+    KIT_CHECK_ON_START_TIP = (
+        "على Windows تظهر نافذة نعم/لا أصلية. على الأنظمة الأخرى لا يُسأل المستخدم ولا يُثبَّت شيء؛ "
+        "استدعِ p2e_runtime.updates.check() من واجهة برنامجك."
+    )
+    KIT_INSTALLER_ARGS_LABEL = "وسائط المثبّت (بناء المجلد):"
+    KIT_INSTALLER_ARGS_PLACEHOLDER = "مثال: /SILENT"
+    KIT_ONEDIR_NOTE = (
+        "ℹ️ بناء المجلد لا يُستبدل في مكانه في هذا الإصدار: اجعل update.json يشير إلى "
+        "مثبّت (Setup.exe) يُحمَّل ويُتحقق منه ثم يُشغَّل بالوسائط أعلاه."
+    )
+    KIT_API_HINT = (
+        "من برنامجك: info = p2e_runtime.updates.check() ثم p2e_runtime.updates.apply(info) "
+        "— متزامنة ولا تعرض أي واجهة، فاسأل المستخدم بطريقتك."
+    )
+    KIT_PUBLIC_KEY_LABEL = "المفتاح العام المضمَّن:"
+    KIT_PUBLIC_KEY_PLACEHOLDER = "64 خانة ست عشرية — يُملأ من مفتاحك"
+    BTN_KIT_USE_MY_KEY = "🔑 استخدم مفتاحي"
+    KIT_KEY_STATUS_NONE = "لا يوجد مفتاح توقيع بعد. أنشئ زوج مفاتيح لتتمكن من نشر التحديثات."
+    KIT_KEY_STATUS_FMT = "مفتاحك: {fingerprint}… — المفتاح الخاص محفوظ في:\n{path}"
+    BTN_KIT_KEY_GENERATE = "🔐 إنشاء زوج مفاتيح"
+    BTN_KIT_KEY_EXPORT = "💾 نسخة احتياطية"
+    BTN_KIT_KEY_IMPORT = "📥 استيراد مفتاح"
+    MSG_KIT_KEY_REPLACE_CONFIRM = (
+        "⚠️ يوجد مفتاح توقيع بالفعل ({fingerprint}…).\n\n"
+        "البرامج التي وزّعتها بالمفتاح الحالي لن تقبل أي تحديث موقَّع بمفتاح جديد — "
+        "لن تتمكن من تحديثها مرة أخرى.\n\n"
+        "سيُحفظ المفتاح الحالي باسم جديد ولن يُحذف. الاستبدال على أي حال؟"
+    )
+    LOG_KIT_KEY_GENERATED = "🔐 أُنشئ مفتاح توقيع جديد: {fingerprint}…"
+    LOG_KIT_KEY_REPLACED = "🔐 حُفظ المفتاح السابق باسم: {path}"
+    MSG_KIT_KEY_EXPORT_WARNING = (
+        "⚠️ هذا الملف هو مفتاحك الخاص. من يملكه يستطيع نشر تحديثات تثبّتها برامجك.\n\n"
+        "• احفظه في مكان آمن خارج مجلد المشروع (مثل مدير كلمات المرور أو قرص مشفّر).\n"
+        "• لا ترفعه إلى git ولا ترسله لأحد.\n"
+        "• إن فقدته فلن تتمكن من تحديث البرامج التي وزّعتها.\n\n"
+        "المتابعة؟"
+    )
+    DIALOG_KIT_KEY_EXPORT = "حفظ نسخة احتياطية من المفتاح الخاص"
+    DIALOG_KIT_KEY_IMPORT = "استيراد مفتاح توقيع"
+    DIALOG_FILTER_KEY = "Signing key (*.json);;All Files (*.*)"
+    ERR_KIT_KEY_EXPORT_IN_PROJECT = (
+        "لا يُحفظ المفتاح الخاص داخل مجلد المشروع أو مجلد الإخراج: قد يُرفع مع الكود أو "
+        "يُوزَّع مع البرنامج. اختر مكاناً آخر."
+    )
+    LOG_KIT_KEY_EXPORTED = "💾 حُفظت نسخة احتياطية من المفتاح في: {path}"
+    LOG_KIT_KEY_IMPORTED = "📥 استُورد مفتاح التوقيع: {fingerprint}…"
+    ERR_KIT_KEY_READ = "تعذّرت قراءة المفتاح: {error}"
+    ERR_KIT_KEY_WRITE = "تعذّر حفظ المفتاح: {error}"
+    ERR_KIT_NO_KEY = "لا يوجد مفتاح توقيع. أنشئ زوج مفاتيح أو استورده أولاً."
+
+    GROUP_KIT_PUBLISH = "📦 نشر تحديث"
+    KIT_PUBLISH_HINT = (
+        "يُنشئ update.json وupdate.json.sig بجوار الملف. لا يُرفع شيء: ضع الملفين مع "
+        "البناء الجديد على خادمك (النشر على GitHub Releases في الإصدار 1.6)."
+    )
+    KIT_PUBLISH_FILE_LABEL = "الملف الجديد:"
+    KIT_PUBLISH_FILE_PLACEHOLDER = "الـ EXE الجديد (أو Setup.exe لبناء المجلد)"
+    DIALOG_CHOOSE_UPDATE_FILE = "اختر ملف التحديث"
+    DIALOG_FILTER_UPDATE_FILE = "Programs (*.exe *.msi);;All Files (*.*)"
+    KIT_PUBLISH_VERSION_LABEL = "إصداره:"
+    KIT_PUBLISH_URL_LABEL = "رابط تنزيله:"
+    KIT_PUBLISH_URL_PLACEHOLDER = "https://example.com/myapp/MyApp-1.3.0.exe"
+    KIT_PUBLISH_MIN_VERSION_LABEL = "أقدم إصدار يُحدَّث مباشرة:"
+    KIT_PUBLISH_MIN_VERSION_PLACEHOLDER = "اختياري"
+    KIT_PUBLISH_NOTES_LABEL = "ملاحظات الإصدار:"
+    BTN_KIT_PUBLISH = "✍️ إنشاء update.json موقَّع"
+    LOG_KIT_PUBLISHED = "✍️ ملفات التحديث: {manifest} و {signature}"
+    MSG_KIT_PUBLISHED_FMT = (
+        "أُنشئ ووُقِّع:\n{manifest}\n{signature}\n\nارفعهما مع الملف الجديد بحيث يكون "
+        "update.json على الرابط المضمَّن في برنامجك."
+    )
+    ERR_KIT_PUBLISH_FMT = "تعذّر إنشاء ملفات التحديث: {error}"
+
+    GROUP_KIT_PREVIEW = "👁️ ما سيُضمَّن في الـ EXE"
+    KIT_PREVIEW_HOOK = "Runtime hook"
+    KIT_PREVIEW_CONFIG = "p2e_runtime.json"
+    KIT_PREVIEW_NONE = "لا خدمة مفعّلة — لن يُضمَّن شيء في الـ EXE."
+
+    MSG_KIT_INVALID_FMT = "إعدادات مكتبة التشغيل تمنع البناء:\n\n{problems}"
+    LOG_KIT_EMBEDDED_FMT = "🧰 مكتبة التشغيل: {services}"
+    MSG_KIT_RISKS_CONFIRM = (
+        "⚠️ ملف الإعدادات هذا يغيّر ما يثق به برنامجك الناتج:\n\n{risks}\n\n"
+        "لا تقبل إلا إذا كنت تثق بمصدر هذا الملف. المتابعة؟"
+    )
+    KIT_RISK_FOREIGN_UPDATE_KEY = (
+        "• المحدِّث سيقبل تحديثات موقَّعة بمفتاح ليس مفتاحك ({key}…) من {url} — "
+        "أي من يملك ذلك المفتاح يستطيع تثبيت برامج على أجهزة مستخدميك."
+    )
+    KIT_RISK_SUPPORT_URL = "• رسالة الانهيار ستعرض فتح الرابط: {url}"
+
+    # Text shown by the built app itself (in the language chosen here).
+    KIT_RT_CRASH_TITLE = "{app} — خطأ غير متوقع"
+    KIT_RT_CRASH_MESSAGE = "توقف {app} بسبب خطأ غير متوقع.\n\nحُفظ تقرير بالتفاصيل في:\n{path}"
+    KIT_RT_SUPPORT_PROMPT = "فتح صفحة الدعم للإبلاغ عن المشكلة؟"
+    KIT_RT_INSTANCE_MESSAGE = "{app} يعمل بالفعل."
+    KIT_RT_UPDATE_TITLE = "{app} — تحديث متاح"
+    KIT_RT_UPDATE_MESSAGE = "الإصدار {version} متاح (لديك {current}).\n\n{notes}\n\nتثبيته الآن؟"
+
+    FIX_LABEL_RUNTIME = "التفعيل في مكتبة التشغيل: {value}"
+    DOCTOR_ALT_HEADER = "أو بدلاً من ذلك:"
+    BTN_DOCTOR_ALT_FMT = "🔀 بدلاً من ذلك: {fix}"
+    REPORT_RUNTIME_KIT = "مكتبة التشغيل المدمجة"
+
+    FINDING_KIT_IMPORTED_NOT_ENABLED_TITLE = "الكود يستورد p2e_runtime ومكتبة التشغيل معطّلة"
+    FINDING_KIT_IMPORTED_NOT_ENABLED_DETAIL = (
+        "لن تُضمَّن الحزمة في الـ EXE فيُغلق بخطأ ModuleNotFoundError. الإصلاح يفعّل "
+        "resource_path في تبويب «مكتبة التشغيل»."
+    )
+    FINDING_KIT_UPDATE_URL_MISSING_TITLE = "المحدِّث مفعّل بلا رابط update.json"
+    FINDING_KIT_UPDATE_URL_MISSING_DETAIL = "أدخل رابط ملف update.json في تبويب «مكتبة التشغيل» أو عطّل المحدِّث."
+    FINDING_KIT_UPDATE_URL_INSECURE_TITLE = "رابط التحديث ليس HTTPS"
+    FINDING_KIT_UPDATE_URL_INSECURE_DETAIL = (
+        "«{url}» — المحدِّث يرفض أي رابط غير HTTPS، لأن الاتصال غير المشفّر يسمح لأي وسيط "
+        "بالعبث بما يُحمَّل."
+    )
+    FINDING_KIT_UPDATE_KEY_MISSING_TITLE = "المحدِّث مفعّل بلا مفتاح عام"
+    FINDING_KIT_UPDATE_KEY_MISSING_DETAIL = (
+        "بدون مفتاح لا يمكن التحقق من أي تحديث، والتحديث غير الموقَّع ثغرة وليس ميزة. "
+        "أنشئ زوج مفاتيح ثم «استخدم مفتاحي»."
+    )
+    FINDING_KIT_UPDATE_KEY_INVALID_TITLE = "المفتاح العام غير صالح"
+    FINDING_KIT_UPDATE_KEY_INVALID_DETAIL = "المفتاح العام لـ Ed25519 هو 64 خانة ست عشرية بالضبط."
+    FINDING_KIT_UPDATE_VERSION_INVALID_TITLE = "إصدار البناء غير صالح للمحدِّث: {version}"
+    FINDING_KIT_UPDATE_VERSION_INVALID_DETAIL = (
+        "المحدِّث يقارن إصدار هذا البناء بإصدار التحديث. أدخل إصداراً مثل 1.2.0 في تبويب "
+        "«مكتبة التشغيل»."
+    )
+    FINDING_KIT_SUPPORT_URL_INVALID_TITLE = "رابط الدعم غير مقبول"
+    FINDING_KIT_SUPPORT_URL_INVALID_DETAIL = "«{url}» — يُقبل فقط رابط https:// أو http:// أو mailto:."
+    FINDING_KIT_UPDATE_NEEDS_INSTALLER_TITLE = "بناء مجلد: التحديث يكون عبر مثبّت"
+    FINDING_KIT_UPDATE_NEEDS_INSTALLER_DETAIL = (
+        "لا يُستبدل بناء المجلد في مكانه في هذا الإصدار. اجعل update.json يشير إلى Setup.exe، "
+        "فيُحمَّل ويُتحقق منه ثم يُشغَّل."
+    )
+    FINDING_KIT_SOURCE_MISSING_TITLE = "ملفات مكتبة التشغيل غير موجودة"
+    FINDING_KIT_SOURCE_MISSING_DETAIL = (
+        "لم يُعثر على مصدر الحزمة p2e_runtime لنسخها إلى البناء. أعد تثبيت التطبيق."
+    )
+
 
 class En:
     """English strings."""
@@ -1197,6 +1378,7 @@ class En:
         "Build and runtime failure diagnostics",
         "Icon Studio for multi-size .ico files",
         "Isolated build environment, size lab and build report",
+        "Runtime Kit: signed updater, crash reporter, single instance",
     ]
 
     # Language selector
@@ -1937,6 +2119,189 @@ class En:
     FINDING_ENV_NOT_CREATED_DETAIL = (
         "You'll be asked to create it when you build, or create it now on the Size "
         "& Environment tab. Until then, which packages it holds can't be checked."
+    )
+
+    # ── 1.5: Runtime Kit ──
+    TAB_RUNTIME = "🧰 Runtime Kit"
+    KIT_HINT = (
+        "Services built into the program you ship, each turned on on its own. Nothing is "
+        "on by default, there is no telemetry of any kind, and nothing touches the network "
+        "unless you set an update URL yourself. Your code is never edited: anything that "
+        "needs a line from you comes as a snippet to copy."
+    )
+    GROUP_KIT_SERVICES = "🧩 Services"
+    KIT_NAME_RESOURCE_PATH = "📁 resource_path() helper"
+    KIT_NAME_LOG_REDIRECT = "📝 Log file for windowed apps"
+    KIT_NAME_CRASH_REPORTER = "🧯 Crash reporter"
+    KIT_NAME_SINGLE_INSTANCE = "🔒 Single instance"
+    KIT_NAME_UPDATER = "🔄 Signed self-updater"
+    KIT_DESC_RESOURCE_PATH = (
+        "Finds bundled files in development and once frozen: from p2e_runtime import resource_path"
+    )
+    KIT_DESC_LOG_REDIRECT = (
+        "Without a console, print(), sys.stdout.write and errors go to a rotating log in the "
+        "user's data folder instead of vanishing or crashing the app."
+    )
+    KIT_DESC_CRASH_REPORTER = (
+        "Instead of closing silently: a report (error, version, OS) is saved and a dialog "
+        "says where. Nothing is sent automatically."
+    )
+    KIT_DESC_SINGLE_INSTANCE = "Opening the program a second time shows a message and closes the second copy."
+    KIT_DESC_UPDATER = (
+        "Checks update.json at your URL, refuses anything not signed with your key or not "
+        "on HTTPS, and checks SHA-256 before replacing anything."
+    )
+    KIT_SUPPORT_URL_LABEL = "Support link (optional):"
+    KIT_SUPPORT_URL_PLACEHOLDER = "https://… — opened only if the user clicks Yes"
+    KIT_INSTANCE_MESSAGE_LABEL = "Second-copy message:"
+    KIT_INSTANCE_MESSAGE_PLACEHOLDER = "Leave empty for “{app} is already running.”"
+
+    GROUP_KIT_UPDATER = "🔄 Signed updater"
+    KIT_UPDATE_URL_LABEL = "update.json URL:"
+    KIT_UPDATE_URL_PLACEHOLDER = "https://example.com/myapp/update.json"
+    KIT_APP_VERSION_LABEL = "This build's version:"
+    KIT_APP_VERSION_PLACEHOLDER = "e.g. 1.2.0 (compared with the update's)"
+    KIT_CHECK_ON_START = "Check at start-up and ask the user (off by default)"
+    KIT_CHECK_ON_START_TIP = (
+        "On Windows a native Yes/No dialog appears. Elsewhere the user is not asked and "
+        "nothing is installed; call p2e_runtime.updates.check() from your own UI."
+    )
+    KIT_INSTALLER_ARGS_LABEL = "Installer arguments (folder build):"
+    KIT_INSTALLER_ARGS_PLACEHOLDER = "e.g. /SILENT"
+    KIT_ONEDIR_NOTE = (
+        "ℹ️ A folder build is not replaced in place in this version: point update.json at an "
+        "installer (Setup.exe); it is downloaded, verified, then run with the arguments above."
+    )
+    KIT_API_HINT = (
+        "From your app: info = p2e_runtime.updates.check() then p2e_runtime.updates.apply(info) "
+        "— synchronous and UI-free, so ask your user your own way."
+    )
+    KIT_PUBLIC_KEY_LABEL = "Embedded public key:"
+    KIT_PUBLIC_KEY_PLACEHOLDER = "64 hex characters — filled from your key"
+    BTN_KIT_USE_MY_KEY = "🔑 Use my key"
+    KIT_KEY_STATUS_NONE = "No signing key yet. Generate a key pair to be able to publish updates."
+    KIT_KEY_STATUS_FMT = "Your key: {fingerprint}… — the private key is stored in:\n{path}"
+    BTN_KIT_KEY_GENERATE = "🔐 Generate key pair"
+    BTN_KIT_KEY_EXPORT = "💾 Back up"
+    BTN_KIT_KEY_IMPORT = "📥 Import key"
+    MSG_KIT_KEY_REPLACE_CONFIRM = (
+        "⚠️ A signing key already exists ({fingerprint}…).\n\n"
+        "Programs you shipped with the current key will refuse any update signed with a new "
+        "one — you will never be able to update them again.\n\n"
+        "The current key will be kept under a new name, not deleted. Replace it anyway?"
+    )
+    LOG_KIT_KEY_GENERATED = "🔐 New signing key created: {fingerprint}…"
+    LOG_KIT_KEY_REPLACED = "🔐 Previous key kept as: {path}"
+    MSG_KIT_KEY_EXPORT_WARNING = (
+        "⚠️ This file is your private key. Whoever holds it can publish updates your "
+        "programs will install.\n\n"
+        "• Keep it somewhere safe outside the project folder (a password manager, an "
+        "encrypted drive).\n"
+        "• Never commit it to git or send it to anyone.\n"
+        "• If you lose it, you can no longer update the programs you shipped.\n\n"
+        "Continue?"
+    )
+    DIALOG_KIT_KEY_EXPORT = "Save a backup of the private key"
+    DIALOG_KIT_KEY_IMPORT = "Import a signing key"
+    DIALOG_FILTER_KEY = "Signing key (*.json);;All Files (*.*)"
+    ERR_KIT_KEY_EXPORT_IN_PROJECT = (
+        "The private key is not saved inside the project or output folder: it could be "
+        "committed with the code or shipped with the program. Choose another place."
+    )
+    LOG_KIT_KEY_EXPORTED = "💾 Key backup saved to: {path}"
+    LOG_KIT_KEY_IMPORTED = "📥 Signing key imported: {fingerprint}…"
+    ERR_KIT_KEY_READ = "Could not read the key: {error}"
+    ERR_KIT_KEY_WRITE = "Could not save the key: {error}"
+    ERR_KIT_NO_KEY = "No signing key. Generate or import a key pair first."
+
+    GROUP_KIT_PUBLISH = "📦 Publish an update"
+    KIT_PUBLISH_HINT = (
+        "Writes update.json and update.json.sig next to the file. Nothing is uploaded: put "
+        "both on your server with the new build (GitHub Releases publishing comes in 1.6)."
+    )
+    KIT_PUBLISH_FILE_LABEL = "New file:"
+    KIT_PUBLISH_FILE_PLACEHOLDER = "The new EXE (or Setup.exe for a folder build)"
+    DIALOG_CHOOSE_UPDATE_FILE = "Choose the update file"
+    DIALOG_FILTER_UPDATE_FILE = "Programs (*.exe *.msi);;All Files (*.*)"
+    KIT_PUBLISH_VERSION_LABEL = "Its version:"
+    KIT_PUBLISH_URL_LABEL = "Download URL:"
+    KIT_PUBLISH_URL_PLACEHOLDER = "https://example.com/myapp/MyApp-1.3.0.exe"
+    KIT_PUBLISH_MIN_VERSION_LABEL = "Oldest version that may update directly:"
+    KIT_PUBLISH_MIN_VERSION_PLACEHOLDER = "optional"
+    KIT_PUBLISH_NOTES_LABEL = "Release notes:"
+    BTN_KIT_PUBLISH = "✍️ Create signed update.json"
+    LOG_KIT_PUBLISHED = "✍️ Update files: {manifest} and {signature}"
+    MSG_KIT_PUBLISHED_FMT = (
+        "Created and signed:\n{manifest}\n{signature}\n\nUpload both with the new file so "
+        "that update.json is at the URL embedded in your program."
+    )
+    ERR_KIT_PUBLISH_FMT = "Could not create the update files: {error}"
+
+    GROUP_KIT_PREVIEW = "👁️ What goes into the EXE"
+    KIT_PREVIEW_HOOK = "Runtime hook"
+    KIT_PREVIEW_CONFIG = "p2e_runtime.json"
+    KIT_PREVIEW_NONE = "No service is on — nothing is added to the EXE."
+
+    MSG_KIT_INVALID_FMT = "The Runtime Kit settings block the build:\n\n{problems}"
+    LOG_KIT_EMBEDDED_FMT = "🧰 Runtime Kit: {services}"
+    MSG_KIT_RISKS_CONFIRM = (
+        "⚠️ This settings file changes what your built program trusts:\n\n{risks}\n\n"
+        "Only accept this if you trust where the file came from. Continue?"
+    )
+    KIT_RISK_FOREIGN_UPDATE_KEY = (
+        "• The updater would accept updates signed with a key that is not yours ({key}…) "
+        "from {url} — whoever holds that key could install programs on your users' machines."
+    )
+    KIT_RISK_SUPPORT_URL = "• The crash dialog would offer to open: {url}"
+
+    # Text shown by the built app itself (in the language chosen here).
+    KIT_RT_CRASH_TITLE = "{app} — unexpected error"
+    KIT_RT_CRASH_MESSAGE = "{app} stopped because of an unexpected error.\n\nA report was saved to:\n{path}"
+    KIT_RT_SUPPORT_PROMPT = "Open the support page to report it?"
+    KIT_RT_INSTANCE_MESSAGE = "{app} is already running."
+    KIT_RT_UPDATE_TITLE = "{app} — update available"
+    KIT_RT_UPDATE_MESSAGE = "Version {version} is available (you have {current}).\n\n{notes}\n\nInstall it now?"
+
+    FIX_LABEL_RUNTIME = "Turn on in the Runtime Kit: {value}"
+    DOCTOR_ALT_HEADER = "Or instead:"
+    BTN_DOCTOR_ALT_FMT = "🔀 Instead: {fix}"
+    REPORT_RUNTIME_KIT = "Runtime Kit"
+
+    FINDING_KIT_IMPORTED_NOT_ENABLED_TITLE = "The code imports p2e_runtime but the Runtime Kit is off"
+    FINDING_KIT_IMPORTED_NOT_ENABLED_DETAIL = (
+        "The package will not be bundled and the EXE will stop with ModuleNotFoundError. The "
+        "fix turns on resource_path on the Runtime Kit tab."
+    )
+    FINDING_KIT_UPDATE_URL_MISSING_TITLE = "The updater is on but has no update.json URL"
+    FINDING_KIT_UPDATE_URL_MISSING_DETAIL = "Enter the update.json URL on the Runtime Kit tab, or turn the updater off."
+    FINDING_KIT_UPDATE_URL_INSECURE_TITLE = "The update URL is not HTTPS"
+    FINDING_KIT_UPDATE_URL_INSECURE_DETAIL = (
+        "“{url}” — the updater refuses anything but HTTPS: an unencrypted connection lets "
+        "anyone in between tamper with what is downloaded."
+    )
+    FINDING_KIT_UPDATE_KEY_MISSING_TITLE = "The updater is on but has no public key"
+    FINDING_KIT_UPDATE_KEY_MISSING_DETAIL = (
+        "Without a key no update can be verified, and an unsigned update is a vulnerability, "
+        "not a feature. Generate a key pair, then “Use my key”."
+    )
+    FINDING_KIT_UPDATE_KEY_INVALID_TITLE = "The public key is not valid"
+    FINDING_KIT_UPDATE_KEY_INVALID_DETAIL = "An Ed25519 public key is exactly 64 hexadecimal characters."
+    FINDING_KIT_UPDATE_VERSION_INVALID_TITLE = "The build version is not usable by the updater: {version}"
+    FINDING_KIT_UPDATE_VERSION_INVALID_DETAIL = (
+        "The updater compares this build's version with the update's. Enter a version such "
+        "as 1.2.0 on the Runtime Kit tab."
+    )
+    FINDING_KIT_SUPPORT_URL_INVALID_TITLE = "The support link is not accepted"
+    FINDING_KIT_SUPPORT_URL_INVALID_DETAIL = "“{url}” — only https://, http:// or mailto: links are accepted."
+    FINDING_KIT_UPDATE_NEEDS_INSTALLER_TITLE = "Folder build: updates go through an installer"
+    FINDING_KIT_UPDATE_NEEDS_INSTALLER_DETAIL = (
+        "A folder build is not replaced in place in this version. Point update.json at a "
+        "Setup.exe; it is downloaded, verified, then run."
+    )
+    FINDING_KIT_SOURCE_MISSING_TITLE = "The Runtime Kit files are missing"
+    FINDING_KIT_SOURCE_MISSING_DETAIL = (
+        "The p2e_runtime package sources to copy into the build were not found. Reinstall "
+        "the application."
     )
 
 

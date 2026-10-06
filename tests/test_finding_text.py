@@ -29,6 +29,7 @@ ALL_PARAMS = {
     "literal": "data.json", "example": "data.json", "stream": "sys.stdout",
     "candidate": "main.py", "icon": "app.ico", "size": "32", "error": "boom",
     "line": "3", "template": "index.html", "attr": "write", "drop": "PySide6",
+    "url": "http://example.com/u.json", "version": "1.x",
 }
 
 

@@ -9,6 +9,7 @@ from py2exe_gui.ui.tabs.doctor_tab import DoctorTab
 from py2exe_gui.ui.tabs.history_tab import HistoryTab
 from py2exe_gui.ui.tabs.installer_tab import InstallerTab
 from py2exe_gui.ui.tabs.main_tab import MainTab
+from py2exe_gui.ui.tabs.runtime_tab import RuntimeTab
 from py2exe_gui.ui.tabs.size_tab import SizeTab
 from py2exe_gui.ui.tabs.templates_tab import TemplatesTab
 from py2exe_gui.ui.tabs.version_info_tab import VersionInfoTab
@@ -23,6 +24,7 @@ __all__ = [
     "HistoryTab",
     "InstallerTab",
     "MainTab",
+    "RuntimeTab",
     "SizeTab",
     "TemplatesTab",
     "VersionInfoTab",
