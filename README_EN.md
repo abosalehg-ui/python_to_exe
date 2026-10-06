@@ -18,6 +18,10 @@ version metadata, build history, and a Windows manifest editor.
 | **Project Doctor** *(1.3)* | Pre-build checkup for code that runs under Python but breaks once frozen: uninstalled imports, unbundled data files, relative paths, `multiprocessing` without `freeze_support()`, `input()`/`sys.stdout` in windowed apps, no entry point, fake `.ico` files. Readiness score out of 100, one-click fixes, copyable code snippets |
 | **Diagnostics** *(1.3)* | Reads the build log, the user-relevant part of `warn-*.txt`, and the built EXE's own traceback; explains it and offers fixes. **Diagnostic run** builds a console copy of a windowed app to read the error it would otherwise hide. "Apply and rebuild" button |
 | **Knowledge base** *(1.3)* | `py2exe_gui/knowledge/packages.json`: what 45 popular packages need to survive PyInstaller (collect flags, hidden imports, data folders, pip names, size notes) |
+| **Isolated build env** *(1.4)* | A per-project virtual environment holding only what the project imports (helpers included), created with `uv` when available or `venv` + pip, only after you approve the exact commands. `p2e-build.lock` pins versions for reproducible builds |
+| **Size lab** *(1.4)* | What's inside the EXE, library by library, read from PyInstaller's own TOC files; one-click `--exclude-module` suggestions; comparison with the previous build. Real example: a Pillow app went from 30.1 MB to 14.2 MB (−53%) in an isolated environment |
+| **Build report** *(1.4)* | Self-contained HTML per build: sizes, breakdown, SHA-256, Python/PyInstaller versions, doctor notes, options |
+| **Windows Sandbox** *(1.4)* | Generates a `.wsb` that runs the build on a clean, throw-away Windows (output mapped read-only) |
 | **Icon Studio** *(1.3)* | Real multi-size `.ico` (16–256px) from an image or from letters, drawn with Qt — no Pillow needed |
 | **Smart Analysis** | AST-based import detection (incl. `__import__` and `importlib`), `requirements.txt` import, hidden-imports auto-suggest |
 | **Deployment** | Splash screen, Windows manifest (DPI, UAC, supported OS), Authenticode code signing, post-build smoke test |
@@ -83,7 +87,8 @@ py2exe-gui
 
 ## Simple and Advanced Modes
 
-A first run shows four tabs — Main, Project Doctor, Templates, About — because ten tabs of
+A first run shows five tabs — Main, Project Doctor, Size & Environment, Templates, About —
+because eleven tabs of
 PyInstaller options is a lot to meet when all you want is one `.exe`. The mode
 button (or `Ctrl+M`) reveals the rest, and the choice is remembered. Hidden
 tabs keep their contents: switching modes mid-setup loses nothing.
@@ -96,6 +101,15 @@ File pickers for source, output directory, icon (with a live preview at
 gives itself away). Core PyInstaller flags (`--onefile`, `--windowed`,
 `--clean`, `--noconfirm`, `--strip`), plus the build log with text search and
 a severity filter.
+
+### ⚖️ Size & Environment
+Choose between the current Python and an **isolated environment** for the
+project (stored under the per-user cache folder, never in your project). The
+tab shows what will be installed — from `p2e-build.lock`, `requirements.txt`, or
+the imports — and creates it only after showing you the exact commands. Below,
+the **size lab** breaks the last build down by library and offers exclusions
+for libraries your code never imports; the **build report** option writes
+`<name>-build-report.html` beside `dist/` after each successful build.
 
 ### 🩺 Project Doctor
 Readiness score, every predicted and actual problem in one list, and the fix
@@ -269,6 +283,11 @@ py2exe_gui/
 │   ├── fixes.py              # shared Finding/Fix model
 │   ├── knowledge.py          # package knowledge base loader
 │   ├── icon_studio.py        # .ico writer/reader
+│   ├── project_scan.py       # imports followed through local modules
+│   ├── venv_manager.py       # per-project isolated environments
+│   ├── size_analyzer.py      # bundle inventory from PyInstaller's TOC files
+│   ├── build_report.py       # self-contained HTML report
+│   ├── sandbox.py            # Windows Sandbox .wsb
 │   ├── build_history.py
 │   └── log_formatter.py
 └── ui/
@@ -304,7 +323,9 @@ See [IDEAS.md](IDEAS.md) for the full roadmap. Currently:
   opt-in update check
 - ✅ **1.3:** Project doctor, build/runtime diagnostics with one-click fixes,
   diagnostic run, package knowledge base, Icon Studio
-- 🧭 **Vision (1.4 → 2.0):** see [PRODUCT_ROADMAP.md](PRODUCT_ROADMAP.md)
+- ✅ **1.4:** Isolated per-project build environment + lock file, size lab with
+  slimming suggestions, HTML build report, Windows Sandbox testing
+- 🧭 **Vision (1.5 → 2.0):** see [PRODUCT_ROADMAP.md](PRODUCT_ROADMAP.md)
 - ⏳ **Next:** venv management, multi-file projects, Linux/macOS installers,
   `.spec` editor, VirusTotal, PySide6 migration —
   see [UI_IMPROVEMENT_PLAN.md](UI_IMPROVEMENT_PLAN.md)

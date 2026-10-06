@@ -4,10 +4,10 @@
 
 ### أداة احترافية لتحويل تطبيقات بايثون إلى ملفات تنفيذية
 
-![Version](https://img.shields.io/badge/الإصدار-1.3.0-blue?style=for-the-badge)
+![Version](https://img.shields.io/badge/الإصدار-1.4.0-blue?style=for-the-badge)
 ![Python](https://img.shields.io/badge/Python-3.8+-green?style=for-the-badge&logo=python&logoColor=white)
 ![PyQt5](https://img.shields.io/badge/PyQt5-GUI-orange?style=for-the-badge&logo=qt&logoColor=white)
-![Tests](https://img.shields.io/badge/الاختبارات-827_passing-brightgreen?style=for-the-badge)
+![Tests](https://img.shields.io/badge/الاختبارات-943_passing-brightgreen?style=for-the-badge)
 ![Languages](https://img.shields.io/badge/اللغات-عربي_+_English-purple?style=for-the-badge)
 ![License](https://img.shields.io/badge/الرخصة-All%20Rights%20Reserved-red?style=for-the-badge)
 
@@ -130,6 +130,26 @@
 
 </td>
 </tr>
+<tr>
+<td width="50%">
+
+### 🧪 بيئة بناء معزولة (جديد في 1.4)
+- ✅ بيئة لكل مشروع تحوي **فقط** ما يستورده (بما فيه ما تستورده ملفاته المساعدة)
+- ✅ تُنشأ بـ `uv` إن وُجد (ثوانٍ) أو `venv` + pip، **بعد موافقتك على الأوامر**
+- ✅ **ملف قفل** `p2e-build.lock` لبناء قابل للتكرار على أي جهاز
+- ✅ **🧊 اختبار في Windows Sandbox** على Windows نظيف بلا بايثون
+
+</td>
+<td width="50%">
+
+### 📏 مختبر الحجم وتقرير البناء (جديد في 1.4)
+- ✅ ما بداخل الـ EXE **مكتبةً مكتبة** بالميغابايت
+- ✅ **مقترحات تنحيف** (`--exclude-module`) بنقرة + مقارنة بالبناء السابق
+- ✅ مثال حقيقي: تطبيق Pillow من **30.1MB إلى 14.2MB (−53%)** ببيئة معزولة
+- ✅ **تقرير HTML** لكل بناء: الحجم، المكتبات، SHA-256، الإصدارات، الملاحظات
+
+</td>
+</tr>
 </table>
 
 ---
@@ -209,7 +229,8 @@ py2exe-gui
 | التبويب | المحتوى |
 |--------|---------|
 | **⚙️ الإعدادات الرئيسية** | ملف المصدر + شارة الجاهزية، الإخراج، الأيقونة + معاينتها + 🎨 استوديو الأيقونات، الخيارات، السجل |
-| **🩺 طبيب المشروع** | درجة الجاهزية، المشاكل المتوقعة والفعلية، الإصلاحات بنقرة، نسخ الكود المقترح، التشغيل التشخيصي |
+| **🩺 طبيب المشروع** | درجة الجاهزية، المشاكل المتوقعة والفعلية، الإصلاحات بنقرة، نسخ الكود المقترح، التشغيل التشخيصي، اختبار Windows Sandbox |
+| **⚖️ الحجم والبيئة** | بيئة البناء المعزولة وملف القفل، مختبر الحجم ومقترحات التنحيف، تقرير البناء |
 | **🔧 إعدادات متقدمة** | ملفات إضافية، Hidden Imports، استيراد من requirements، UPX، أوامر مخصصة |
 | **📝 معلومات الإصدار** | CompanyName، FileDescription، FileVersion، ProductVersion، Copyright، إلخ |
 | **🚀 النشر** | Splash، Manifest (DPI/UAC/OS)، التوقيع الرقمي، Smoke Test |
@@ -379,6 +400,11 @@ python_to_exe/
 │   │   ├── fixes.py                  # نموذج Finding/Fix المشترك + تطبيق الإصلاحات
 │   │   ├── knowledge.py              # قارئ قاعدة معرفة المكتبات
 │   │   ├── icon_studio.py            # كتابة وقراءة .ico بلا مكتبات صور
+│   │   ├── project_scan.py           # تتبّع الاستيرادات عبر ملفات المشروع
+│   │   ├── venv_manager.py           # 🧪 البيئات المعزولة لكل مشروع
+│   │   ├── size_analyzer.py          # 📏 ما بداخل الـ EXE من ملفات TOC
+│   │   ├── build_report.py           # 📄 تقرير HTML مستقل
+│   │   ├── sandbox.py                # 🧊 ملف .wsb لـ Windows Sandbox
 │   │   ├── build_history.py
 │   │   └── log_formatter.py
 │   │
@@ -396,10 +422,12 @@ python_to_exe/
 │       ├── icon_studio_dialog.py     # 🎨 استوديو الأيقونات
 │       ├── diagnostic_thread.py      # التشغيل التشخيصي
 │       ├── finding_text.py           # نصوص المشاكل والإصلاحات حسب اللغة
+│       ├── env_thread.py             # إنشاء البيئة في خيط منفصل
 │       └── tabs/               # كل تبويب widget مستقل يملك عناصره
 │           ├── base.py
 │           ├── main_tab.py
 │           ├── doctor_tab.py
+│           ├── size_tab.py
 │           ├── advanced_tab.py
 │           ├── version_info_tab.py
 │           ├── deploy_tab.py
@@ -515,7 +543,9 @@ else:
   التفاصيل في [UI_IMPROVEMENT_PLAN.md](UI_IMPROVEMENT_PLAN.md)
 - ✅ **الإصدار 1.3:** طبيب المشروع، تشخيص أعطال البناء والتشغيل مع الإصلاح
   بنقرة، التشغيل التشخيصي، قاعدة معرفة المكتبات، استوديو الأيقونات
-- 🧭 **الرؤية القادمة (1.4 → 2.0):** تحويل الأداة إلى استوديو تسليم كامل —
+- ✅ **الإصدار 1.4:** بيئة بناء معزولة لكل مشروع + ملف قفل، مختبر الحجم
+  ومقترحات التنحيف، تقرير HTML لكل بناء، اختبار Windows Sandbox
+- 🧭 **الرؤية القادمة (1.5 → 2.0):** تحويل الأداة إلى استوديو تسليم كامل —
   طبيب المشروع، تشخيص وإصلاح تلقائي للأعطال، بيئة بناء معزولة، محرك Nuitka،
   مكتبة تشغيل مدمجة (تحديث ذاتي + تقارير انهيار)، ونشر بنقرة —
   التفاصيل في [PRODUCT_ROADMAP.md](PRODUCT_ROADMAP.md)

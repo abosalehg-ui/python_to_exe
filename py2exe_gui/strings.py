@@ -237,6 +237,7 @@ class Ar:
         "طبيب مشروع يكتشف ما سيكسر الـ EXE ويصلحه بنقرة",
         "تشخيص أعطال البناء والتشغيل",
         "استوديو أيقونات .ico بكل الأحجام",
+        "بيئة بناء معزولة + مختبر الحجم + تقرير البناء",
     ]
 
     # Language selector (Phase 3)
@@ -818,6 +819,150 @@ class Ar:
     ICON_STUDIO_SAVE_FAIL = "تعذّر حفظ الأيقونة: {error}"
     LOG_ICON_STUDIO_SAVED = "🎨 تم إنشاء الأيقونة ({sizes}): {path}"
 
+    # ── 1.4: build environment, size lab, build report, sandbox ──
+    TAB_SIZE = "⚖️ الحجم والبيئة"
+    GROUP_BUILD_ENV = "🧪 بيئة البناء"
+    ENV_HINT = (
+        "PyInstaller يضمّن كل ما يجده مثبتاً، فالبناء من بايثون مليء بالمكتبات "
+        "يضخّم الـ EXE. البيئة المعزولة تحوي فقط ما يستورده مشروعك."
+    )
+    ENV_MODE_CURRENT_FMT = "بايثون الحالي ({version})"
+    ENV_MODE_ISOLATED = "بيئة معزولة لهذا المشروع (موصى بها: EXE أصغر وبناء قابل للتكرار)"
+    ENV_BASE_PYTHON_LABEL = "بايثون لإنشاء البيئة:"
+    ENV_BASE_PYTHON_PLACEHOLDER = "اتركه فارغاً لاستخدام بايثون الحالي"
+    DIALOG_CHOOSE_PYTHON = "اختر مفسّر بايثون"
+    DIALOG_FILTER_PYTHON = "Python (python.exe python python3*);;All Files (*)"
+    ENV_STATUS_NONE = "البيئة: لم تُنشأ بعد"
+    ENV_STATUS_FMT = "البيئة: Python {version} · {size}\n{path}"
+    ENV_STATUS_NO_SOURCE = "اختر ملف المصدر أولاً"
+    ENV_REQUIREMENTS_FMT = "ستُثبَّت: {items}"
+    ENV_REQ_FROM_LOCK = "ملف القفل {file} (إصدارات مثبتة بدقة)"
+    ENV_REQ_FROM_FILE = "ملف {file}"
+    ENV_REQ_NONE = "لا مكتبات خارجية — PyInstaller فقط"
+    ENV_UV_NOTE = "⚡ سيُستخدم uv لتسريع إنشاء البيئة"
+    BTN_ENV_CREATE = "🔧 إنشاء / تحديث البيئة"
+    BTN_ENV_RECREATE = "♻️ إعادة الإنشاء من الصفر"
+    BTN_ENV_LOCK = "🔒 حفظ ملف القفل"
+    BTN_ENV_LOCK_TIP = (
+        "يحفظ الإصدارات الدقيقة للمكتبات في p2e-build.lock بجوار مشروعك، فتُعاد "
+        "البيئة نفسها تماماً على أي جهاز."
+    )
+    BTN_ENV_DELETE = "🗑️ حذف البيئة"
+    MSG_ENV_CONFIRM = (
+        "سيتم تنفيذ الأوامر التالية (تحتاج اتصالاً بالإنترنت لتنزيل الحزم):\n\n"
+        "{commands}\n\nمتابعة؟"
+    )
+    MSG_ENV_DELETE_CONFIRM = "حذف البيئة المعزولة لهذا المشروع ({size})؟"
+    MSG_ENV_NEEDED = (
+        "اخترت البناء في بيئة معزولة، لكنها لم تُنشأ بعد.\n"
+        "إنشاؤها الآن ثم البناء؟"
+    )
+    LOG_ENV_START = "🧪 إنشاء بيئة البناء: {path}"
+    LOG_ENV_STEP = "▶ {cmd}"
+    LOG_ENV_RETRY_SINGLE = "⚠️ فشل التثبيت المجمّع — إعادة المحاولة لكل حزمة على حدة"
+    LOG_ENV_PACKAGE_FAILED = "❌ تعذّر تثبيت: {name}"
+    LOG_ENV_DONE = "✅ بيئة البناء جاهزة"
+    LOG_ENV_DONE_PARTIAL = (
+        "⚠️ البيئة جاهزة لكن تعذّر تثبيت: {names} — أضفها إلى requirements.txt "
+        "بأسمائها الصحيحة على PyPI"
+    )
+    LOG_ENV_FAILED = "❌ فشل إنشاء البيئة: {error}"
+    LOG_ENV_DELETED = "🗑️ حُذفت بيئة البناء"
+    LOG_ENV_LOCK_SAVED = "🔒 حُفظ ملف القفل: {path}"
+    LOG_ENV_LOCK_FAILED = "❌ تعذّر حفظ ملف القفل: {error}"
+    LOG_ENV_PYTHON = "🐍 البناء باستخدام: {python}"
+    ERR_ENV_PYTHON_MISSING = "مفسّر بايثون غير موجود: {path}"
+
+    GROUP_SIZE = "📏 مختبر الحجم — آخر بناء"
+    SIZE_NONE = "ابنِ مشروعك ليظهر هنا ما بداخل الـ EXE وحجم كل مكتبة."
+    SIZE_SUMMARY_FMT = "الحجم على القرص: {disk} · المحتوى قبل الضغط: {content}"
+    SIZE_COMPARE_FMT = "مقارنة بالبناء السابق ({previous}): {change}"
+    SIZE_COL_PACKAGE = "المكتبة"
+    SIZE_COL_SIZE = "الحجم"
+    SIZE_COL_SHARE = "النسبة"
+    SIZE_GROUP_RUNTIME = "مفسّر بايثون ومكوّناته"
+    SIZE_GROUP_STDLIB = "مكتبة بايثون القياسية"
+    SIZE_GROUP_SCRIPT = "كودك"
+    SIZE_INDIRECT_FMT = (
+        "💡 {size} من مكتبات لا يستوردها كودك مباشرة ({names}). كثير منها تبعيات "
+        "حقيقية، لكن البناء في بيئة معزولة يتخلص مما جاء لمجرد أنه مثبت."
+    )
+    SIZE_ONEFILE_SLOW_FMT = (
+        "🐢 ملف واحد بحجم {size} يفك نفسه عند كل تشغيل فيبطؤ إقلاعه. وضع المجلد مع "
+        "مثبّت يقلع فوراً."
+    )
+    GROUP_SIZE_SUGGESTIONS = "✂️ مقترحات التنحيف"
+    SIZE_SUGGESTIONS_NONE = "لا مقترحات — لا توجد في الـ EXE مكتبات معروفة يمكن استبعادها."
+    SIZE_SUGGESTIONS_HINT = (
+        "مكتبات داخل الـ EXE لا يستوردها كودك. استبعادها آمن غالباً، وأي خطأ بعد "
+        "إعادة البناء سيلتقطه طبيب المشروع."
+    )
+    BTN_SIZE_APPLY = "✅ استبعد المحدد"
+    BTN_SIZE_APPLY_REBUILD = "🔁 استبعد وأعد البناء"
+    BTN_SIZE_REFRESH = "🔄 حلّل آخر بناء"
+    LOG_SIZE_SUMMARY = "📏 الحجم: {disk} — التفاصيل في تبويب «الحجم والبيئة»"
+
+    GROUP_REPORT = "📄 تقرير البناء"
+    REPORT_AUTO = "إنشاء تقرير HTML بعد كل بناء ناجح"
+    BTN_REPORT_OPEN = "📄 فتح آخر تقرير"
+    LOG_REPORT_SAVED = "📄 تقرير البناء: {path}"
+    LOG_REPORT_FAILED = "❌ تعذّر كتابة التقرير: {error}"
+    REPORT_TITLE = "تقرير البناء"
+    REPORT_DETAILS = "التفاصيل"
+    REPORT_RESULT = "النتيجة"
+    REPORT_SUCCESS = "نجح"
+    REPORT_FAILED = "فشل"
+    REPORT_SIZE_ON_DISK = "الحجم على القرص"
+    REPORT_CONTENTS = "المحتوى قبل الضغط"
+    REPORT_DURATION = "مدة البناء"
+    REPORT_PREVIOUS = "مقارنة بالبناء السابق"
+    REPORT_APP = "التطبيق"
+    REPORT_DATE = "التاريخ"
+    REPORT_SOURCE = "ملف المصدر"
+    REPORT_OUTPUT = "الناتج"
+    REPORT_MODE = "النمط"
+    REPORT_ONEFILE = "ملف واحد"
+    REPORT_ONEDIR = "مجلد"
+    REPORT_ENVIRONMENT = "بيئة البناء"
+    REPORT_ENV_ISOLATED = "بيئة معزولة"
+    REPORT_ENV_CURRENT = "بايثون الحالي"
+    REPORT_PYTHON = "Python"
+    REPORT_PYINSTALLER = "PyInstaller"
+    REPORT_PLATFORM = "النظام"
+    REPORT_BREAKDOWN = "ما بداخل الـ EXE"
+    REPORT_PACKAGE = "المكتبة"
+    REPORT_SIZE = "الحجم"
+    REPORT_SHARE = "النسبة"
+    REPORT_LARGEST_FILES = "أكبر الملفات"
+    REPORT_FINDINGS = "ملاحظات طبيب المشروع"
+    REPORT_OPTIONS = "خيارات PyInstaller"
+    REPORT_NONE = "لا شيء"
+    REPORT_GENERATOR_FMT = "أُنشئ بواسطة {app} {version}"
+
+    BTN_SANDBOX = "🧊 اختبار في Windows Sandbox"
+    BTN_SANDBOX_TIP = (
+        "يشغّل الـ EXE على نسخة Windows نظيفة تماماً (بلا بايثون ولا مكتباتك) "
+        "لكشف مشاكل «يعمل عندي فقط»."
+    )
+    SANDBOX_UNAVAILABLE = (
+        "Windows Sandbox غير متاح على هذا الجهاز (يتطلب Windows 10/11 Pro أو "
+        "Enterprise مع تفعيل الميزة).\n\nللاختبار على جهاز نظيف: انسخ\n{path}\n"
+        "إلى جهاز أو آلة افتراضية بلا بايثون وشغّله."
+    )
+    MSG_SANDBOX_NO_BUILD = "ابنِ المشروع أولاً."
+    LOG_SANDBOX_WRITTEN = "🧊 ملف Windows Sandbox: {path}"
+
+    FINDING_SIZE_EXCLUDE_CANDIDATE_TITLE = "استبعاد «{package}» يوفّر {size}"
+    FINDING_SIZE_EXCLUDE_CANDIDATE_DETAIL = (
+        "كودك لا يستورد {package}، لكن مكتبة أخرى جرّتها إلى الـ EXE. إن كانت تلك "
+        "المكتبة تحتاجها فعلاً فسيظهر الخطأ في التشخيص بعد إعادة البناء."
+    )
+    FINDING_ENV_NOT_CREATED_TITLE = "البيئة المعزولة لم تُنشأ بعد"
+    FINDING_ENV_NOT_CREATED_DETAIL = (
+        "سيُطلب منك إنشاؤها عند البناء، أو أنشئها الآن من تبويب «الحجم والبيئة». "
+        "حتى ذلك الحين لا يمكن التحقق من المكتبات المثبتة فيها."
+    )
+
 
 class En:
     """English strings."""
@@ -1051,6 +1196,7 @@ class En:
         "Project doctor that finds what will break the EXE and fixes it in one click",
         "Build and runtime failure diagnostics",
         "Icon Studio for multi-size .ico files",
+        "Isolated build environment, size lab and build report",
     ]
 
     # Language selector
@@ -1644,6 +1790,154 @@ class En:
     ICON_STUDIO_BAD_IMAGE = "The image could not be opened"
     ICON_STUDIO_SAVE_FAIL = "Could not save the icon: {error}"
     LOG_ICON_STUDIO_SAVED = "🎨 Icon created ({sizes}): {path}"
+
+    # ── 1.4: build environment, size lab, build report, sandbox ──
+    # "&&": a single "&" in a tab title is a keyboard-mnemonic marker.
+    TAB_SIZE = "⚖️ Size && Environment"
+    GROUP_BUILD_ENV = "🧪 Build environment"
+    ENV_HINT = (
+        "PyInstaller bundles whatever it finds installed, so building from a "
+        "Python full of libraries bloats the EXE. An isolated environment holds "
+        "only what your project imports."
+    )
+    ENV_MODE_CURRENT_FMT = "Current Python ({version})"
+    ENV_MODE_ISOLATED = "Isolated environment for this project (recommended: smaller EXE, reproducible builds)"
+    ENV_BASE_PYTHON_LABEL = "Python to create it from:"
+    ENV_BASE_PYTHON_PLACEHOLDER = "Leave empty to use the current Python"
+    DIALOG_CHOOSE_PYTHON = "Choose a Python interpreter"
+    DIALOG_FILTER_PYTHON = "Python (python.exe python python3*);;All Files (*)"
+    ENV_STATUS_NONE = "Environment: not created yet"
+    ENV_STATUS_FMT = "Environment: Python {version} · {size}\n{path}"
+    ENV_STATUS_NO_SOURCE = "Choose a source file first"
+    ENV_REQUIREMENTS_FMT = "Will install: {items}"
+    ENV_REQ_FROM_LOCK = "lock file {file} (exact versions)"
+    ENV_REQ_FROM_FILE = "{file}"
+    ENV_REQ_NONE = "no third-party packages — PyInstaller only"
+    ENV_UV_NOTE = "⚡ uv will be used to create the environment faster"
+    BTN_ENV_CREATE = "🔧 Create / update environment"
+    BTN_ENV_RECREATE = "♻️ Recreate from scratch"
+    BTN_ENV_LOCK = "🔒 Save lock file"
+    BTN_ENV_LOCK_TIP = (
+        "Saves the exact package versions to p2e-build.lock next to your project, "
+        "so the very same environment can be rebuilt on any machine."
+    )
+    BTN_ENV_DELETE = "🗑️ Delete environment"
+    MSG_ENV_CONFIRM = (
+        "These commands will run (packages are downloaded, so this needs an "
+        "internet connection):\n\n{commands}\n\nContinue?"
+    )
+    MSG_ENV_DELETE_CONFIRM = "Delete this project's isolated environment ({size})?"
+    MSG_ENV_NEEDED = (
+        "You chose to build in an isolated environment, but it has not been "
+        "created yet.\nCreate it now and then build?"
+    )
+    LOG_ENV_START = "🧪 Creating the build environment: {path}"
+    LOG_ENV_STEP = "▶ {cmd}"
+    LOG_ENV_RETRY_SINGLE = "⚠️ The combined install failed — retrying one package at a time"
+    LOG_ENV_PACKAGE_FAILED = "❌ Could not install: {name}"
+    LOG_ENV_DONE = "✅ Build environment ready"
+    LOG_ENV_DONE_PARTIAL = (
+        "⚠️ Environment ready, but these could not be installed: {names} — add "
+        "them to requirements.txt under their real PyPI names"
+    )
+    LOG_ENV_FAILED = "❌ Creating the environment failed: {error}"
+    LOG_ENV_DELETED = "🗑️ Build environment deleted"
+    LOG_ENV_LOCK_SAVED = "🔒 Lock file saved: {path}"
+    LOG_ENV_LOCK_FAILED = "❌ Could not save the lock file: {error}"
+    LOG_ENV_PYTHON = "🐍 Building with: {python}"
+    ERR_ENV_PYTHON_MISSING = "Python interpreter not found: {path}"
+
+    GROUP_SIZE = "📏 Size lab — last build"
+    SIZE_NONE = "Build your project to see what is inside the EXE and how big each library is."
+    SIZE_SUMMARY_FMT = "On disk: {disk} · contents before compression: {content}"
+    SIZE_COMPARE_FMT = "Compared with the previous build ({previous}): {change}"
+    SIZE_COL_PACKAGE = "Library"
+    SIZE_COL_SIZE = "Size"
+    SIZE_COL_SHARE = "Share"
+    SIZE_GROUP_RUNTIME = "Python interpreter and runtime"
+    SIZE_GROUP_STDLIB = "Python standard library"
+    SIZE_GROUP_SCRIPT = "Your code"
+    SIZE_INDIRECT_FMT = (
+        "💡 {size} comes from libraries your code doesn't import directly ({names}). "
+        "Many are real dependencies, but building in an isolated environment sheds "
+        "the ones pulled in only because they were installed."
+    )
+    SIZE_ONEFILE_SLOW_FMT = (
+        "🐢 A {size} one-file EXE unpacks itself on every launch, so it starts "
+        "slowly. Folder mode with an installer starts instantly."
+    )
+    GROUP_SIZE_SUGGESTIONS = "✂️ Slimming suggestions"
+    SIZE_SUGGESTIONS_NONE = "No suggestions — no known removable libraries are in the EXE."
+    SIZE_SUGGESTIONS_HINT = (
+        "Libraries inside the EXE that your code doesn't import. Excluding them is "
+        "usually safe, and the Project Doctor catches any error after the rebuild."
+    )
+    BTN_SIZE_APPLY = "✅ Exclude selected"
+    BTN_SIZE_APPLY_REBUILD = "🔁 Exclude and rebuild"
+    BTN_SIZE_REFRESH = "🔄 Analyze last build"
+    LOG_SIZE_SUMMARY = "📏 Size: {disk} — details on the Size & Environment tab"
+
+    GROUP_REPORT = "📄 Build report"
+    REPORT_AUTO = "Write an HTML report after every successful build"
+    BTN_REPORT_OPEN = "📄 Open last report"
+    LOG_REPORT_SAVED = "📄 Build report: {path}"
+    LOG_REPORT_FAILED = "❌ Could not write the report: {error}"
+    REPORT_TITLE = "Build report"
+    REPORT_DETAILS = "Details"
+    REPORT_RESULT = "Result"
+    REPORT_SUCCESS = "Succeeded"
+    REPORT_FAILED = "Failed"
+    REPORT_SIZE_ON_DISK = "Size on disk"
+    REPORT_CONTENTS = "Contents before compression"
+    REPORT_DURATION = "Build time"
+    REPORT_PREVIOUS = "Versus previous build"
+    REPORT_APP = "Application"
+    REPORT_DATE = "Date"
+    REPORT_SOURCE = "Source file"
+    REPORT_OUTPUT = "Output"
+    REPORT_MODE = "Mode"
+    REPORT_ONEFILE = "One file"
+    REPORT_ONEDIR = "Folder"
+    REPORT_ENVIRONMENT = "Build environment"
+    REPORT_ENV_ISOLATED = "Isolated environment"
+    REPORT_ENV_CURRENT = "Current Python"
+    REPORT_PYTHON = "Python"
+    REPORT_PYINSTALLER = "PyInstaller"
+    REPORT_PLATFORM = "Platform"
+    REPORT_BREAKDOWN = "What's inside"
+    REPORT_PACKAGE = "Library"
+    REPORT_SIZE = "Size"
+    REPORT_SHARE = "Share"
+    REPORT_LARGEST_FILES = "Largest files"
+    REPORT_FINDINGS = "Project Doctor notes"
+    REPORT_OPTIONS = "PyInstaller options"
+    REPORT_NONE = "None"
+    REPORT_GENERATOR_FMT = "Generated by {app} {version}"
+
+    BTN_SANDBOX = "🧊 Test in Windows Sandbox"
+    BTN_SANDBOX_TIP = (
+        "Runs the EXE on a completely clean Windows (no Python, none of your "
+        "libraries) to catch “works on my machine” problems."
+    )
+    SANDBOX_UNAVAILABLE = (
+        "Windows Sandbox is not available on this machine (it needs Windows 10/11 "
+        "Pro or Enterprise with the feature enabled).\n\nTo test on a clean system: "
+        "copy\n{path}\nto a machine or VM without Python and run it there."
+    )
+    MSG_SANDBOX_NO_BUILD = "Build the project first."
+    LOG_SANDBOX_WRITTEN = "🧊 Windows Sandbox file: {path}"
+
+    FINDING_SIZE_EXCLUDE_CANDIDATE_TITLE = "Excluding “{package}” saves {size}"
+    FINDING_SIZE_EXCLUDE_CANDIDATE_DETAIL = (
+        "Your code doesn't import {package}, but another library pulled it into the "
+        "EXE. If that library really needs it, the diagnostics will show the error "
+        "after the rebuild."
+    )
+    FINDING_ENV_NOT_CREATED_TITLE = "The isolated environment has not been created yet"
+    FINDING_ENV_NOT_CREATED_DETAIL = (
+        "You'll be asked to create it when you build, or create it now on the Size "
+        "& Environment tab. Until then, which packages it holds can't be checked."
+    )
 
 
 # ──────────────────────────────────────────────────────────────────────────

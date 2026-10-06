@@ -26,10 +26,13 @@ class BatchThread(QThread):
     progress_signal = pyqtSignal(int)
     finished_signal = pyqtSignal(bool)
 
-    def __init__(self, jobs, base_config):
+    def __init__(self, jobs, base_config, python_for=None):
         super().__init__()
         self.jobs = jobs
         self.base_config = base_config
+        # Resolves the interpreter for a job's config (an isolated
+        # environment, or the app's own Python when None).
+        self.python_for = python_for
         self.process = None
         self.is_cancelled = False
 
@@ -86,7 +89,8 @@ class BatchThread(QThread):
     def _run_one(self, job) -> bool:
         """Build a single job. Returns True on a zero exit code."""
         config = job_config(job, self.base_config)
-        command, error = build_pyinstaller_command(config)
+        python = self.python_for(config) if self.python_for else None
+        command, error = build_pyinstaller_command(config, python_executable=python)
         if error:
             job.message = error
             self.log_signal.emit(error)

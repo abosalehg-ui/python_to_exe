@@ -94,3 +94,11 @@ def test_malformed_entries_are_rejected(packages):
 def test_missing_packages_object_is_rejected():
     with pytest.raises(ValueError):
         parse_knowledge({})
+
+
+def test_import_name_for_dist_maps_bundle_folders_back():
+    from py2exe_gui.core.knowledge import import_name_for_dist
+
+    assert import_name_for_dist("pillow") == "PIL"
+    assert import_name_for_dist("opencv_python") == "cv2"
+    assert import_name_for_dist("numpy") == "numpy"

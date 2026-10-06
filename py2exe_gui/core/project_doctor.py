@@ -36,6 +36,7 @@ from py2exe_gui.core.knowledge import (
     load_knowledge,
     pip_name_for,
 )
+from py2exe_gui.core.project_scan import project_imports
 
 # Folder names that are never data: build output, environments, tooling.
 _IGNORED_DIRS = frozenset({
@@ -102,8 +103,14 @@ def examine(
 
     project_dir = os.path.dirname(os.path.abspath(source))
     local = local_module_names(project_dir)
-    report.imports = detect_imports(code)
+    # The script's own imports plus those of the local modules it uses: a
+    # package imported only by helpers.py is just as missing from the EXE.
+    report.imports = detect_imports(code) | project_imports(source)
     report.third_party = {m for m in filter_non_stdlib(report.imports) if m not in local}
+    # An interpreter other than this one is asked in a single subprocess.
+    prefetch = getattr(is_installed, "prefetch", None)
+    if prefetch is not None:
+        prefetch(report.third_party | set(QT_BINDINGS))
     windowed = config.windowed or config.noconsole
 
     findings: List[Finding] = []

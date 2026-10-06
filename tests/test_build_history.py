@@ -182,3 +182,12 @@ def test_save_reports_failure_instead_of_swallowing(tmp_path):
     history.path = str(bad)
     assert history.save() is False
     assert history.last_error
+
+
+def test_size_bytes_round_trips_and_old_records_load(tmp_path):
+    path = tmp_path / "h.json"
+    history = BuildHistory(str(path))
+    history.add(make_record("a.py", "A", True, 1.0, {}, size_bytes=1234))
+    reloaded = BuildHistory(str(path))
+    assert reloaded.records[0].size_bytes == 1234
+    assert BuildRecord.from_dict({"source": "a.py"}).size_bytes == 0

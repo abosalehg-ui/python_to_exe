@@ -137,5 +137,23 @@ def pip_name_for(import_name: str, path: Optional[str] = None) -> str:
     return info.pip_name if info else top
 
 
+def _normalize_dist(name: str) -> str:
+    return name.lower().replace("-", "_").replace(".", "_")
+
+
+def import_name_for_dist(dist: str, path: Optional[str] = None) -> str:
+    """The import name for a distribution name (``Pillow`` → ``PIL``), if known.
+
+    Folders such as ``pillow.libs`` or ``opencv_python.libs`` in a bundle are
+    named after the distribution; this maps them back so they are counted
+    with the package they belong to.
+    """
+    wanted = _normalize_dist(dist)
+    for name, info in load_knowledge(path).items():
+        if info.pip and _normalize_dist(info.pip) == wanted:
+            return name
+    return dist
+
+
 def known_packages(path: Optional[str] = None) -> List[str]:
     return sorted(load_knowledge(path))

@@ -15,8 +15,8 @@ import time
 import webbrowser
 from dataclasses import replace
 
-from PyQt5.QtCore import Qt, QTimer
-from PyQt5.QtGui import QFont, QKeySequence
+from PyQt5.QtCore import Qt, QTimer, QUrl
+from PyQt5.QtGui import QDesktopServices, QFont, QKeySequence
 from PyQt5.QtWidgets import (
     QFileDialog,
     QFrame,
@@ -79,8 +79,48 @@ from py2exe_gui.core import (
     sort_findings,
     summarize,
 )
-from py2exe_gui.core.fixes import ORIGIN_BUILD, ORIGIN_RUNTIME, fix_is_applied
+from py2exe_gui.core.build_report import (
+    ReportData,
+    parse_versions,
+    render_html,
+    report_path_for,
+    sha256_file,
+    write_report,
+)
+from py2exe_gui.core.diagnostics import build_name, build_root
+from py2exe_gui.core.fixes import ORIGIN_BUILD, ORIGIN_RUNTIME, Finding, fix_is_applied
 from py2exe_gui.core.installer import validate as validate_installer
+from py2exe_gui.core.knowledge import default_is_installed
+from py2exe_gui.core.project_scan import project_imports
+from py2exe_gui.core.sandbox import generate_wsb, sandbox_available, wsb_for_output
+from py2exe_gui.core.size_analyzer import (
+    analyze_build,
+    exclude_suggestions,
+    format_size,
+    group_label_key,
+    indirect_packages,
+    onefile_too_big,
+    output_path_for,
+    previous_size,
+)
+from py2exe_gui.core.venv_manager import (
+    InstalledChecker,
+    delete_env,
+    env_dir_for,
+    env_exists,
+    env_python,
+    env_status,
+    find_uv,
+    folder_size,
+    format_lock,
+    freeze_command,
+    lock_file_path,
+    plan_environment,
+    project_requirements,
+    quote_command,
+    write_metadata,
+)
+from py2exe_gui.paths import envs_dir
 from py2exe_gui.strings import (
     LOCALE_LAYOUT,
     S,
@@ -99,7 +139,8 @@ from py2exe_gui.ui.batch_thread import BatchThread
 from py2exe_gui.ui.conversion_thread import ConversionThread
 from py2exe_gui.ui.diagnostic_thread import DiagnosticThread
 from py2exe_gui.ui.dialogs import CommandPreviewDialog, PresetNameDialog, WelcomeDialog
-from py2exe_gui.ui.finding_text import fix_label
+from py2exe_gui.ui.env_thread import EnvThread
+from py2exe_gui.ui.finding_text import finding_detail, finding_title, fix_label
 from py2exe_gui.ui.icon_studio_dialog import IconStudioDialog
 from py2exe_gui.ui.installer_thread import InstallerThread
 from py2exe_gui.ui.post_build_thread import PostBuildThread
@@ -112,14 +153,20 @@ from py2exe_gui.ui.tabs import (
     HistoryTab,
     InstallerTab,
     MainTab,
+    SizeTab,
     TemplatesTab,
     VersionInfoTab,
 )
+from py2exe_gui.ui.tabs.size_tab import size_text
 from py2exe_gui.ui.tray import BuildTray
 
 # Tabs shown in simple mode. Eight tabs at once is a lot to meet when all you
 # want is one .exe; the rest stay one button away.
-SIMPLE_MODE_TABS = ("main", "doctor", "templates", "about")
+SIMPLE_MODE_TABS = ("main", "doctor", "size", "templates", "about")
+
+# Where isolated build environments are created. A module global so tests can
+# point it at a temporary folder.
+ENVS_ROOT = envs_dir()
 
 # Wait this long after the last edit before re-examining the project, so the
 # doctor does not re-parse the script on every keystroke in the path field.
@@ -136,6 +183,7 @@ class MainWindow(QMainWindow):
         self.post_build_thread = None
         self.batch_thread = None
         self.diagnostic_thread = None
+        self.env_thread = None
         self.settings = {}
         self.current_theme = "dark"
         self.font_scale = DEFAULT_FONT_SCALE
@@ -155,6 +203,12 @@ class MainWindow(QMainWindow):
         self._source_imports = set()
         self._build_output = []
         self._build_wall_start = 0.0
+        self._build_command = []
+        # One import checker per foreign interpreter (isolated environments),
+        # so the doctor asks each one in a single subprocess, not per module.
+        self._checkers = {}
+        self._size_view = None
+        self._last_report_path = ""
         self._doctor_timer = QTimer(self)
         self._doctor_timer.setSingleShot(True)
         self._doctor_timer.setInterval(DOCTOR_DEBOUNCE_MS)
@@ -213,6 +267,7 @@ class MainWindow(QMainWindow):
 
         self.main_tab = MainTab(self)
         self.doctor_tab = DoctorTab(self)
+        self.size_tab = SizeTab(self)
         self.advanced_tab = AdvancedTab(self)
         self.version_info_tab = VersionInfoTab(self)
         self.deploy_tab = DeployTab(self)
@@ -226,6 +281,7 @@ class MainWindow(QMainWindow):
         self._all_tabs = (
             ("main", self.main_tab, S.TAB_MAIN),
             ("doctor", self.doctor_tab, S.TAB_DOCTOR),
+            ("size", self.size_tab, S.TAB_SIZE),
             ("advanced", self.advanced_tab, S.TAB_ADVANCED),
             ("version_info", self.version_info_tab, S.TAB_VERSION_INFO),
             ("deploy", self.deploy_tab, S.TAB_DEPLOY),
@@ -248,6 +304,19 @@ class MainWindow(QMainWindow):
         main.icon_input.textChanged.connect(self._schedule_doctor)
         main.windowed_check.toggled.connect(self._schedule_doctor)
         main.noconsole_check.toggled.connect(self._schedule_doctor)
+
+        # Per-user preferences that live in settings, not in shared configs:
+        # the interpreter path in particular must never come from a JSON file
+        # someone else wrote.
+        size = self.size_tab
+        size.base_python.setText(str(self.settings.get("base_python", "")))
+        size.base_python.textChanged.connect(
+            lambda text: self.settings.__setitem__("base_python", text.strip())
+        )
+        size.report_auto.setChecked(bool(self.settings.get("report_auto", True)))
+        size.report_auto.toggled.connect(
+            lambda on: self.settings.__setitem__("report_auto", bool(on))
+        )
 
         layout.addWidget(self._create_progress_group())
         layout.addLayout(self._create_action_buttons())
@@ -440,6 +509,7 @@ class MainWindow(QMainWindow):
             upx_dir=advanced.upx_dir.text().strip(),
             extra_args=advanced.extra_args.text(),
             splash_image=deploy.splash_input.text().strip(),
+            isolated_env=self.size_tab.isolated_radio.isChecked(),
         )
 
     def _apply_config(self, config: BuildConfig):
@@ -467,6 +537,10 @@ class MainWindow(QMainWindow):
         advanced.extra_args.setText(config.extra_args)
 
         deploy.splash_input.setText(config.splash_image)
+        if config.isolated_env:
+            self.size_tab.isolated_radio.setChecked(True)
+        else:
+            self.size_tab.current_radio.setChecked(True)
 
     def save_current_settings(self):
         file_path, _ = QFileDialog.getSaveFileName(
@@ -656,7 +730,9 @@ class MainWindow(QMainWindow):
         self.progress_bar.setValue(0)
         self.progress_bar.setFormat(S.PROGRESS_CONVERTING)
 
-        self.batch_thread = BatchThread(jobs, self._current_config())
+        self.batch_thread = BatchThread(
+            jobs, self._current_config(), python_for=self.build_python
+        )
         self.batch_thread.log_signal.connect(self._append_log)
         self.batch_thread.progress_signal.connect(self.progress_bar.setValue)
         self.batch_thread.job_signal.connect(self._on_batch_job_update)
@@ -705,7 +781,9 @@ class MainWindow(QMainWindow):
         )
 
     def _build_in_progress(self) -> bool:
-        for thread in (self.conversion_thread, self.batch_thread, self.diagnostic_thread):
+        for thread in (
+            self.conversion_thread, self.batch_thread, self.diagnostic_thread, self.env_thread
+        ):
             if thread and thread.isRunning():
                 return True
         return False
@@ -736,16 +814,17 @@ class MainWindow(QMainWindow):
 
     # ─── Build pipeline ─────────────────────────────────────────────────
 
-    def _ensure_pyinstaller(self) -> bool:
+    def _ensure_pyinstaller(self, python: str = "") -> bool:
         """Check for PyInstaller, offering to install it with explicit consent.
 
         The previous version ran ``pip install pyinstaller`` silently on the
         first build: an unattended network install, unpinned, from whatever
-        index the environment happened to point at.
+        index the environment happened to point at. ``python`` is the build
+        interpreter (an isolated environment's), defaulting to this one.
         """
         try:
             subprocess.run(
-                [sys.executable, "-m", "PyInstaller", "--version"],
+                [python or sys.executable, "-m", "PyInstaller", "--version"],
                 capture_output=True,
                 check=True,
             )
@@ -753,7 +832,7 @@ class MainWindow(QMainWindow):
         except (OSError, subprocess.CalledProcessError):
             pass
 
-        install_cmd = [sys.executable, "-m", "pip", "install", PYINSTALLER_REQUIREMENT]
+        install_cmd = [python or sys.executable, "-m", "pip", "install", PYINSTALLER_REQUIREMENT]
         reply = QMessageBox.question(
             self,
             S.MSG_CONFIRM,
@@ -788,15 +867,29 @@ class MainWindow(QMainWindow):
 
         # Every early return below must clean up the temp files created above;
         # one path used to skip that and leak into %TEMP%.
-        cmd, error = build_pyinstaller_command(config)
+        python = self.build_python(config)
+        cmd, error = build_pyinstaller_command(config, python_executable=python)
         if error:
             self._cleanup_temp_files()
             QMessageBox.warning(self, S.MSG_WARNING, error)
             return
 
-        if not self._ensure_pyinstaller():
+        if config.isolated_env and not env_exists(self._env_dir(config.source)):
+            self._cleanup_temp_files()
+            reply = QMessageBox.question(
+                self, S.MSG_CONFIRM, S.MSG_ENV_NEEDED,
+                QMessageBox.Yes | QMessageBox.No, QMessageBox.Yes,
+            )
+            if reply == QMessageBox.Yes:
+                self.create_build_env(then_build=True)
+            return
+
+        if not self._ensure_pyinstaller(python):
             self._cleanup_temp_files()
             return
+        if python != sys.executable:
+            self._append_log(S.LOG_ENV_PYTHON.format(python=python))
+        self._build_command = list(cmd)
 
         self._build_start_time = time.monotonic()
         self._build_wall_start = time.time()
@@ -858,6 +951,17 @@ class MainWindow(QMainWindow):
         self.cancel_btn.setEnabled(False)
         duration = max(0.0, time.monotonic() - self._build_start_time)
         snapshot = self._build_config_snapshot
+
+        # Measure before recording: the record stores the size, and the
+        # comparison must be against the build *before* this one.
+        size_report, previous = None, 0
+        if success and snapshot:
+            built = BuildConfig.from_dict(snapshot)
+            previous = previous_size(
+                self.history.records, built.source, snapshot.get("output_name", "")
+            )
+            size_report = analyze_build(built)
+
         if snapshot:
             record = make_record(
                 source=snapshot.get("source", ""),
@@ -865,6 +969,7 @@ class MainWindow(QMainWindow):
                 success=success,
                 duration_seconds=round(duration, 2),
                 config=snapshot,
+                size_bytes=size_report.output_bytes if size_report else 0,
             )
             if not self.history.add(record):
                 self._append_log(
@@ -877,6 +982,16 @@ class MainWindow(QMainWindow):
             diagnosed = self._diagnose_build(BuildConfig.from_dict(snapshot))
             if not success and diagnosed:
                 message += S.MSG_DOCTOR_FAILED_HINT.format(count=len(diagnosed))
+
+        if size_report is not None:
+            built = BuildConfig.from_dict(snapshot)
+            self._show_size(built, size_report, previous)
+            if size_report.output_bytes:
+                self._append_log(
+                    S.LOG_SIZE_SUMMARY.format(disk=size_text(size_report.output_bytes))
+                )
+            if self.size_tab.report_auto.isChecked():
+                self._write_build_report(built, size_report, previous, duration, success)
 
         # Post-build actions only make sense for a successful build.
         if success and snapshot:
@@ -903,7 +1018,10 @@ class MainWindow(QMainWindow):
 
     def preview_command(self):
         """Show the PyInstaller command that would be executed."""
-        cmd, error = build_pyinstaller_command(self._current_config())
+        config = self._current_config()
+        cmd, error = build_pyinstaller_command(
+            config, python_executable=self.build_python(config)
+        )
         if error:
             QMessageBox.warning(self, S.MSG_WARNING, error)
             return
@@ -1111,6 +1229,9 @@ class MainWindow(QMainWindow):
         self.main_tab.restore_log(log_lines)
         self.main_tab.refresh_icon_preview()
         self._refresh_doctor_view()
+        self._refresh_size_view()
+        self.refresh_env_view()
+        self.size_tab.set_report_path(self._last_report_path)
         self.batch_tab.set_sources(batch_sources)
         self.mode_btn.setText(self._mode_button_label())
         self._refresh_history_list()
@@ -1241,14 +1362,25 @@ class MainWindow(QMainWindow):
             self._doctor_findings = []
             self._source_imports = set()
             self._refresh_doctor_view()
+            self.refresh_env_view()
             return
         # Findings from a build of a different script no longer apply.
         if self._build_findings and source != self._build_findings_source:
             self._build_findings = []
-        report = examine(source, self._current_config())
-        self._doctor_findings = report.findings
+        config = self._current_config()
+        extra = []
+        if config.isolated_env and not env_exists(self._env_dir(source)):
+            # Its packages will be installed when it is created; until then
+            # there is nothing to ask, so don't report them all as missing.
+            is_installed = lambda _module: True  # noqa: E731
+            extra.append(Finding("env_not_created", "warning"))
+        else:
+            is_installed = self._installed_checker(config)
+        report = examine(source, config, is_installed=is_installed)
+        self._doctor_findings = sort_findings(report.findings + extra)
         self._source_imports = report.imports
         self._refresh_doctor_view()
+        self.refresh_env_view()
 
     def _refresh_doctor_view(self):
         source = self._source_path()
@@ -1302,6 +1434,7 @@ class MainWindow(QMainWindow):
             if not f.fixes or not all(fix_is_applied(new_config, x) for x in f.fixes)
         ]
         self.run_doctor()
+        self._refresh_size_view()
         if rebuild:
             self.start_conversion()
 
@@ -1312,6 +1445,7 @@ class MainWindow(QMainWindow):
             origin=ORIGIN_BUILD,
             source=config.source,
             source_imports=self._source_imports,
+            is_installed=self._installed_checker(config),
         )
         findings += read_warn_findings(
             config,
@@ -1330,6 +1464,7 @@ class MainWindow(QMainWindow):
                 origin=ORIGIN_RUNTIME,
                 source=config.source,
                 source_imports=self._source_imports,
+                is_installed=self._installed_checker(config),
             )
         if findings:
             self._set_build_findings(self._build_findings + findings, config.source)
@@ -1347,12 +1482,16 @@ class MainWindow(QMainWindow):
             return
         if not config.output_dir:
             config.output_dir = os.path.dirname(os.path.abspath(config.source))
+        if config.isolated_env and not env_exists(self._env_dir(config.source)):
+            QMessageBox.warning(self, S.MSG_WARNING, S.FINDING_ENV_NOT_CREATED_DETAIL)
+            return
         diag = diagnostic_config(config)
-        cmd, error = build_pyinstaller_command(diag)
+        python = self.build_python(config)
+        cmd, error = build_pyinstaller_command(diag, python_executable=python)
         if error:
             QMessageBox.warning(self, S.MSG_WARNING, error)
             return
-        if not self._ensure_pyinstaller():
+        if not self._ensure_pyinstaller(python):
             return
 
         self.convert_btn.setEnabled(False)
@@ -1377,13 +1516,16 @@ class MainWindow(QMainWindow):
         self.doctor_tab.diagnose_btn.setEnabled(True)
 
         imports = self._source_imports
+        checker = self._installed_checker(config)
         if built:
             findings = diagnose_output(
-                output, origin=ORIGIN_RUNTIME, source=config.source, source_imports=imports
+                output, origin=ORIGIN_RUNTIME, source=config.source,
+                source_imports=imports, is_installed=checker,
             )
         else:
             findings = diagnose_output(
-                build_log, origin=ORIGIN_BUILD, source=config.source, source_imports=imports
+                build_log, origin=ORIGIN_BUILD, source=config.source,
+                source_imports=imports, is_installed=checker,
             )
         # The diagnostic run is the freshest evidence: it replaces, not adds to,
         # what the last build reported.
@@ -1392,6 +1534,297 @@ class MainWindow(QMainWindow):
             self._append_log(S.LOG_DIAG_CLEAN)
         self._append_log(S.LOG_DIAG_DONE_FMT.format(count=len(findings)))
         self.show_doctor_tab()
+
+    # ─── Build environment ──────────────────────────────────────────────
+
+    def _env_dir(self, source: str) -> str:
+        return env_dir_for(source, ENVS_ROOT)
+
+    def _base_python(self) -> str:
+        return self.size_tab.base_python.text().strip() or sys.executable
+
+    def build_python(self, config: BuildConfig) -> str:
+        """The interpreter that runs PyInstaller for ``config``."""
+        if config.isolated_env and config.source:
+            return env_python(self._env_dir(config.source))
+        return sys.executable
+
+    def _installed_checker(self, config: BuildConfig):
+        """``is_installed`` answering for the build interpreter, not this one."""
+        python = self.build_python(config)
+        if python == sys.executable:
+            return default_is_installed
+        if python not in self._checkers:
+            self._checkers[python] = InstalledChecker(python)
+        return self._checkers[python]
+
+    def on_env_mode_changed(self, *_args):
+        self._schedule_doctor()
+
+    def refresh_env_view(self):
+        source = self._source_path()
+        if not source or not os.path.isfile(source):
+            self.size_tab.show_env(None, "", False, has_source=False)
+            return
+        status = env_status(self._env_dir(source), with_size=False)
+        if status.exists and not status.metadata.get("size_bytes"):
+            # An environment made outside the app (or before 1.4) has no
+            # recorded size: measure it once and remember it.
+            status.metadata["size_bytes"] = folder_size(status.env_dir)
+            write_metadata(status.env_dir, status.metadata)
+        requirements = project_requirements(source)
+        if requirements.origin == "lock":
+            text = S.ENV_REQ_FROM_LOCK.format(file=requirements.describe())
+        elif requirements.origin == "file":
+            text = S.ENV_REQ_FROM_FILE.format(file=requirements.describe())
+        else:
+            text = ", ".join(requirements.args) if requirements.args else S.ENV_REQ_NONE
+        self.size_tab.show_env(status, text, bool(find_uv()), has_source=True)
+
+    def create_build_env(self, recreate: bool = False, then_build: bool = False):
+        """Create (or refresh) the project's environment, after explicit consent."""
+        if self._build_in_progress():
+            QMessageBox.warning(self, S.MSG_WARNING, S.MSG_DIAG_BUSY)
+            return
+        source = self._source_path()
+        if not source or not os.path.isfile(source):
+            QMessageBox.warning(self, S.MSG_WARNING, S.ERR_NO_SOURCE)
+            return
+        base = self._base_python()
+        if not os.path.isfile(base):
+            QMessageBox.warning(self, S.MSG_WARNING, S.ERR_ENV_PYTHON_MISSING.format(path=base))
+            return
+
+        plan = plan_environment(
+            source, ENVS_ROOT, base, PYINSTALLER_REQUIREMENT,
+            uv=find_uv(), recreate=recreate,
+        )
+        commands = "\n\n".join(quote_command(c) for c in plan.all_commands())
+        reply = QMessageBox.question(
+            self, S.MSG_CONFIRM, S.MSG_ENV_CONFIRM.format(commands=commands),
+            QMessageBox.Yes | QMessageBox.No, QMessageBox.No,
+        )
+        if reply != QMessageBox.Yes:
+            return
+        if recreate and env_exists(plan.env_dir):
+            delete_env(plan.env_dir, ENVS_ROOT)
+        os.makedirs(ENVS_ROOT, exist_ok=True)
+
+        self.size_tab.set_env_busy()
+        self.convert_btn.setEnabled(False)
+        self.progress_bar.setRange(0, 0)
+        self.env_thread = EnvThread(plan, base_python=base)
+        self.env_thread.log_signal.connect(self._append_log)
+        self.env_thread.finished_signal.connect(
+            lambda ok, failed, error: self._on_env_finished(plan, ok, failed, error, then_build)
+        )
+        self.env_thread.start()
+
+    def recreate_build_env(self):
+        self.create_build_env(recreate=True)
+
+    def _on_env_finished(self, plan, ok: bool, failed, error: str, then_build: bool):
+        self.progress_bar.setRange(0, 100)
+        self.progress_bar.setValue(0)
+        self.progress_bar.setFormat(S.PROGRESS_READY)
+        self.convert_btn.setEnabled(True)
+        # The environment changed: what it can import must be asked again.
+        self._checkers.pop(plan.python, None)
+        if ok:
+            if failed:
+                self._append_log(S.LOG_ENV_DONE_PARTIAL.format(names=", ".join(failed)))
+            else:
+                self._append_log(S.LOG_ENV_DONE)
+        else:
+            self._append_log(S.LOG_ENV_FAILED.format(error=error))
+            QMessageBox.critical(self, S.MSG_ERROR, S.LOG_ENV_FAILED.format(error=error))
+        self.run_doctor()
+        if ok and then_build:
+            self.start_conversion()
+
+    def delete_build_env(self):
+        source = self._source_path()
+        if not source:
+            return
+        env_dir = self._env_dir(source)
+        status = env_status(env_dir, with_size=False)
+        if not status.exists:
+            return
+        size = format_size(int(status.metadata.get("size_bytes", 0) or 0))
+        reply = QMessageBox.question(
+            self, S.MSG_CONFIRM, S.MSG_ENV_DELETE_CONFIRM.format(size=size),
+            QMessageBox.Yes | QMessageBox.No, QMessageBox.No,
+        )
+        if reply != QMessageBox.Yes:
+            return
+        if delete_env(env_dir, ENVS_ROOT):
+            self._append_log(S.LOG_ENV_DELETED)
+        self._checkers.pop(env_python(env_dir), None)
+        self.run_doctor()
+
+    def save_env_lock(self):
+        """Pin the environment's exact versions in p2e-build.lock."""
+        source = self._source_path()
+        env_dir = self._env_dir(source) if source else ""
+        if not env_dir or not env_exists(env_dir):
+            return
+        try:
+            result = subprocess.run(
+                freeze_command(env_python(env_dir), find_uv()),
+                capture_output=True, text=True, timeout=120,
+            )
+        except (OSError, subprocess.SubprocessError) as e:
+            self._append_log(S.LOG_ENV_LOCK_FAILED.format(error=str(e)))
+            return
+        if result.returncode != 0:
+            self._append_log(
+                S.LOG_ENV_LOCK_FAILED.format(error=(result.stderr or "").strip()[:300])
+            )
+            return
+        path = lock_file_path(source)
+        try:
+            with open(path, "w", encoding="utf-8") as f:
+                f.write(format_lock(result.stdout))
+        except OSError as e:
+            self._append_log(S.LOG_ENV_LOCK_FAILED.format(error=str(e)))
+            return
+        self._append_log(S.LOG_ENV_LOCK_SAVED.format(path=path))
+        self.refresh_env_view()
+
+    # ─── Size lab and build report ──────────────────────────────────────
+
+    def _show_size(self, config: BuildConfig, report, previous: int):
+        self._size_view = (config, report, previous)
+        self._refresh_size_view()
+
+    def _refresh_size_view(self):
+        """Render the size lab. Text is built here, so a language switch
+        re-renders it in the new language rather than keeping the old one."""
+        if self._size_view is None:
+            self.size_tab.show_size_report(None)
+            self.size_tab.show_suggestions([])
+            return
+        config, report, previous = self._size_view
+        imports = project_imports(config.source) if config.source else set()
+        # Against the current settings: an exclusion just applied drops out.
+        suggestions = exclude_suggestions(report, imports, self._current_config())
+        hints = []
+        indirect = indirect_packages(report, imports)
+        if indirect and not config.isolated_env:
+            hints.append(S.SIZE_INDIRECT_FMT.format(
+                size=size_text(sum(size for _n, size in indirect)),
+                names=", ".join(name for name, _s in indirect[:6]),
+            ))
+        if onefile_too_big(report, config):
+            hints.append(S.SIZE_ONEFILE_SLOW_FMT.format(size=size_text(report.output_bytes)))
+        self.size_tab.show_size_report(report, previous, hints)
+        self.size_tab.show_suggestions(suggestions)
+
+    def analyze_last_build(self):
+        """Re-read the inventory of the current settings' last build."""
+        config = self._current_config()
+        if not config.source:
+            return
+        report = analyze_build(config)
+        if not report.ok:
+            self._size_view = None
+            self._refresh_size_view()
+            return
+        previous = previous_size(
+            self.history.records, config.source, config.output_name, skip=1
+        )
+        # Re-reading changes no settings, so hints use the settings as they are.
+        self._show_size(config, report, previous)
+
+    def _report_labels(self) -> dict:
+        keys = (
+            "title", "details", "result", "success", "failed", "size_on_disk",
+            "contents", "duration", "previous", "app", "date", "source", "output",
+            "mode", "onefile", "onedir", "environment", "python", "pyinstaller",
+            "platform", "breakdown", "package", "size", "share", "largest_files",
+            "findings", "options", "none",
+        )
+        return {key: getattr(S, f"REPORT_{key.upper()}") for key in keys}
+
+    def _write_build_report(self, config, report, previous, duration, success):
+        output = report.output_path or output_path_for(config)
+        exe = output if os.path.isfile(output) else locate_built_executable(
+            build_root(config), build_name(config), config.onefile
+        ) or ""
+        groups = []
+        for group, size in report.ranked(20):
+            key = group_label_key(group)
+            groups.append((getattr(S, key) if key else group, size))
+        versions = parse_versions("\n".join(self._build_output))
+        findings = [
+            (f.severity, finding_title(f), finding_detail(f))
+            for f in self._build_findings + self._doctor_findings
+        ]
+        data = ReportData(
+            app_name=build_name(config),
+            source=config.source,
+            output_path=output,
+            timestamp=time.strftime("%Y-%m-%d %H:%M:%S"),
+            success=success,
+            duration_seconds=duration,
+            output_bytes=report.output_bytes,
+            content_bytes=report.content_bytes,
+            previous_bytes=previous,
+            sha256=sha256_file(exe),
+            onefile=config.onefile,
+            environment=S.REPORT_ENV_ISOLATED if config.isolated_env else S.REPORT_ENV_CURRENT,
+            python_version=versions.get("python", ""),
+            pyinstaller_version=versions.get("pyinstaller", ""),
+            platform=versions.get("platform", ""),
+            command=self._build_command,
+            groups=groups,
+            largest_files=report.largest_files,
+            findings=findings,
+        )
+        document = render_html(
+            data,
+            self._report_labels(),
+            rtl=LOCALE_LAYOUT.get(current_locale(), "ltr") == "rtl",
+            lang=current_locale(),
+            generator=S.REPORT_GENERATOR_FMT.format(app=APP_NAME, version=APP_VERSION),
+        )
+        path = report_path_for(config)
+        error = write_report(path, document)
+        if error:
+            self._append_log(S.LOG_REPORT_FAILED.format(error=error))
+            return
+        self._last_report_path = path
+        self.size_tab.set_report_path(path)
+        self._append_log(S.LOG_REPORT_SAVED.format(path=path))
+
+    def open_last_report(self):
+        if self._last_report_path and os.path.isfile(self._last_report_path):
+            QDesktopServices.openUrl(QUrl.fromLocalFile(self._last_report_path))
+
+    # ─── Windows Sandbox ────────────────────────────────────────────────
+
+    def open_in_sandbox(self):
+        """Run the last build on a clean Windows inside Windows Sandbox."""
+        config = self._current_config()
+        output = output_path_for(config) if config.source else ""
+        if not output:
+            QMessageBox.information(self, S.MSG_WARNING, S.MSG_SANDBOX_NO_BUILD)
+            return
+        if not sandbox_available():
+            QMessageBox.information(
+                self, S.MSG_WARNING, S.SANDBOX_UNAVAILABLE.format(path=output)
+            )
+            return
+        host, exe = wsb_for_output(output, config.onefile)
+        path = os.path.join(build_root(config), f"{build_name(config)}.wsb")
+        try:
+            with open(path, "w", encoding="utf-8") as f:
+                f.write(generate_wsb(host, exe))
+        except OSError as e:
+            QMessageBox.critical(self, S.MSG_ERROR, str(e))
+            return
+        self._append_log(S.LOG_SANDBOX_WRITTEN.format(path=path))
+        os.startfile(path)  # Windows only: guarded by sandbox_available() above
 
     # ─── Icon studio ────────────────────────────────────────────────────
 
@@ -1701,7 +2134,8 @@ class MainWindow(QMainWindow):
             # Both threads spawn a child process; leaving either running
             # orphans a PyInstaller run after the window is gone.
             for thread in (
-                self.conversion_thread, self.batch_thread, self.diagnostic_thread
+                self.conversion_thread, self.batch_thread, self.diagnostic_thread,
+                self.env_thread,
             ):
                 if thread and thread.isRunning():
                     thread.cancel()

@@ -331,19 +331,31 @@ QTextEdit {{
     font-size: {pt_log};
     color: {log_text};
 }}
-QListWidget {{
+QListWidget, QTreeWidget {{
     background-color: {input_bg};
     border: 2px solid {input_border};
     border-radius: 6px;
     padding: 5px;
 }}
-QListWidget::item {{
+QListWidget::item, QTreeWidget::item {{
     padding: 5px;
     border-radius: 4px;
 }}
-QListWidget::item:selected {{
+QListWidget::item:selected, QTreeWidget::item:selected {{
     background-color: {accent};
     color: {on_accent};
+}}
+QHeaderView::section {{
+    background-color: {input_bg};
+    color: {accent};
+    border: none;
+    border-bottom: 1px solid {input_border};
+    padding: 4px 6px;
+    font-weight: bold;
+}}
+QScrollArea, QScrollArea > QWidget > QWidget {{
+    background: transparent;
+    border: none;
 }}
 QCheckBox {{
     spacing: 8px;
