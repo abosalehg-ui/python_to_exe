@@ -1,4 +1,4 @@
-"""Background thread that runs PyInstaller and streams output to the UI."""
+"""Background thread that runs the build engine and streams output to the UI."""
 
 import subprocess
 from datetime import datetime
@@ -18,13 +18,16 @@ class ConversionThread(QThread):
     stage_signal = pyqtSignal(str)
     finished_signal = pyqtSignal(bool, str)
 
-    def __init__(self, command, output_dir):
+    def __init__(self, command, output_dir, stages=None, popen_kwargs=None):
         super().__init__()
         self.command = command
         self.output_dir = output_dir
         self.process = None
         self.is_cancelled = False
-        self.stages = BuildStageTracker()
+        # The engine's phases (PyInstaller's by default) and how to start it
+        # (Nuitka: stdin closed, the build interpreter's folder on PATH).
+        self.stages = BuildStageTracker(stages)
+        self.popen_kwargs = dict(popen_kwargs or {})
 
     def run(self):
         try:
@@ -44,6 +47,7 @@ class ConversionThread(QThread):
                 bufsize=1,
                 universal_newlines=True,
                 cwd=self.output_dir,
+                **self.popen_kwargs,
             )
 
             # Progress now follows the phase PyInstaller announces rather than

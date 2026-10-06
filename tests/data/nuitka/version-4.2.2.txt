@@ -1,0 +1,10 @@
+4.2.2
+Update status: up to date with stable release '4.2.2' (cached, 18 minutes old).
+Commercial: None
+Python: 3.12.3 (main, Aug 31 2026, 10:18:26) [GCC 13.3.0]
+Flavor: Debian Python
+Executable: /home/user/venv312/bin/python
+OS: Linux
+Arch: x86_64
+Distribution: Ubuntu (based on Debian) 24.04.5
+Version C compiler: gcc (gcc 13).

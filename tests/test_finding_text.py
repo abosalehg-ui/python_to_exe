@@ -30,6 +30,9 @@ ALL_PARAMS = {
     "candidate": "main.py", "icon": "app.ico", "size": "32", "error": "boom",
     "line": "3", "template": "index.html", "attr": "write", "drop": "PySide6",
     "url": "http://example.com/u.json", "version": "1.x",
+    # 2.0: engines
+    "engine": "Nuitka", "feature": "manifest", "nuitka": "4.2.2", "plugin": "tk-inter",
+    "reason": "Tkinter needs TCL included.", "tool": "patchelf", "compiler": "gcc",
 }
 
 

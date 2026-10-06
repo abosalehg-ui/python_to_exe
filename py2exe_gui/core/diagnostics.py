@@ -34,6 +34,7 @@ from py2exe_gui.core.fixes import (
     Fix,
     dedupe_findings,
     flag_fix,
+    localize_findings,
     runtime_fix,
     sort_findings,
 )
@@ -101,7 +102,8 @@ def diagnose_output(
     # something when the EXE itself printed them.
     if origin != ORIGIN_BUILD:
         findings += _runtime_findings(
-            text, origin, source, project_dir, knowledge_path, is_installed
+            text, origin, source, project_dir, knowledge_path, is_installed,
+            eng.bundle_prefix,
         )
 
     # What only this engine's log says (Qt hook collisions, a bad icon...).
@@ -118,11 +120,12 @@ def diagnose_output(
             findings.append(Finding("runtime_unhandled", SEVERITY_ERROR, {"error": last},
                                     origin=origin))
 
-    return sort_findings(dedupe_findings(findings))
+    # In the engine's own terms: a Nuitka build gets Nuitka options.
+    return sort_findings(dedupe_findings(localize_findings(findings, eng.name)))
 
 
 def _runtime_findings(
-    text, origin, source, project_dir, knowledge_path, is_installed
+    text, origin, source, project_dir, knowledge_path, is_installed, bundle_prefix=None
 ) -> List[Finding]:
     """Failures an EXE reports about itself while starting or running."""
     findings: List[Finding] = []
@@ -146,7 +149,8 @@ def _runtime_findings(
             )
 
     for raw in _RE_FILE_NOT_FOUND.findall(text):
-        findings.append(_missing_file(raw.replace("\\\\", "\\"), project_dir, origin))
+        findings.append(_missing_file(raw.replace("\\\\", "\\"), project_dir, origin,
+                                      bundle_prefix))
 
     for template in _RE_TEMPLATE.findall(text):
         folder = os.path.join(project_dir, "templates") if project_dir else ""
@@ -169,7 +173,7 @@ def _runtime_findings(
         )
 
     for module in _RE_DLL.findall(text):
-        package = _package_from_traceback(text, source)
+        package = _package_from_traceback(text, source, bundle_prefix)
         fixes = (flag_fix("--collect-binaries", package),) if package else ()
         findings.append(
             Finding("dll_load_failed", SEVERITY_ERROR,
@@ -202,13 +206,14 @@ def _missing_module(module: str, origin: str, knowledge_path, is_installed) -> F
     )
 
 
-def bundle_relative(path: str) -> str:
+def bundle_relative(path: str, prefix=None) -> str:
     """Strip the frozen extraction folder from ``path``.
 
     ``C:\\Users\\me\\AppData\\Local\\Temp\\_MEI1234\\data\\x.json`` → ``data\\x.json``.
     Relative paths come back unchanged; other absolute paths yield ''.
+    ``prefix`` is the engine's pattern for that folder (PyInstaller's by default).
     """
-    stripped = _RE_BUNDLE_PREFIX.sub("", path, count=1)
+    stripped = (prefix or _RE_BUNDLE_PREFIX).sub("", path, count=1)
     if stripped != path:
         return stripped
     if os.path.isabs(path) or re.match(r"^[A-Za-z]:[\\/]", path):
@@ -216,8 +221,8 @@ def bundle_relative(path: str) -> str:
     return path
 
 
-def _missing_file(path: str, project_dir: str, origin: str) -> Finding:
-    relative = bundle_relative(path)
+def _missing_file(path: str, project_dir: str, origin: str, prefix=None) -> Finding:
+    relative = bundle_relative(path, prefix)
     shown = relative or os.path.basename(path)
     fixes: Tuple[Fix, ...] = ()
     if relative and project_dir:
@@ -234,12 +239,12 @@ def _missing_file(path: str, project_dir: str, origin: str) -> Finding:
     )
 
 
-def _package_from_traceback(text: str, source: str = "") -> str:
+def _package_from_traceback(text: str, source: str = "", prefix=None) -> str:
     """The top-level package of the deepest frame that isn't PyInstaller's."""
     script = os.path.basename(source) if source else ""
     package = ""
     for frame in _RE_FRAME.findall(text):
-        relative = bundle_relative(frame) or frame
+        relative = bundle_relative(frame, prefix) or frame
         parts = [p for p in re.split(r"[\\/]", relative) if p]
         if not parts:
             continue

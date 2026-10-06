@@ -186,7 +186,8 @@ def default_doctor(ctx: ReleaseContext):
 
     checker = (default_is_installed if ctx.python == sys.executable
                else InstalledChecker(ctx.python))
-    return examine(ctx.project.build.source, ctx.project.build, is_installed=checker)
+    return examine(ctx.project.build.source, ctx.project.build, is_installed=checker,
+                   extra_features=ctx.project.features_used())
 
 
 # ── Steps ─────────────────────────────────────────────────────────────────

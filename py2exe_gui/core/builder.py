@@ -44,6 +44,21 @@ DANGEROUS_FLAGS = frozenset({
     "--add-binary",        # ships an arbitrary binary inside the bundle
     "--upx-dir",           # runs an executable from a caller-chosen directory
     "--runtime-tmpdir",    # redirects the onefile extraction directory
+    # 2.0, Nuitka (checked against Nuitka 4.2.2's --help):
+    "--user-plugin",                        # a Python plugin run during the build
+    "--user-package-configuration-file",    # YAML that can patch module source
+    "--include-plugin-directory",           # ships arbitrary code as main files
+    "--include-plugin-files",
+    "--force-runtime-environment-variable",  # sets e.g. PYTHONPATH in every EXE
+    "--onefile-tempdir-spec",               # redirects the onefile extraction directory
+    "--upx-binary",                         # runs an executable it names
+    "--pgo-executable",                     # runs a command during the build
+    "--python-for-scons",                   # runs another Python binary
+    "--windows-nsis-path",                  # runs an installer tool it names
+    "--linux-installer-appimagetool-path",
+    # Consent to download and run tools is the user's to give, per build —
+    # never something a shared settings file grants.
+    "--assume-yes-for-downloads",
 })
 
 

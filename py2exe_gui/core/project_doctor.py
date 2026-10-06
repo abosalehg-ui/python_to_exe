@@ -27,6 +27,7 @@ from py2exe_gui.core.fixes import (
     finding_resolved,
     fix_is_applied,
     flag_fix,
+    localize_findings,
     readiness_score,
     runtime_fix,
     sort_findings,
@@ -79,8 +80,16 @@ def examine(
     config: Optional[BuildConfig] = None,
     is_installed: Callable[[str], bool] = default_is_installed,
     knowledge_path: Optional[str] = None,
+    extra_features: Iterable[str] = (),
+    toolchain=None,
 ) -> DoctorReport:
-    """Run every check against ``source`` built with ``config``."""
+    """Run every check against ``source`` built with ``config``.
+
+    ``extra_features`` are features the project uses outside ``BuildConfig``
+    (Version Info, the manifest: see ``ProjectConfig.features_used``), so an
+    engine that lacks them is reported. ``toolchain`` describes the build
+    machine (default: detected for the interpreter ``is_installed`` asks).
+    """
     config = config or BuildConfig(source=source)
     report = DoctorReport(source=source)
 
@@ -133,8 +142,12 @@ def examine(
     findings += _check_entry_point(tree, source, project_dir)
     findings += _check_icon(config)
     findings += _check_runtime_kit(config, uses_runtime)
+    findings += _check_engine(config, report.imports, is_installed, knowledge_path,
+                              extra_features, toolchain)
 
-    report.findings = sort_findings(f for f in findings if not finding_resolved(config, f))
+    unresolved = [f for f in findings if not finding_resolved(config, f)]
+    # Fixes in the terms of the engine that will build (Nuitka options...).
+    report.findings = sort_findings(localize_findings(unresolved, config.engine))
     return report
 
 
@@ -508,6 +521,39 @@ def _check_icon(config) -> List[Finding]:
     if len(sizes) == 1:
         return [Finding("icon_single_size", SEVERITY_INFO, {"icon": name, "size": str(sizes[0])})]
     return []
+
+
+def _check_engine(config, imports, is_installed, knowledge_path, extra_features,
+                  toolchain) -> List[Finding]:
+    """What the selected engine cannot do, and what it needs on this machine."""
+    from py2exe_gui.core.engines import engine_for
+    from py2exe_gui.core.engines.prerequisites import Toolchain, nuitka_findings
+
+    engine = engine_for(config)
+    findings: List[Finding] = []
+    missing = engine.unsupported_features(config)
+    missing += [f for f in extra_features if not engine.supports(f) and f not in missing]
+    for feature in missing:
+        findings.append(Finding("engine_feature_unsupported", SEVERITY_WARNING,
+                                {"engine": engine.display_name, "feature": feature}))
+    if engine.name != "nuitka":
+        return findings
+
+    if toolchain is None:
+        toolchain = Toolchain.for_python(getattr(is_installed, "python", ""))
+    findings += nuitka_findings(toolchain, is_installed)
+    # Plugins a package needs (stdlib included: tkinter needs tk-inter).
+    knowledge = load_knowledge(knowledge_path)
+    for module in sorted(imports):
+        info = knowledge.get(module)
+        if info is None:
+            continue
+        needed = tuple(f for f in info.engine_fixes(engine.name) if not fix_is_applied(config, f))
+        for fix in needed:
+            findings.append(Finding("nuitka_plugin_for_package", SEVERITY_WARNING,
+                                    {"package": module, "plugin": fix.value.split(" ", 1)[1]},
+                                    (fix,)))
+    return findings
 
 
 def _check_runtime_kit(config, uses_runtime: bool) -> List[Finding]:

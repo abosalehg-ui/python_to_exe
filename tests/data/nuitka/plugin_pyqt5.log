@@ -1,0 +1,16 @@
+Nuitka-Options: Used command line options:
+Nuitka-Options:   --mode=standalone --output-dir=/tmp/claude-0/-home-user-python-to-exe/0679a7d4-5b85-58b2-850f-8732ea649bc4/scratchpad/qtapp/dist --update-check=never --progress-bar=none qtapp.py
+Nuitka: Starting Python compilation with:
+Nuitka:   Version '4.2.2' on Python 3.12 (flavor 'Debian Python') commercial grade 'not installed'.
+Nuitka-Plugins:WARNING: Use '--enable-plugin=pyqt5' for: Inclusion of Qt plugins.
+Nuitka: Completed Python level compilation and optimization.
+Nuitka: Generating source code for C backend compiler.
+Nuitka: Running data composer tool for optimal constant value handling.
+Nuitka: Running C compilation via Scons.
+Nuitka-Scons: Backend C compiler: gcc (gcc 13).
+Nuitka-Scons: Backend C linking with 7 files (no progress information available for this stage).
+Nuitka-Scons:WARNING: You are not using ccache, re-compilation of identical code will be slower than necessary. Use your OS package manager to install it.
+Nuitka-Plugins:data-files: Included data file 'PyQt5/Qt5/.keep_dir.txt' due to empty dir needed for 'PyQt5'.
+Nuitka-Plugins:data-files: Included data file 'PyQt5/Qt/.keep_dir.txt' due to empty dir needed for 'PyQt5'.
+Nuitka: Keeping build directory '/tmp/claude-0/-home-user-python-to-exe/0679a7d4-5b85-58b2-850f-8732ea649bc4/scratchpad/qtapp/dist/qtapp.build'.
+Nuitka: Successfully created '/tmp/claude-0/-home-user-python-to-exe/0679a7d4-5b85-58b2-850f-8732ea649bc4/scratchpad/qtapp/dist/qtapp.dist/qtapp.bin'.

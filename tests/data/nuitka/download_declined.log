@@ -1,0 +1,20 @@
+Nuitka-Options: Used command line options:
+Nuitka-Options:   --mode=standalone --linux-create-installer --product-name=Hello --product-version=1.0.0 --company-name=Me --file-description=Hello --output-dir=/tmp/claude-0/-home-user-python-to-exe/0679a7d4-5b85-58b2-850f-8732ea649bc4/scratchpad/sample/out4/dist --update-check=never --progress-bar=none hello.py
+Nuitka: Starting Python compilation with:
+Nuitka:   Version '4.2.2' on Python 3.12 (flavor 'Debian Python') commercial grade 'not installed'.
+Nuitka-Plugins:anti-bloat: Not including '_json' automatically in order to avoid bloat, but this may cause: may slow down by using fallback implementation.
+Nuitka: Completed Python level compilation and optimization.
+Nuitka: Generating source code for C backend compiler.
+Nuitka: Running data composer tool for optimal constant value handling.
+Nuitka: Running C compilation via Scons.
+Nuitka-Scons: Backend C compiler: gcc (gcc 13).
+Nuitka-Scons: Backend C linking with 6 files (no progress information available for this stage).
+Nuitka-Scons:WARNING: You are not using ccache, re-compilation of identical code will be slower than necessary. Use your OS package manager to install it.
+Nuitka: Keeping build directory '/tmp/claude-0/-home-user-python-to-exe/0679a7d4-5b85-58b2-850f-8732ea649bc4/scratchpad/sample/out4/dist/hello.build'.
+Nuitka: Successfully created '/tmp/claude-0/-home-user-python-to-exe/0679a7d4-5b85-58b2-850f-8732ea649bc4/scratchpad/sample/out4/dist/hello.dist/hello.bin'.
+Nuitka will download appimagetool from the official upstream release to create the Linux installer, it will be cached for future use.
+
+Is it OK to download and put it in local user cache.
+
+Fully automatic, cached. Proceed and download? [Yes]/No : no (default non-interactive)
+FATAL: Error, appimagetool is required to create a Linux installer.

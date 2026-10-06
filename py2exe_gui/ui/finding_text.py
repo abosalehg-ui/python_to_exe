@@ -25,7 +25,7 @@ PIP_CODES = frozenset({"missing_package", "warn_missing_module"})
 # Codes about one knowledge-base package: its note is appended to the detail.
 PACKAGE_CODES = frozenset({
     "package_needs_collect", "package_data_dir", "package_console_streams",
-    "large_package",
+    "large_package", "nuitka_plugin_for_package",
 })
 
 
@@ -37,14 +37,26 @@ def _format(template: str, params: dict) -> str:
         return template
 
 
+def feature_label(feature: str) -> str:
+    """An engine feature key (``core/engines/base.py``) in the active locale."""
+    return getattr(S, f"FEATURE_{feature.upper()}", feature)
+
+
+def _params(finding: Finding) -> dict:
+    params = dict(finding.params)
+    if "feature" in params:
+        params["feature"] = feature_label(params["feature"])
+    return params
+
+
 def finding_title(finding: Finding) -> str:
     template = getattr(S, f"FINDING_{finding.code.upper()}_TITLE", finding.code)
-    return _format(template, finding.params)
+    return _format(template, _params(finding))
 
 
 def finding_detail(finding: Finding) -> str:
     template = getattr(S, f"FINDING_{finding.code.upper()}_DETAIL", "")
-    return _format(template, finding.params)
+    return _format(template, _params(finding))
 
 
 def finding_label(finding: Finding) -> str:
@@ -76,11 +88,15 @@ def pip_command(finding: Finding) -> str:
     return f"pip install {pip}" if pip else ""
 
 
-def package_note(finding: Finding) -> str:
+def package_note(finding: Finding, engine: str = "") -> str:
     if finding.code not in PACKAGE_CODES:
         return ""
     info = lookup(finding.params.get("package", ""))
-    return info.note(current_locale()) if info else ""
+    if info is None:
+        return ""
+    if finding.code == "nuitka_plugin_for_package":
+        engine = "nuitka"
+    return info.note(current_locale(), engine)
 
 
 def copy_text(finding: Finding) -> str:
@@ -104,6 +120,9 @@ def detail_lines(finding: Finding) -> List[str]:
     if finding.alternatives:
         lines += ["", S.DOCTOR_ALT_HEADER]
         lines += [f"  • {fix_label(fix)}" for fix in finding.alternatives]
+    if finding.unsupported:
+        lines += ["", S.DOCTOR_UNSUPPORTED_HEADER]
+        lines += [f"  • {fix_label(fix)}" for fix in finding.unsupported]
     if finding.code in PIP_CODES:
         lines += ["", S.DOCTOR_PIP_HEADER, f"  {pip_command(finding)}"]
     if finding.snippet:

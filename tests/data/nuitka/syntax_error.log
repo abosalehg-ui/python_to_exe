@@ -1,0 +1,14 @@
+Nuitka-Options: Used command line options:
+Nuitka-Options:   --mode=standalone --output-dir=/tmp/claude-0/-home-user-python-to-exe/0679a7d4-5b85-58b2-850f-8732ea649bc4/scratchpad/bad/dist --update-check=never --progress-bar=none syn.py
+Nuitka: Starting Python compilation with:
+Nuitka:   Version '4.2.2' on Python 3.12 (flavor 'Debian Python') commercial grade 'not installed'.
+  File "syn.py", line 1
+    def f(:
+          ^
+SyntaxError: invalid syntax
+
+Nuitka is very syntax compatible with standard Python. It is currently running
+with Python version '3.12', you might want to specify more clearly with the use
+of the precise Python interpreter binary and '-m nuitka', e.g. use this
+'python3.14 -m nuitka' option, if that's not the one the program expects.
+

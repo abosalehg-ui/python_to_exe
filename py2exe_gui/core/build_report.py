@@ -23,6 +23,8 @@ from py2exe_gui.core.size_analyzer import format_size
 _RE_PYINSTALLER = re.compile(r"PyInstaller:\s*([\w.+-]+)")
 _RE_PYTHON = re.compile(r"Python:\s*([\d.]+\w*)")
 _RE_PLATFORM = re.compile(r"Platform:\s*(\S+)")
+# Nuitka's second log line: "Version '4.2.2' on Python 3.12 (flavor ...)".
+_RE_NUITKA = re.compile(r"Nuitka:\s+Version '([^']+)' on Python ([\d.]+)")
 
 
 @dataclass
@@ -41,6 +43,8 @@ class ReportData:
     environment: str = ""
     python_version: str = ""
     pyinstaller_version: str = ""
+    #: 2.0: "Nuitka 4.2.2" for a build by another engine ('' = PyInstaller).
+    engine: str = ""
     platform: str = ""
     command: List[str] = field(default_factory=list)
     #: (label, bytes) per package, biggest first.
@@ -58,7 +62,10 @@ def report_path_for(config: BuildConfig) -> str:
 
 
 def parse_versions(build_log: str) -> Dict[str, str]:
-    """PyInstaller, Python and platform as PyInstaller's first log lines state them."""
+    """PyInstaller, Python and platform as PyInstaller's first log lines state them.
+
+    For a Nuitka build: its version (``nuitka``) and the Python it ran on.
+    """
     found = {}
     for key, pattern in (
         ("pyinstaller", _RE_PYINSTALLER),
@@ -68,6 +75,10 @@ def parse_versions(build_log: str) -> Dict[str, str]:
         match = pattern.search(build_log or "")
         if match:
             found[key] = match.group(1).rstrip(",")
+    match = _RE_NUITKA.search(build_log or "")
+    if match:
+        found["nuitka"] = match.group(1)
+        found.setdefault("python", match.group(2))
     return found
 
 
@@ -179,6 +190,7 @@ def render_html(data: ReportData, labels: Dict[str, str], rtl: bool = False,
         (label("mode"), label("onefile") if data.onefile else label("onedir")),
         (label("environment"), _e(data.environment)),
         (label("python"), _e(data.python_version)),
+        (label("engine"), _e(data.engine)) if data.engine else
         (label("pyinstaller"), _e(data.pyinstaller_version)),
         (label("platform"), _e(data.platform)),
         ("SHA-256", f'<code>{_e(data.sha256) or "—"}</code>'),

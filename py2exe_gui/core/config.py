@@ -13,7 +13,7 @@ RUNTIME_SERVICES = (
 DEFAULT_ENGINE = "pyinstaller"
 #: Engine names this version knows. Kept here, not imported from
 #: ``core/engines``, so the config stays a leaf module with no imports.
-KNOWN_ENGINES = ("pyinstaller",)
+KNOWN_ENGINES = ("pyinstaller", "nuitka")
 
 
 def _engine_name(value: Any) -> str:

@@ -36,24 +36,27 @@ def locate_built_executable(
     output_dir: str,
     output_name: str,
     onefile: bool,
+    engine: str = "pyinstaller",
 ) -> Optional[str]:
     """Return the path to the produced EXE, or None if not found.
 
     Mirrors PyInstaller's layout:
       onefile  : <output_dir>/dist/<name>.exe
       onedir   : <output_dir>/dist/<name>/<name>.exe
-    Also tries name-without-extension for non-Windows hosts.
+    Also tries name-without-extension for non-Windows hosts. Nuitka's folder
+    builds are ``dist/<name>.dist/<name>.exe`` (it always adds ``.dist``).
     """
     if not output_dir or not output_name:
         return None
 
     candidates = []
     base = os.path.join(output_dir, "dist")
+    folder = output_name + ".dist" if engine == "nuitka" else output_name
     for ext in (".exe", ""):
         if onefile:
             candidates.append(os.path.join(base, output_name + ext))
         else:
-            candidates.append(os.path.join(base, output_name, output_name + ext))
+            candidates.append(os.path.join(base, folder, output_name + ext))
     for path in candidates:
         if os.path.isfile(path):
             return path

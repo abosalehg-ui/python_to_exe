@@ -21,7 +21,13 @@ from typing import Dict, Iterable, List, Optional, Sequence, Tuple
 from py2exe_gui.constants import STDLIB_MODULES
 from py2exe_gui.core.config import BuildConfig
 from py2exe_gui.core.diagnostics import build_name, build_root
-from py2exe_gui.core.fixes import SEVERITY_INFO, Finding, fix_is_applied, flag_fix
+from py2exe_gui.core.fixes import (
+    SEVERITY_INFO,
+    Finding,
+    fix_is_applied,
+    flag_fix,
+    localize_findings,
+)
 from py2exe_gui.core.knowledge import import_name_for_dist
 from py2exe_gui.core.project_doctor import local_module_names
 
@@ -29,6 +35,9 @@ from py2exe_gui.core.project_doctor import local_module_names
 GROUP_RUNTIME = "<python-runtime>"
 GROUP_STDLIB = "<stdlib>"
 GROUP_SCRIPT = "<your-code>"
+# 2.0, Nuitka: the program binary minus the bytecode it carries — the
+# compiled modules and the Python runtime, which cannot be told apart.
+GROUP_COMPILED = "<compiled-code>"
 
 _TYPECODES = frozenset({
     "PYMODULE", "PYSOURCE", "BINARY", "EXTENSION", "DATA", "DEPENDENCY",
@@ -188,6 +197,18 @@ def path_size(path: str) -> int:
     return total
 
 
+def analyze(config: BuildConfig, local_modules: Optional[Iterable[str]] = None) -> SizeReport:
+    """Inventory the last build of ``config`` with the engine that made it.
+
+    PyInstaller reads its TOC files (``analyze_build``); Nuitka its
+    compilation report. An engine without a size report gives an empty one.
+    """
+    from py2exe_gui.core.engines import engine_for
+
+    report = engine_for(config).analyze_size(config, local_modules=local_modules)
+    return report if report is not None else SizeReport()
+
+
 def analyze_build(
     config: BuildConfig, top_files: int = 15, local_modules: Optional[Iterable[str]] = None
 ) -> SizeReport:
@@ -284,6 +305,8 @@ def exclude_suggestions(
                 origin="build",
             )
         )
+    if config is not None:
+        findings = localize_findings(findings, config.engine)
     return findings
 
 
@@ -295,7 +318,7 @@ def indirect_packages(report: SizeReport, project_imports: Iterable[str],
     hint that building in an isolated environment may shed some of them.
     """
     used = set(project_imports)
-    special = {GROUP_RUNTIME, GROUP_STDLIB, GROUP_SCRIPT}
+    special = {GROUP_RUNTIME, GROUP_STDLIB, GROUP_SCRIPT, GROUP_COMPILED}
     return [
         (group, size)
         for group, size in report.ranked()
@@ -332,6 +355,7 @@ def group_label_key(group: str) -> str:
         GROUP_RUNTIME: "SIZE_GROUP_RUNTIME",
         GROUP_STDLIB: "SIZE_GROUP_STDLIB",
         GROUP_SCRIPT: "SIZE_GROUP_SCRIPT",
+        GROUP_COMPILED: "SIZE_GROUP_COMPILED",
     }.get(group, "")
 
 

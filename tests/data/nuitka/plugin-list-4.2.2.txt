@@ -1,0 +1,34 @@
+                 The following plugins are available in Nuitka                  
+--------------------------------------------------------------------------------
+ delvewheel        Required by 'delvewheel' using packages. (core) 
+ implicit-imports  Provide implicit imports of package as per package configuration files. (core) [auto-enabled]
+ data-files        Include data files specified by package configuration files. (core, feature) 
+ dll-files         Include DLLs as per package configuration files. (core, feature) 
+ anti-bloat        Patch stupid imports out of widely used library modules source codes. (core, feature, package-support) [auto-enabled]
+ options-nanny     Inform user about potential problems as per package configuration files. (core, package-support) [auto-enabled]
+ pylint-warnings   Support PyLint / PyDev linting source markers. (feature) 
+ source-inclusion  Record and replay selected 'inspect.getsource()' lookups. (feature, package-support) 
+ upx               Compress created binaries with UPX automatically. (integration) 
+ dill-compat       Required by 'dill' and 'cloudpickle' packages. (package-support) [has detector]
+ gevent            Required by 'gevent' package. (package-support) 
+ gi                Required by 'gi' package. (package-support) [auto-enabled]
+ glfw              Required by 'glfw' and 'PyOpenGL' packages. (package-support) 
+ kivy              Required by 'kivy' package. (package-support) 
+ matplotlib        Required by 'matplotlib' package. (package-support) 
+ multiprocessing   Required by 'multiprocessing' package. (package-support) [auto-enabled]
+ no-qt             Disable inclusion of all Qt bindings. (package-support) 
+ pbr-compat        Required by 'pbr' package. (package-support) 
+ pkg-resources     Required by 'pkg_resources' package. (package-support) [auto-enabled]
+ playwright        Required by 'playwright' package. (package-support) 
+ pmw-freezer       Required by 'Pmw' package. (package-support) [has detector]
+ pywebview         Required by 'webview' package. (package-support) 
+ spacy             Required by 'spacy' package. (package-support) 
+ tk-inter          Required by 'tkinter' package. (package-support) [has detector]
+ torch-hub         Resolve and scan Torch Hub repositories for dependency inclusion. (package-support) 
+ torch-jit         Required by 'torch.jit' source inspection in standalone mode. (package-support) 
+ transformers      Required by 'transformers' package. (package-support) [auto-enabled]
+ enum-compat       Required by 'enum' package on Python2. (package-support, python2) 
+ pyqt5             Required by 'PyQt5' package. (package-support, qt-binding) [has detector]
+ pyqt6             Required by 'PyQt6' package. (package-support, qt-binding) [has detector]
+ pyside2           Required by 'PySide2' package. (package-support, qt-binding) [has detector]
+ pyside6           Required by 'PySide6' package. (package-support, qt-binding) [has detector]

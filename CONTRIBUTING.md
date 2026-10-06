@@ -51,8 +51,9 @@ pytest tests/ -m slow               # بناءات PyInstaller حقيقية (د�
 قاعدة معرفة طبيب المشروع ملف بيانات: `py2exe_gui/knowledge/packages.json`.
 المفتاح هو **اسم الاستيراد** (`PIL` لا `Pillow`). الحقول كلها اختيارية:
 `pip`، `hidden_imports`، `collect_data`، `collect_submodules`، `collect_all`،
-`copy_metadata`، `data_dirs`، `console_streams`، `large`، `notes` (`ar` + `en`).
-أضف فقط ما جرّبته فعلاً على بناء حقيقي، ثم شغّل `pytest tests/test_knowledge.py`.
+`copy_metadata`، `data_dirs`، `console_streams`، `large`، `notes` (`ar` + `en`)، و(منذ 2.0)
+`engines` لما يحتاجه محرك آخر فوق ما سبق، مثل `{"nuitka": {"plugins": ["pyqt5"]}}`.
+أضف فقط ما جرّبته فعلاً على بناء حقيقي، ثم شغّل `pytest tests/test_knowledge.py tests/test_nuitka.py`.
 
 ### إضافة محرك بناء
 
@@ -123,9 +124,10 @@ The project doctor's knowledge base is a data file:
 `py2exe_gui/knowledge/packages.json`. Entries are keyed by **import name**
 (`PIL`, not `Pillow`). Every field is optional: `pip`, `hidden_imports`,
 `collect_data`, `collect_submodules`, `collect_all`, `copy_metadata`,
-`data_dirs`, `console_streams`, `large`, `notes` (`ar` + `en`). Only add what
-you have verified against a real build, then run
-`pytest tests/test_knowledge.py`.
+`data_dirs`, `console_streams`, `large`, `notes` (`ar` + `en`) and, since 2.0,
+`engines` for what another engine needs on top of those, e.g.
+`{"nuitka": {"plugins": ["pyqt5"]}}`. Only add what you have verified against a
+real build, then run `pytest tests/test_knowledge.py tests/test_nuitka.py`.
 
 ### Adding a Build Engine
 

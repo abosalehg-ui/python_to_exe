@@ -5,6 +5,58 @@ follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### 2.0.0-dev — Every platform, every engine (milestone 2: Nuitka)
+
+#### Added
+- **Nuitka engine** (`core/engines/nuitka.py`), chosen in the main tab, with
+  `engine = "nuitka"` in `p2e.toml`, or `py2exe-gui build --engine nuitka`.
+  Every option was mapped from the installed Nuitka's own `--help`
+  (**verified against Nuitka 4.2.2**, kept as a test fixture; a test checks
+  that every option the engine can emit is documented there): `--mode=onefile`/
+  `standalone`, output folder and file name, `--windows-console-mode=disable`,
+  the icon, Version Info (`--company-name`, `--product-name`, `--file-version`,
+  `--product-version`, `--file-description`, `--copyright`), data files and
+  folders, included modules, `--python-flag` for the optimization level, UPX
+  (the `upx` plugin) and the one-file splash screen on Windows.
+- Same output layout as PyInstaller: `dist/<name>` for one file (Nuitka's
+  intermediates in `build/nuitka/`), `dist/<name>.dist/` for a folder.
+- **Fix model per engine**: fixes keep PyInstaller's vocabulary and are
+  translated for the engine that builds (`--collect-data` →
+  `--include-package-data`, `--collect-submodules` → `--include-package`,
+  `--copy-metadata` → `--include-distribution-metadata`, `--exclude-module` →
+  `--nofollow-import-to`...). What has no equivalent (`--collect-binaries`, the
+  Runtime Kit) is shown as "no equivalent in this engine" and never applied.
+- **Knowledge base**: optional `engines` section per package
+  (`{"nuitka": {"plugins": [...], "notes": {...}}}`), validated, backward
+  compatible; `PyQt5 → pyqt5` and `tkinter → tk-inter`, both from real builds.
+- **Doctor checks for Nuitka**: a C compiler (MSVC or MinGW on Windows, gcc or
+  clang elsewhere, `CC` honoured), the Python version Nuitka supports (3.15 is
+  only experimental in 4.2.2), `patchelf` and `readelf` on Linux, Nuitka
+  itself, plugins a package needs, and every feature the project asks for that
+  the engine lacks.
+- **Consent for downloads**: Nuitka runs with stdin closed, so its own prompt
+  answers "no". If it stopped for a download, the GUI asks (and the CLI asks,
+  or takes `--allow-downloads`) and adds `--assume-yes-for-downloads` to that
+  one build only. Installing Nuitka is offered with the exact `pip` command.
+- Progress stages and diagnostics read from **real** Nuitka output (logs in
+  `tests/data/nuitka/`): plugin needed, download declined, missing
+  `patchelf`/`readelf`, no working C compiler, syntax errors, experimental
+  Python, Nuitka not installed; runtime tracebacks from `<name>.dist/` and the
+  one-file extraction folder lead to the same fixes as with PyInstaller.
+- **Size lab without TOC files**: Nuitka's compilation report (`--report`)
+  plus a walk of the `<name>.dist` folder. The program binary is split only
+  into what can be measured: the bytecode blob (stdlib) and "compiled code
+  and the Python runtime".
+- The build report names the engine and its version.
+
+#### Security
+- Nuitka options that run code or tools named by the settings
+  (`--user-plugin`, `--user-package-configuration-file`, `--upx-binary`,
+  `--force-runtime-environment-variable`, ...) and `--assume-yes-for-downloads`
+  in a shared file now need the same confirmation as `--runtime-hook`.
+- Nuitka's update check is off (`--update-check=never`,
+  `NUITKA_UPDATE_CHECK=never`): its `--version` otherwise goes online.
+
 ### 2.0.0-dev — Every platform, every engine (milestone 1: engine abstraction)
 
 First milestone of the 2.0 release of [PRODUCT_ROADMAP.md](PRODUCT_ROADMAP.md)

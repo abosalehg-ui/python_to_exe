@@ -65,6 +65,11 @@ FINDING_CODES = (
     "kit_imported_not_enabled", "kit_update_url_missing", "kit_update_url_insecure",
     "kit_update_key_missing", "kit_update_key_invalid", "kit_update_version_invalid",
     "kit_support_url_invalid", "kit_update_needs_installer", "kit_source_missing",
+    # 2.0: engines (core/engines)
+    "engine_feature_unsupported", "nuitka_missing", "nuitka_python_unsupported",
+    "nuitka_python_experimental", "nuitka_no_compiler", "nuitka_no_compiler_macos",
+    "nuitka_no_compiler_windows", "nuitka_tool_missing", "nuitka_compiler_failed",
+    "nuitka_plugin_needed", "nuitka_plugin_for_package", "nuitka_download_declined",
 )
 
 # Penalty per finding when computing the readiness score.
@@ -108,6 +113,9 @@ class Finding:
     # Another way to resolve it, offered instead of ``fixes`` (never applied
     # together with them): log redirection instead of the console, say.
     alternatives: Tuple[Fix, ...] = ()
+    # 2.0: fixes the build's engine has no equivalent for (``localize_finding``).
+    # Shown, never applied.
+    unsupported: Tuple[Fix, ...] = field(default=(), hash=False, compare=False)
 
     @property
     def auto_fixable(self) -> bool:
@@ -161,8 +169,82 @@ def has_flag(extra_args: str, flag: str, argument: str) -> bool:
     return False
 
 
+# ── Engines ───────────────────────────────────────────────────────────────
+#
+# Fixes are written in PyInstaller's vocabulary (``--collect-data x``). With
+# another engine each one is translated to that engine's option, or reported
+# as unsupported — never passed to an engine that does not have it.
+
+
+def _engine(name: str):
+    from py2exe_gui.core.engines import get_engine
+
+    return get_engine(name or "pyinstaller")
+
+
+def localize_fix(fix: Fix, engine: str = "pyinstaller") -> Tuple[Fix, ...]:
+    """``fix`` in ``engine``'s terms: usually one fix, () when unsupported."""
+    eng = _engine(engine)
+    if fix.kind == FIX_RUNTIME:
+        return (fix,) if eng.supports("runtime_kit") else ()
+    if fix.kind != FIX_FLAG:
+        return (fix,)
+    flag, _, argument = fix.value.partition(" ")
+    targets = eng.translate_flag(flag, argument)
+    if not targets:
+        return ()
+    return tuple(flag_fix(f, a) for f, a in targets)
+
+
+def localize_fixes(fixes: Iterable[Fix], engine: str = "pyinstaller"
+                   ) -> Tuple[Tuple[Fix, ...], Tuple[Fix, ...]]:
+    """(translated fixes, original fixes with no equivalent), de-duplicated."""
+    done: List[Fix] = []
+    missing: List[Fix] = []
+    for fix in fixes:
+        translated = localize_fix(fix, engine)
+        if not translated:
+            missing.append(fix)
+        done.extend(t for t in translated if t not in done)
+    return tuple(done), tuple(missing)
+
+
+def localize_finding(finding: Finding, engine: str = "pyinstaller") -> Finding:
+    """``finding`` with its fixes in ``engine``'s terms (unchanged for PyInstaller)."""
+    if (engine or "pyinstaller") == "pyinstaller":
+        return finding
+    fixes, missing = localize_fixes(finding.fixes, engine)
+    alternatives, missing_alt = localize_fixes(finding.alternatives, engine)
+    if (fixes, alternatives) == (finding.fixes, finding.alternatives) and not missing:
+        return finding
+    return replace(finding, fixes=fixes, alternatives=alternatives,
+                   unsupported=finding.unsupported + missing + missing_alt)
+
+
+def localize_findings(findings: Iterable[Finding], engine: str = "pyinstaller") -> List[Finding]:
+    return [localize_finding(f, engine) for f in findings]
+
+
+def _flag_text(engine: str, flag: str, argument: str) -> str:
+    """``--flag argument``, or ``--flag=argument`` for engines that prefer it."""
+    if getattr(_engine(engine), "flag_style", "space") == "equals":
+        return f"{flag}={argument}"
+    return f"{flag} {argument}"
+
+
 def fix_is_applied(config: BuildConfig, fix: Fix) -> bool:
-    """Whether ``config`` already contains what ``fix`` would add."""
+    """Whether ``config`` already contains what ``fix`` would add.
+
+    The fix is first put in the terms of the config's engine; one that engine
+    has no equivalent for can never be applied.
+    """
+    engine = getattr(config, "engine", "pyinstaller")
+    if engine != "pyinstaller":
+        translated = localize_fix(fix, engine)
+        if not translated:
+            return False
+        if translated != (fix,):
+            return all(fix_is_applied(config, t) for t in translated)
     if fix.kind == FIX_HIDDEN_IMPORT:
         return fix.value in config.hidden_imports
     if fix.kind == FIX_ADD_DATA:
@@ -193,8 +275,13 @@ def apply_fixes(
     """Return a new config with ``fixes`` applied, and the fixes that changed it.
 
     The input config is left untouched. Fixes already present are skipped, so
-    applying the same list twice is a no-op the second time.
+    applying the same list twice is a no-op the second time. With an engine
+    other than PyInstaller, fixes are translated first and the ones it has no
+    equivalent for are left out (``localize_fixes`` names them).
     """
+    engine = getattr(config, "engine", "pyinstaller")
+    if engine != "pyinstaller":
+        fixes, _missing = localize_fixes(fixes, engine)
     hidden = list(config.hidden_imports)
     extra_files = list(config.extra_files)
     extra_args = config.extra_args or ""
@@ -221,7 +308,8 @@ def apply_fixes(
         elif fix.kind == FIX_ADD_DATA:
             extra_files.append(fix.value)
         elif fix.kind == FIX_FLAG:
-            extra_args = f"{extra_args} {fix.value}".strip()
+            flag, _, argument = fix.value.partition(" ")
+            extra_args = f"{extra_args} {_flag_text(engine, flag, argument)}".strip()
         elif fix.kind == FIX_CONSOLE:
             windowed = noconsole = False
         elif fix.kind == FIX_SET_SOURCE:

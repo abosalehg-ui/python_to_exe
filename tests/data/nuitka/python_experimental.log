@@ -1,0 +1,4 @@
+Nuitka-Options: Used command line options:
+Nuitka-Options:   --mode=standalone --output-dir=/tmp/claude-0/-home-user-python-to-exe/0679a7d4-5b85-58b2-850f-8732ea649bc4/scratchpad/sample/out7 --update-check=never hello.py
+Nuitka:WARNING: The Python version '3.15' is only experimentally supported by Nuitka '4.2.2', but an upcoming release will change that. In the mean time use Python version '3.14' instead or newer Nuitka.
+Nuitka:WARNING: The Python version '3.15' level 'beta' is only experimentally supported by Nuitka and recommended only for use in Nuitka development and testing.

@@ -1,0 +1,13 @@
+Nuitka-Options: Used command line options:
+Nuitka-Options:   --mode=standalone --output-dir=/tmp/claude-0/-home-user-python-to-exe/0679a7d4-5b85-58b2-850f-8732ea649bc4/scratchpad/sample/out6 --update-check=never --progress-bar=none hello.py
+Nuitka: Starting Python compilation with:
+Nuitka:   Version '4.2.2' on Python 3.12 (flavor 'Debian Python') commercial grade 'not installed'.
+Nuitka-Plugins:anti-bloat: Not including '_json' automatically in order to avoid bloat, but this may cause: may slow down by using fallback implementation.
+Nuitka: Completed Python level compilation and optimization.
+Nuitka: Generating source code for C backend compiler.
+Nuitka: Running data composer tool for optimal constant value handling.
+Nuitka: Running C compilation via Scons.
+FATAL: Error, failed to detect GCC version of backend compiler 'x86_64-conda-linux-gnu-gcc'.
+FATAL: Failed unexpectedly in Scons C backend compilation.
+Nuitka:WARNING:     Complex topic! More information can be found at [94mhttps://nuitka.net/info/scons-backend-failure.html[0m
+Nuitka-Reports: Compilation crash report written to file 'nuitka-crash-report.xml'.

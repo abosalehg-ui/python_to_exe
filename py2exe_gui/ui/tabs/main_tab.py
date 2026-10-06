@@ -20,6 +20,7 @@ from PyQt5.QtWidgets import (
 )
 
 from py2exe_gui.core import classify_line, format_html
+from py2exe_gui.core.engines import engine_names, get_engine
 from py2exe_gui.strings import S
 from py2exe_gui.ui.tabs.base import BaseTab, browse_button
 
@@ -130,6 +131,30 @@ class MainTab(BaseTab):
         row2.addWidget(self.noconfirm_check)
         row2.addWidget(self.strip_check)
 
+        # 2.0: which engine builds. What it cannot do for this project is
+        # listed right under it, before anything is built.
+        # One line: the full, careful description is the tooltip; the status
+        # line appears only when the engine cannot do something asked of it.
+        engine_row = QHBoxLayout()
+        engine_label = QLabel(S.ENGINE_LABEL)
+        self.engine_combo = QComboBox()
+        self.engine_combo.setAccessibleName(S.ENGINE_LABEL)
+        for name in engine_names():
+            self.engine_combo.addItem(get_engine(name).display_name, name)
+        engine_label.setBuddy(self.engine_combo)
+        self.engine_desc = QLabel("")
+        self.engine_desc.setObjectName("aboutMuted")
+        engine_row.addWidget(engine_label)
+        engine_row.addWidget(self.engine_combo)
+        engine_row.addWidget(self.engine_desc, stretch=1)
+        self.engine_status = QLabel("")
+        self.engine_status.setWordWrap(True)
+        self.engine_status.setVisible(False)
+        self.engine_combo.currentIndexChanged.connect(self._on_engine_changed)
+        self._show_engine_desc()
+
+        options_layout.addLayout(engine_row)
+        options_layout.addWidget(self.engine_status)
         options_layout.addLayout(row1)
         options_layout.addLayout(row2)
         layout.addWidget(options_group)
@@ -376,6 +401,40 @@ class MainTab(BaseTab):
             return
         self.log(S.LOG_EXPORT_OK.format(path=path))
 
+    # ── Engine ─────────────────────────────────────────────────────────────
+
+    def engine_name(self) -> str:
+        return self.engine_combo.currentData() or "pyinstaller"
+
+    def set_engine(self, name: str) -> None:
+        index = self.engine_combo.findData(name)
+        self.engine_combo.setCurrentIndex(index if index >= 0 else 0)
+
+    def _show_engine_desc(self):
+        name = self.engine_name()
+        full = getattr(S, f"ENGINE_DESC_{name.upper()}", "")
+        self.engine_desc.setText(getattr(S, f"ENGINE_SHORT_{name.upper()}", ""))
+        for widget in (self.engine_combo, self.engine_desc):
+            widget.setToolTip(f"{S.ENGINE_TIP}\n\n{full}")
+        self.engine_desc.setAccessibleDescription(full)
+
+    def _on_engine_changed(self, _index=None):
+        self._show_engine_desc()
+        handler = getattr(self.window, "on_engine_changed", None)
+        if handler is not None:
+            handler()
+
+    def set_engine_status(self, unsupported):
+        """Name the features the selected engine cannot provide (keys); hide when none."""
+        if not unsupported:
+            self.engine_status.setText(S.ENGINE_ALL_SUPPORTED)
+            self.engine_status.setVisible(False)
+            return
+        labels = ", ".join(getattr(S, f"FEATURE_{f.upper()}", f) for f in unsupported)
+        self.engine_status.setText(S.ENGINE_UNSUPPORTED_FMT.format(
+            engine=self.engine_combo.currentText(), features=labels))
+        self.engine_status.setVisible(True)
+
     # ── The project model ──────────────────────────────────────────────────
 
     def read_project(self, project):
@@ -390,6 +449,7 @@ class MainTab(BaseTab):
         build.clean = self.clean_check.isChecked()
         build.noconfirm = self.noconfirm_check.isChecked()
         build.strip = self.strip_check.isChecked()
+        build.engine = self.engine_name()
 
     def apply_project(self, project, sections=()):
         if "build" not in sections:
@@ -405,3 +465,4 @@ class MainTab(BaseTab):
         self.noconsole_check.setChecked(build.noconsole)
         self.noconfirm_check.setChecked(build.noconfirm)
         self.strip_check.setChecked(build.strip)
+        self.set_engine(build.engine)

@@ -51,11 +51,12 @@ def installer_basename(config: BuildConfig, version: str) -> str:
 
 
 def built_output(config: BuildConfig) -> str:
-    """The EXE (one-file) or the folder (one-dir) PyInstaller produced; '' if none."""
+    """The EXE (one-file) or the folder (one-dir) the engine produced; '' if none."""
     exe = locate_built_executable(
         config.output_dir or os.path.dirname(config.source),
         build_name(config),
         config.onefile,
+        engine=config.engine,
     )
     if not exe:
         return ""
