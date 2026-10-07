@@ -1,0 +1,73 @@
+{
+  "folder": "/tmp/claude-0/-home-user-python-to-exe/0679a7d4-5b85-58b2-850f-8732ea649bc4/scratchpad/fx_kit_onefile/p2e_compare",
+  "engines": [
+    {
+      "engine": "pyinstaller",
+      "built": true,
+      "error": "",
+      "findings": [],
+      "build_seconds": 6.787,
+      "output": "/tmp/claude-0/-home-user-python-to-exe/0679a7d4-5b85-58b2-850f-8732ea649bc4/scratchpad/fx_kit_onefile/p2e_compare/pyinstaller/dist/kitapp",
+      "size_bytes": 7529488,
+      "smoke": {
+        "passed": true,
+        "returncode": 0
+      },
+      "startup": {
+        "method": "probe",
+        "timeout": 10.0,
+        "median_seconds": 0.14729452699999968,
+        "runs": [
+          {
+            "method": "probe",
+            "seconds": 0.14739617500001145
+          },
+          {
+            "method": "probe",
+            "seconds": 0.14211894399998926
+          },
+          {
+            "method": "probe",
+            "seconds": 0.14729452699999968
+          },
+          {
+            "method": "probe",
+            "seconds": 0.11484069499999805
+          },
+          {
+            "method": "probe",
+            "seconds": 0.15536655500000052
+          }
+        ]
+      },
+      "unsupported": []
+    },
+    {
+      "engine": "nuitka",
+      "built": false,
+      "error": "",
+      "findings": [
+        "engine_feature_unsupported"
+      ],
+      "build_seconds": 0.0,
+      "output": "",
+      "size_bytes": 0,
+      "smoke": null,
+      "startup": null,
+      "unsupported": [
+        "runtime_kit"
+      ]
+    }
+  ],
+  "recommendation": "pyinstaller",
+  "reasons": [
+    {
+      "code": "not_built",
+      "engine": "nuitka"
+    },
+    {
+      "code": "only_working",
+      "engine": "pyinstaller"
+    }
+  ]
+}

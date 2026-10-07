@@ -1,0 +1,112 @@
+{
+  "folder": "/tmp/claude-0/-home-user-python-to-exe/0679a7d4-5b85-58b2-850f-8732ea649bc4/scratchpad/fx_yaml_onefile/p2e_compare",
+  "engines": [
+    {
+      "engine": "pyinstaller",
+      "built": true,
+      "error": "",
+      "findings": [],
+      "build_seconds": 8.235,
+      "output": "/tmp/claude-0/-home-user-python-to-exe/0679a7d4-5b85-58b2-850f-8732ea649bc4/scratchpad/fx_yaml_onefile/p2e_compare/pyinstaller/dist/yamlapp",
+      "size_bytes": 8316000,
+      "smoke": {
+        "passed": true,
+        "returncode": 0
+      },
+      "startup": {
+        "method": "exit",
+        "timeout": 10.0,
+        "median_seconds": 0.20184785700000418,
+        "runs": [
+          {
+            "method": "exit",
+            "seconds": 0.20184785700000418
+          },
+          {
+            "method": "exit",
+            "seconds": 0.18307055500000047
+          },
+          {
+            "method": "exit",
+            "seconds": 0.21974748899999952
+          },
+          {
+            "method": "exit",
+            "seconds": 0.1830093450000021
+          },
+          {
+            "method": "exit",
+            "seconds": 0.20783432900000065
+          }
+        ]
+      },
+      "unsupported": []
+    },
+    {
+      "engine": "nuitka",
+      "built": true,
+      "error": "",
+      "findings": [],
+      "build_seconds": 40.256,
+      "output": "/tmp/claude-0/-home-user-python-to-exe/0679a7d4-5b85-58b2-850f-8732ea649bc4/scratchpad/fx_yaml_onefile/p2e_compare/nuitka/dist/yamlapp",
+      "size_bytes": 5527768,
+      "smoke": {
+        "passed": true,
+        "returncode": 0
+      },
+      "startup": {
+        "method": "exit",
+        "timeout": 10.0,
+        "median_seconds": 0.10784953200000302,
+        "runs": [
+          {
+            "method": "exit",
+            "seconds": 0.11238733099999365
+          },
+          {
+            "method": "exit",
+            "seconds": 0.1372439020000087
+          },
+          {
+            "method": "exit",
+            "seconds": 0.10784953200000302
+          },
+          {
+            "method": "exit",
+            "seconds": 0.1065069760000057
+          },
+          {
+            "method": "exit",
+            "seconds": 0.10341811099999632
+          }
+        ]
+      },
+      "unsupported": []
+    }
+  ],
+  "recommendation": "nuitka",
+  "reasons": [
+    {
+      "code": "startup_faster",
+      "engine": "nuitka",
+      "other": "pyinstaller",
+      "fast": 0.10784953200000302,
+      "slow": 0.20184785700000418,
+      "method": "exit"
+    },
+    {
+      "code": "smaller",
+      "engine": "nuitka",
+      "other": "pyinstaller",
+      "small": 5527768,
+      "big": 8316000
+    },
+    {
+      "code": "builds_faster",
+      "engine": "pyinstaller",
+      "other": "nuitka",
+      "fast": 8.235233124,
+      "slow": 40.255588029
+    }
+  ]
+}

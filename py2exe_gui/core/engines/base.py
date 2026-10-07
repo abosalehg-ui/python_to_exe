@@ -267,7 +267,14 @@ class Engine:
         return []
 
     def prepare_output(self, config: BuildConfig) -> None:
-        """Create any folder the engine expects to exist before it runs."""
+        """Create any folder the engine expects to exist before it runs.
+
+        At least the output folder: the build runs *in* it, and a project
+        whose ``output_dir`` does not exist yet (a fresh checkout, a compare
+        folder) would otherwise fail before the engine even starts.
+        """
+        if config.output_dir:
+            os.makedirs(config.output_dir, exist_ok=True)
 
     def translate_flag(self, flag: str, argument: str) -> Optional[List[Tuple[str, str]]]:
         """This engine's equivalent of a fix's ``--flag argument``.

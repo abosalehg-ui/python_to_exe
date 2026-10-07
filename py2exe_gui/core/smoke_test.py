@@ -7,6 +7,8 @@ import tempfile
 from dataclasses import dataclass
 from typing import Optional
 
+from py2exe_gui.core.process_tree import group_kwargs, kill_tree
+
 
 @dataclass
 class SmokeResult:
@@ -102,30 +104,36 @@ def run_smoke_test(
     # dialog (Windows) and look alive until the timeout.
     env = dict(os.environ, P2E_RUNTIME_NO_DIALOGS="1")
     try:
-        completed = subprocess.run(
-            [exe_path],
-            capture_output=True,
-            text=True,
-            timeout=timeout,
-            cwd=cwd,
-            env=env,
-        )
-    except subprocess.TimeoutExpired as e:
-        return SmokeResult(
-            ran=True, exited_cleanly=False, returncode=None,
-            error="", output=_combined(e.stdout, e.stderr),
+        # Its own process group: a timeout must also end what the EXE started
+        # (a one-file EXE's app runs as a child of the bootloader).
+        process = subprocess.Popen(
+            [exe_path], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True,
+            encoding="utf-8", errors="replace", stdin=subprocess.DEVNULL,
+            cwd=cwd, env=env, **group_kwargs(),
         )
     except OSError as e:
         return SmokeResult(
             ran=False, exited_cleanly=False, returncode=None,
             error=str(e),
         )
+    try:
+        stdout, stderr = process.communicate(timeout=timeout)
+    except subprocess.TimeoutExpired:
+        kill_tree(process)
+        try:
+            stdout, stderr = process.communicate(timeout=5)
+        except subprocess.TimeoutExpired:
+            stdout, stderr = "", ""
+        return SmokeResult(
+            ran=True, exited_cleanly=False, returncode=None,
+            error="", output=_combined(stdout, stderr),
+        )
     return SmokeResult(
         ran=True,
         exited_cleanly=True,
-        returncode=completed.returncode,
-        error=(completed.stderr or "")[:500],
-        output=_combined(completed.stdout, completed.stderr),
+        returncode=process.returncode,
+        error=(stderr or "")[:500],
+        output=_combined(stdout, stderr),
     )
 
 

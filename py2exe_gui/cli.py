@@ -28,7 +28,7 @@ EXIT_CONSENT = 4  # a step needed a yes it did not get
 EXIT_TOOL = 5  # a required tool is missing (PyInstaller, the environment...)
 EXIT_INTERRUPTED = 130
 
-COMMANDS = ("init", "doctor", "build", "size", "env", "release")
+COMMANDS = ("init", "doctor", "build", "size", "compare", "env", "release")
 SIGN_PASSWORD_ENV = "P2E_SIGN_PASSWORD"
 LANG_ENV = "P2E_LANG"
 
@@ -157,6 +157,14 @@ def build_parser() -> argparse.ArgumentParser:
 
     p = command("size", S.CLI_HELP_SIZE)
     p.add_argument("--json", action="store_true", help=S.CLI_HELP_JSON)
+
+    p = command("compare", S.CLI_HELP_COMPARE)
+    p.add_argument("--runs", type=int, default=5, metavar="N", help=S.CLI_HELP_RUNS)
+    p.add_argument("--timeout", type=float, default=10.0, metavar="S", help=S.CLI_HELP_TIMEOUT)
+    p.add_argument("--json", action="store_true", help=S.CLI_HELP_JSON)
+    p.add_argument("--yes", "-y", action="store_true", help=S.CLI_HELP_YES)
+    p.add_argument("--allow-downloads", dest="allow_downloads", action="store_true",
+                   help=S.CLI_HELP_ALLOW_DOWNLOADS)
 
     p = command("env", S.CLI_HELP_ENV)
     p.add_argument("action", choices=("create", "lock", "delete"))
@@ -487,6 +495,84 @@ def cmd_size(args, console: Console) -> int:
     return EXIT_OK
 
 
+def cmd_compare(args, console: Console) -> int:
+    from py2exe_gui.core.compare import COMPARE_DIR, recommend, run_compare
+    from py2exe_gui.core.diagnostics import build_root
+    from py2exe_gui.core.engines import engine_names, get_engine
+    from py2exe_gui.strings import S
+    from py2exe_gui.texts import (
+        compare_table,
+        engine_label,
+        is_rtl,
+        recommendation_lines,
+        runtime_texts,
+    )
+
+    loaded = _load(args, console)
+    project = loaded.project
+    _review_untrusted(project, console)
+    python = _build_python(project)
+    if not python:
+        console.print(S.CLI_ENV_NEEDED)
+        _create_env(project, console, base_python="", recreate=False)
+        python = _build_python(project)
+    for name in engine_names():
+        _ensure_engine(get_engine(name), python, console)
+
+    phases = {"build": S.COMPARE_PHASE_BUILD, "smoke": S.COMPARE_PHASE_SMOKE,
+              "startup": S.COMPARE_PHASE_STARTUP}
+
+    # With --json, stdout carries only the JSON document; progress goes to stderr.
+    progress = console.error if args.json else console.print
+
+    def on_engine(engine: str, phase: str) -> None:
+        progress(phases[phase].format(engine=engine_label(engine)))
+
+    def on_stage(engine: str, stage: str, percent: int) -> None:
+        label = getattr(S, f"STAGE_{stage.upper()}", stage)
+        progress(S.CLI_COMPARE_ENGINE.format(engine=engine_label(engine),
+                                             phase=f"{label} {percent}%"))
+
+    rows = run_compare(project, python, runs=max(1, args.runs), timeout=max(0.5, args.timeout),
+                       texts=runtime_texts(), rtl=is_rtl(),
+                       allow_downloads=bool(args.allow_downloads),
+                       on_engine=on_engine, on_stage=on_stage)
+    rec = recommend(rows)
+    folder = os.path.join(build_root(project.build), COMPARE_DIR)
+    if args.json:
+        console.print(json.dumps({
+            "folder": folder,
+            "engines": [{
+                "engine": r.engine, "built": r.built, "error": r.error,
+                "findings": [f.code for f in r.findings],
+                "build_seconds": round(r.build_seconds, 3), "output": r.output_path,
+                "size_bytes": r.size_bytes,
+                "smoke": None if r.smoke is None else {"passed": r.smoke.passed,
+                                                       "returncode": r.smoke.returncode},
+                "startup": None if r.startup is None else {
+                    "method": r.startup.method, "timeout": r.startup.timeout,
+                    "median_seconds": r.startup.median,
+                    "runs": [{"method": t.method, "seconds": t.seconds}
+                             for t in r.startup.runs]},
+                "unsupported": r.unsupported,
+            } for r in rows],
+            "recommendation": rec.engine,
+            "reasons": [{"code": x.code, **{k: v for k, v in x.params.items()}}
+                        for x in rec.reasons],
+        }, ensure_ascii=False, indent=2, default=str))
+    else:
+        width = max(len(label) for label, _cells in compare_table(rows)) + 2
+        header = "".ljust(width) + " | ".join(engine_label(r.engine) for r in rows)
+        console.print(header)
+        for label, cells in compare_table(rows):
+            console.print(label.ljust(width) + " | ".join(cells))
+        console.print("")
+        for line in recommendation_lines(rec):
+            console.print(line)
+        console.print(S.COMPARE_DONE_LOG.format(folder=folder))
+    return EXIT_OK if rec.engine else EXIT_FAILED
+
+
 def _create_env(project, console: Console, base_python: str, recreate: bool) -> None:
     from datetime import datetime
 
@@ -696,7 +782,7 @@ def cmd_release(args, console: Console) -> int:
 
 HANDLERS = {
     "init": cmd_init, "doctor": cmd_doctor, "build": cmd_build, "size": cmd_size,
-    "env": cmd_env, "release": cmd_release,
+    "env": cmd_env, "release": cmd_release, "compare": cmd_compare,
 }
 
 

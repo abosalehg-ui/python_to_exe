@@ -20,6 +20,9 @@ from PyQt5.QtWidgets import (
     QListWidgetItem,
     QPushButton,
     QRadioButton,
+    QSpinBox,
+    QTableWidget,
+    QTableWidgetItem,
     QTreeWidget,
     QTreeWidgetItem,
     QVBoxLayout,
@@ -72,6 +75,7 @@ class SizeTab(BaseTab):
         layout.addWidget(self._build_env_group())
         layout.addWidget(self._build_size_group())
         layout.addWidget(self._build_suggestions_group())
+        layout.addWidget(self._build_compare_group())
         layout.addWidget(self._build_report_group())
         layout.addStretch(1)
 
@@ -292,6 +296,79 @@ class SizeTab(BaseTab):
             self.window.apply_doctor_fixes(self.checked_fixes(), rebuild=rebuild)
 
     # ── Report ─────────────────────────────────────────────────────────────
+
+    # ── Compare engines (2.0) ──────────────────────────────────────────────
+
+    def _build_compare_group(self) -> QGroupBox:
+        group = QGroupBox(S.COMPARE_GROUP)
+        box = QVBoxLayout(group)
+        box.addWidget(_muted(S.COMPARE_INTRO.format(folder="p2e_compare/<engine>")))
+
+        row = QHBoxLayout()
+        runs_label = QLabel(S.COMPARE_RUNS_LABEL)
+        self.compare_runs = QSpinBox()
+        self.compare_runs.setRange(1, 20)
+        self.compare_runs.setValue(5)
+        self.compare_runs.setAccessibleName(S.COMPARE_RUNS_LABEL)
+        runs_label.setBuddy(self.compare_runs)
+        timeout_label = QLabel(S.COMPARE_TIMEOUT_LABEL)
+        self.compare_timeout = QSpinBox()
+        self.compare_timeout.setRange(1, 120)
+        self.compare_timeout.setValue(10)
+        self.compare_timeout.setAccessibleName(S.COMPARE_TIMEOUT_LABEL)
+        timeout_label.setBuddy(self.compare_timeout)
+        self.compare_btn = QPushButton(S.BTN_COMPARE)
+        self.compare_btn.setAccessibleName(S.BTN_COMPARE)
+        self.compare_btn.clicked.connect(self.window_action("start_compare"))
+        for widget in (runs_label, self.compare_runs, timeout_label, self.compare_timeout):
+            row.addWidget(widget)
+        row.addStretch(1)
+        row.addWidget(self.compare_btn)
+        box.addLayout(row)
+
+        self.compare_table = QTableWidget(0, 0)
+        self.compare_table.setEditTriggers(QTableWidget.NoEditTriggers)
+        self.compare_table.setWordWrap(True)
+        self.compare_table.setVisible(False)
+        box.addWidget(self.compare_table)
+        self.compare_result = QLabel("")
+        self.compare_result.setWordWrap(True)
+        self.compare_result.setTextInteractionFlags(Qt.TextSelectableByMouse)
+        self.compare_result.setVisible(False)
+        box.addWidget(self.compare_result)
+        return group
+
+    def show_compare(self, rows, recommendation):
+        """Fill the comparison table and the recommendation (None clears them)."""
+        from py2exe_gui.texts import compare_table, engine_label, recommendation_lines
+
+        if not rows:
+            self.compare_table.setVisible(False)
+            self.compare_result.setVisible(False)
+            return
+        table = compare_table(rows, isolate=True)
+        self.compare_table.clear()
+        self.compare_table.setColumnCount(len(rows))
+        self.compare_table.setRowCount(len(table))
+        self.compare_table.setHorizontalHeaderLabels([engine_label(r.engine) for r in rows])
+        self.compare_table.setVerticalHeaderLabels([label for label, _cells in table])
+        for i, (_label, cells) in enumerate(table):
+            for j, text in enumerate(cells):
+                item = QTableWidgetItem(text)
+                item.setToolTip(text)
+                self.compare_table.setItem(i, j, item)
+        header = self.compare_table.horizontalHeader()
+        header.setSectionResizeMode(QHeaderView.Stretch)
+        self.compare_table.resizeRowsToContents()
+        # Every row visible: the table is short, and a scroll bar inside the
+        # tab's own scroll area hides the last rows.
+        rows_height = sum(self.compare_table.rowHeight(i) for i in range(len(table)))
+        frame = 2 * self.compare_table.frameWidth() + 16
+        self.compare_table.setFixedHeight(rows_height + header.height() + frame)
+        self.compare_table.setVisible(True)
+        lines = recommendation_lines(recommendation, isolate=True)
+        self.compare_result.setText("\n".join(lines))
+        self.compare_result.setVisible(True)
 
     def _build_report_group(self) -> QGroupBox:
         group = QGroupBox(S.GROUP_REPORT)

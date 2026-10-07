@@ -86,8 +86,9 @@ from py2exe_gui.core.build_report import (
     write_report,
 )
 from py2exe_gui.core.build_runner import popen_options
+from py2exe_gui.core.compare import COMPARE_DIR
 from py2exe_gui.core.diagnostics import build_name, build_root
-from py2exe_gui.core.engines import engine_for
+from py2exe_gui.core.engines import engine_for, engine_names, get_engine
 from py2exe_gui.core.fixes import (
     ORIGIN_BUILD,
     ORIGIN_RUNTIME,
@@ -184,6 +185,7 @@ from py2exe_gui.styles import (
 from py2exe_gui.templates import TEMPLATES, template_name
 from py2exe_gui.texts import notes_titles, project_error_text, runtime_texts
 from py2exe_gui.ui.batch_thread import BatchThread
+from py2exe_gui.ui.compare_thread import CompareThread
 from py2exe_gui.ui.conversion_thread import ConversionThread
 from py2exe_gui.ui.diagnostic_thread import DiagnosticThread
 from py2exe_gui.ui.dialogs import (
@@ -252,6 +254,7 @@ class MainWindow(QMainWindow):
         self.installer_thread = None
         self.post_build_thread = None
         self.batch_thread = None
+        self.compare_thread = None
         self.diagnostic_thread = None
         self.env_thread = None
         self.settings = {}
@@ -280,6 +283,9 @@ class MainWindow(QMainWindow):
         # Set by the person, for the next build only (Nuitka's downloads).
         self._allow_downloads_once = False
         self._size_view = None
+        # The last comparison (rows, recommendation), re-rendered on a
+        # language switch like the size lab.
+        self._compare_view = None
         self._last_report_path = ""
         # The open project file ('' = none) and the state it was saved in,
         # for the window title's unsaved-changes marker.
@@ -890,10 +896,67 @@ class MainWindow(QMainWindow):
             f"{summary.succeeded}/{summary.total}",
         )
 
+    # ─── Compare engines (2.0) ──────────────────────────────────────────
+
+    def start_compare(self, allow_downloads: bool = False):
+        """Build the project with every engine into p2e_compare/, then measure."""
+        if self._build_in_progress():
+            QMessageBox.warning(self, S.MSG_WARNING, S.MSG_COMPARE_BUSY)
+            return
+        project = self._current_project()
+        config = project.build
+        if not config.source or not os.path.isfile(config.source):
+            QMessageBox.warning(self, S.MSG_WARNING, S.ERR_NO_SOURCE)
+            return
+        if config.isolated_env and not env_exists(self._env_dir(config.source)):
+            QMessageBox.warning(self, S.MSG_WARNING, S.FINDING_ENV_NOT_CREATED_DETAIL)
+            return
+        python = self.build_python(config)
+        for name in engine_names():
+            if not self._ensure_engine(get_engine(name), python):
+                return
+        self.size_tab.show_compare([], None)
+        self.size_tab.compare_btn.setEnabled(False)
+        self.convert_btn.setEnabled(False)
+        self.progress_bar.setRange(0, 0)  # busy: one bar for several builds
+        self.compare_thread = CompareThread(
+            project, python, runs=self.size_tab.compare_runs.value(),
+            timeout=float(self.size_tab.compare_timeout.value()),
+            texts=self._runtime_texts(), rtl=self._rtl(), allow_downloads=allow_downloads,
+        )
+        self.compare_thread.log_signal.connect(self._append_log)
+        self.compare_thread.phase_signal.connect(self._on_compare_phase)
+        self.compare_thread.finished_signal.connect(self._on_compare_finished)
+        self.compare_thread.start()
+
+    def _on_compare_phase(self, engine: str, phase: str):
+        template = getattr(S, f"COMPARE_PHASE_{phase.upper()}", "{engine}")
+        text = template.format(engine=get_engine(engine).display_name)
+        self.progress_bar.setFormat(text)
+        self._append_log(text)
+
+    def _on_compare_finished(self, rows, recommendation):
+        self.progress_bar.setRange(0, 100)
+        self.progress_bar.setValue(0)
+        self.progress_bar.setFormat(S.PROGRESS_READY)
+        self.size_tab.compare_btn.setEnabled(True)
+        self.convert_btn.setEnabled(True)
+        self._compare_view = (rows, recommendation)
+        self.size_tab.show_compare(rows, recommendation)
+        config = self._current_config()
+        self._append_log(S.COMPARE_DONE_LOG.format(
+            folder=os.path.join(build_root(config), COMPARE_DIR)))
+        self.tabs.setCurrentWidget(self.size_tab)
+        declined = [f for row in rows for f in row.findings
+                    if f.code == "nuitka_download_declined"]
+        if declined and self.ask_download_consent(declined[0].params.get("tool", "")):
+            self._allow_downloads_once = False  # the consent goes to this comparison
+            self.start_compare(allow_downloads=True)
+
     def _build_in_progress(self) -> bool:
         for thread in (
             self.conversion_thread, self.batch_thread, self.diagnostic_thread, self.env_thread,
-            self.release_thread,
+            self.release_thread, self.compare_thread,
         ):
             if thread and thread.isRunning():
                 return True
@@ -1938,6 +2001,8 @@ class MainWindow(QMainWindow):
     def _refresh_size_view(self):
         """Render the size lab. Text is built here, so a language switch
         re-renders it in the new language rather than keeping the old one."""
+        if self._compare_view is not None:
+            self.size_tab.show_compare(*self._compare_view)
         if self._size_view is None:
             self.size_tab.show_size_report(None)
             self.size_tab.show_suggestions([])
@@ -2969,7 +3034,7 @@ class MainWindow(QMainWindow):
             # orphans a PyInstaller run after the window is gone.
             for thread in (
                 self.conversion_thread, self.batch_thread, self.diagnostic_thread,
-                self.env_thread,
+                self.env_thread, self.compare_thread,
             ):
                 if thread and thread.isRunning():
                     thread.cancel()
