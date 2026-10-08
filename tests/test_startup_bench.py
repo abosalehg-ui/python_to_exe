@@ -21,6 +21,26 @@ from py2exe_gui.core.smoke_test import run_smoke_test
 posix_only = pytest.mark.skipif(sys.platform == "win32", reason="needs a shebang script")
 
 
+def gone(pid, wait=5.0):
+    """True once ``pid`` no longer runs. A killed orphan can linger as a
+    zombie until the container's init reaps it, so a zombie counts as gone."""
+    deadline = time.monotonic() + wait
+    while True:
+        try:
+            os.kill(pid, 0)
+        except OSError:
+            return True
+        try:
+            with open(f"/proc/{pid}/stat") as f:
+                if f.read().rsplit(")", 1)[1].split()[0] == "Z":
+                    return True
+        except OSError:
+            pass
+        if time.monotonic() > deadline:
+            return False
+        time.sleep(0.05)
+
+
 def program(tmp_path, name, body):
     path = tmp_path / name
     path.write_text(f"#!{sys.executable}\n{body}")
@@ -85,9 +105,7 @@ def test_a_timeout_ends_the_whole_process_group(tmp_path):
     exe = program(tmp_path, "parent", body)
     sb.measure_startup(exe, runs=1, timeout=1.5)
     child = int(marker.read_text())
-    time.sleep(0.3)
-    with pytest.raises(OSError):
-        os.kill(child, 0)  # gone: no orphan left behind
+    assert gone(child)  # no orphan left behind
 
 
 @posix_only
@@ -104,10 +122,7 @@ def test_the_smoke_test_no_longer_orphans_children(tmp_path):
     result = run_smoke_test(exe, timeout=1.5)
     assert result.ran and result.passed and result.returncode is None
     assert "up" in result.output
-    child = int(marker.read_text())
-    time.sleep(0.3)
-    with pytest.raises(OSError):
-        os.kill(child, 0)
+    assert gone(int(marker.read_text()))
 
 
 def test_missing_program():
