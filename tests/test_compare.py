@@ -16,6 +16,7 @@ from py2exe_gui import cli
 from py2exe_gui.core import compare as cmp
 from py2exe_gui.core.build_runner import BuildOutcome
 from py2exe_gui.core.config import BuildConfig, RuntimeKitConfig
+from py2exe_gui.core.engines import get_engine
 from py2exe_gui.core.fixes import Finding
 from py2exe_gui.core.project_file import ProjectConfig
 from py2exe_gui.core.smoke_test import SmokeResult
@@ -38,6 +39,18 @@ def load(name):
         return json.load(f)
 
 
+def _finding(code, data) -> Finding:
+    """The finding as the run reported it (the fixtures predate finding_details)."""
+    for detail in data.get("finding_details", ()):
+        if detail["code"] == code:
+            return Finding(code, "error", dict(detail["params"]))
+    params = {}
+    if code == "engine_feature_unsupported" and data["unsupported"]:
+        params = {"engine": get_engine(data["engine"]).display_name,
+                  "feature": data["unsupported"][0]}
+    return Finding(code, "error", params)
+
+
 def row_from_json(data) -> cmp.EngineRun:
     startup = None
     if data["startup"] is not None:
@@ -51,7 +64,7 @@ def row_from_json(data) -> cmp.EngineRun:
                             returncode=data["smoke"]["returncode"])
     return cmp.EngineRun(
         data["engine"], built=data["built"], error=data["error"],
-        findings=[Finding(code, "error") for code in data["findings"]],
+        findings=[_finding(code, data) for code in data["findings"]],
         build_seconds=data["build_seconds"], output_path=data["output"],
         size_bytes=data["size_bytes"], smoke=smoke, startup=startup,
         unsupported=list(data["unsupported"]))
@@ -312,6 +325,7 @@ def test_cli_compare_json_keeps_stdout_clean(cli_project):
     r = run_cli("compare", "--json")
     data = json.loads(r.out)  # nothing but the document on stdout
     assert data["recommendation"] == "nuitka"
+    assert all("finding_details" in e for e in data["engines"])
     assert [e["engine"] for e in data["engines"]] == ["pyinstaller", "nuitka"]
     assert "PyInstaller: building…" in r.err
 

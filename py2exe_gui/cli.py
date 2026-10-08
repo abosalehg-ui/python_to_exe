@@ -545,6 +545,8 @@ def cmd_compare(args, console: Console) -> int:
             "engines": [{
                 "engine": r.engine, "built": r.built, "error": r.error,
                 "findings": [f.code for f in r.findings],
+                "finding_details": [{"code": f.code, "params": dict(f.params)}
+                                    for f in r.findings],
                 "build_seconds": round(r.build_seconds, 3), "output": r.output_path,
                 "size_bytes": r.size_bytes,
                 "smoke": None if r.smoke is None else {"passed": r.smoke.passed,
