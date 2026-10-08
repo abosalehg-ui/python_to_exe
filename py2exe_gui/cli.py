@@ -114,6 +114,12 @@ def _requested_language(argv: List[str]) -> str:
 # ── Parser ────────────────────────────────────────────────────────────────
 
 
+def engine_choices() -> List[str]:
+    from py2exe_gui.core.engines import engine_names
+
+    return engine_names()
+
+
 def build_parser() -> argparse.ArgumentParser:
     from py2exe_gui.constants import APP_VERSION
     from py2exe_gui.strings import S
@@ -145,6 +151,9 @@ def build_parser() -> argparse.ArgumentParser:
     p = command("build", S.CLI_HELP_BUILD)
     p.add_argument("--strict", action="store_true", help=S.CLI_HELP_STRICT)
     p.add_argument("--yes", "-y", action="store_true", help=S.CLI_HELP_YES)
+    p.add_argument("--engine", choices=engine_choices(), help=S.CLI_HELP_ENGINE)
+    p.add_argument("--allow-downloads", dest="allow_downloads", action="store_true",
+                   help=S.CLI_HELP_ALLOW_DOWNLOADS)
 
     p = command("size", S.CLI_HELP_SIZE)
     p.add_argument("--json", action="store_true", help=S.CLI_HELP_JSON)
@@ -251,7 +260,8 @@ def _doctor(project, python: str):
     from py2exe_gui.core.venv_manager import InstalledChecker
 
     checker = default_is_installed if python in ("", sys.executable) else InstalledChecker(python)
-    return examine(project.build.source, project.build, is_installed=checker)
+    return examine(project.build.source, project.build, is_installed=checker,
+                   extra_features=project.features_used())
 
 
 def _print_findings(report, console: Console) -> None:
@@ -269,6 +279,31 @@ def _run_streaming(command: List[str], console: Console, cwd: str = "") -> int:
     from py2exe_gui.core.build_runner import stream_command
 
     return stream_command(command, cwd, console.print)
+
+
+def _ensure_engine(engine, python: str, console: Console) -> None:
+    """The build engine is installed in ``python``, or installed with consent."""
+    from py2exe_gui.strings import S
+
+    if engine.name == "pyinstaller":
+        _ensure_pyinstaller(python, console)
+        return
+    if engine.is_available(python):
+        return
+    command = [python, "-m", "pip", "install", *engine.requirements()]
+    if not console.confirm(S.MSG_INSTALL_ENGINE_CONFIRM.format(engine=engine.display_name,
+                                                               cmd=quote_cmd(command))):
+        raise CliExit(EXIT_CONSENT, S.LOG_INSTALL_ENGINE_DECLINED.format(
+            engine=engine.display_name))
+    if _run_streaming(command, console) != 0:
+        raise CliExit(EXIT_TOOL, S.ERR_INSTALL_ENGINE_FAIL.format(engine=engine.display_name,
+                                                                   error="pip"))
+
+
+def quote_cmd(command: List[str]) -> str:
+    from py2exe_gui.core.venv_manager import quote_command
+
+    return quote_command(command)
 
 
 def _ensure_pyinstaller(python: str, console: Console) -> None:
@@ -359,6 +394,8 @@ def cmd_build(args, console: Console) -> int:
 
     loaded = _load(args, console)
     project = loaded.project
+    if getattr(args, "engine", None):
+        project.build.engine = args.engine
     _review_untrusted(project, console)
     python = _build_python(project)
     if not python:
@@ -372,8 +409,14 @@ def cmd_build(args, console: Console) -> int:
     if report.count("error") and args.strict:
         raise CliExit(EXIT_FAILED, S.CLI_STRICT_FAILED)
 
-    _ensure_pyinstaller(python, console)
-    prepared = prepare_build(project, python, runtime_texts(), is_rtl())
+    from py2exe_gui.core.diagnostics import diagnose_output
+    from py2exe_gui.core.engines import engine_for
+
+    engine = engine_for(project.build)
+    _ensure_engine(engine, python, console)
+    allow_downloads = bool(getattr(args, "allow_downloads", False))
+    prepared = prepare_build(project, python, runtime_texts(), is_rtl(),
+                             allow_downloads=allow_downloads)
     if prepared.kit_errors:
         problems = "\n".join(f"• {finding_title(f)}" for f in prepared.kit_errors)
         raise CliExit(EXIT_FAILED, S.MSG_KIT_INVALID_FMT.format(problems=problems))
@@ -387,7 +430,27 @@ def cmd_build(args, console: Console) -> int:
         label = getattr(S, f"STAGE_{stage.upper()}", stage)
         console.print(S.CLI_STAGE_MARKER.format(stage=label, percent=percent))
 
-    outcome = run_build(prepared, console.print, on_stage)
+    if engine.name != "pyinstaller":
+        console.print(S.LOG_ENGINE_BUILD.format(engine=engine.display_name))
+    lines: List[str] = []
+
+    def on_line(line: str) -> None:
+        lines.append(line)
+        console.print(line)
+
+    outcome = run_build(prepared, on_line, on_stage)
+    if not outcome.ok and not allow_downloads:
+        # Nuitka asked to download a tool and got "no" (stdin is closed):
+        # ask the person, and build again only if they say yes.
+        declined = [f for f in diagnose_output("\n".join(lines), origin="build",
+                                                engine=engine.name)
+                    if f.code == "nuitka_download_declined"]
+        if declined and console.confirm(S.CLI_DOWNLOAD_CONFIRM.format(
+                tool=declined[0].params.get("tool") or "?")):
+            console.print(S.LOG_NUITKA_DOWNLOAD_ALLOWED)
+            prepared = prepare_build(project, python, runtime_texts(), is_rtl(),
+                                     allow_downloads=True)
+            outcome = run_build(prepared, on_line, on_stage)
     if not outcome.ok:
         console.print(S.CLI_STAGE_MARKER.format(stage=S.PROGRESS_FAILED, percent=100))
         raise CliExit(EXIT_FAILED, S.CONV_FAILED_MSG if not outcome.error else outcome.error)
@@ -399,11 +462,11 @@ def cmd_build(args, console: Console) -> int:
 
 
 def cmd_size(args, console: Console) -> int:
-    from py2exe_gui.core.size_analyzer import analyze_build, format_size, group_label_key
+    from py2exe_gui.core.size_analyzer import analyze, format_size, group_label_key
     from py2exe_gui.strings import S
 
     loaded = _load(args, console)
-    report = analyze_build(loaded.project.build)
+    report = analyze(loaded.project.build)
     if not report.ok:
         raise CliExit(EXIT_FAILED, S.CLI_SIZE_NO_BUILD)
     if args.json:
@@ -444,7 +507,10 @@ def _create_env(project, console: Console, base_python: str, recreate: bool) -> 
     base = base_python or sys.executable
     if not os.path.isfile(base):
         raise CliExit(EXIT_TOOL, S.ERR_ENV_PYTHON_MISSING.format(path=base))
-    plan = plan_environment(project.build.source, root, base, PYINSTALLER_REQUIREMENT,
+    from py2exe_gui.core.engines import engine_for
+
+    tools = engine_for(project.build).requirements() or PYINSTALLER_REQUIREMENT
+    plan = plan_environment(project.build.source, root, base, tools,
                             uv=find_uv(), recreate=recreate)
     commands = "\n\n".join(quote_command(c) for c in plan.all_commands())
     if not console.confirm(S.MSG_ENV_CONFIRM.format(commands=commands)):

@@ -1,0 +1,13 @@
+Nuitka-Options: Used command line options:
+Nuitka-Options:   --mode=standalone --output-dir=/tmp/claude-0/-home-user-python-to-exe/0679a7d4-5b85-58b2-850f-8732ea649bc4/scratchpad/bad/dist --update-check=never --progress-bar=none --remove-output miss.py
+Nuitka: Starting Python compilation with:
+Nuitka:   Version '4.2.2' on Python 3.12 (flavor 'Debian Python') commercial grade 'not installed'.
+Nuitka: Completed Python level compilation and optimization.
+Nuitka: Generating source code for C backend compiler.
+Nuitka: Running data composer tool for optimal constant value handling.
+Nuitka: Running C compilation via Scons.
+Nuitka-Scons: Backend C compiler: gcc (gcc 13).
+Nuitka-Scons: Backend C linking with 6 files (no progress information available for this stage).
+Nuitka-Scons:WARNING: You are not using ccache, re-compilation of identical code will be slower than necessary. Use your OS package manager to install it.
+Nuitka: Removing build directory '/tmp/claude-0/-home-user-python-to-exe/0679a7d4-5b85-58b2-850f-8732ea649bc4/scratchpad/bad/dist/miss.build'.
+Nuitka: Successfully created '/tmp/claude-0/-home-user-python-to-exe/0679a7d4-5b85-58b2-850f-8732ea649bc4/scratchpad/bad/dist/miss.dist/miss.bin'.

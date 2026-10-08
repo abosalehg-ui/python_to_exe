@@ -1,0 +1,25 @@
+Nuitka-Options: Used command line options:
+Nuitka-Options:   --mode=onefile --output-dir=/tmp/claude-0/-home-user-python-to-exe/0679a7d4-5b85-58b2-850f-8732ea649bc4/scratchpad/sample/out3/build/nuitka --output-folder-name=hello --output-filename=/tmp/claude-0/-home-user-python-to-exe/0679a7d4-5b85-58b2-850f-8732ea649bc4/scratchpad/sample/out3/dist/hello --include-data-dir=/tmp/claude-0/-home-user-python-to-exe/0679a7d4-5b85-58b2-850f-8732ea649bc4/scratchpad/sample/data=data --report=/tmp/claude-0/-home-user-python-to-exe/0679a7d4-5b85-58b2-850f-8732ea649bc4/scratchpad/sample/out3/build/hello-nuitka-report.xml --update-check=never --progress-bar=none hello.py
+Nuitka: Starting Python compilation with:
+Nuitka:   Version '4.2.2' on Python 3.12 (flavor 'Debian Python') commercial grade 'not installed'.
+Nuitka-Plugins:anti-bloat: Not including '_json' automatically in order to avoid bloat, but this may cause: may slow down by using fallback implementation.
+Nuitka: Completed Python level compilation and optimization.
+Nuitka: Generating source code for C backend compiler.
+Nuitka: Running data composer tool for optimal constant value handling.
+Nuitka: Running C compilation via Scons.
+Nuitka-Scons: Backend C compiler: gcc (gcc 13).
+Nuitka-Scons: Backend C linking with 6 files (no progress information available for this stage).
+Nuitka-Scons:WARNING: You are not using ccache, re-compilation of identical code will be slower than necessary. Use your OS package manager to install it.
+Nuitka-Options: Included data file 'data/greeting.json' due to specified data dir '/tmp/claude-0/-home-user-python-to-exe/0679a7d4-5b85-58b2-850f-8732ea649bc4/scratchpad/sample/data' on command line.
+Nuitka-Onefile: Creating single file from dist folder, this may take a while.
+Nuitka-Onefile: Running bootstrap binary compilation via Scons.
+Nuitka-Onefile: Using compression for onefile payload.
+Nuitka-Onefile: Onefile payload compression ratio (27.08%) size 15644856 to 4236599.
+Nuitka-Scons: Onefile C compiler: gcc (gcc 13).
+Nuitka-Scons: Onefile C linking with 2 files (no progress information available for this stage).
+Nuitka-Scons:WARNING: You are not using ccache, re-compilation of identical code will be slower than necessary. Use your OS package manager to install it.
+Nuitka-Onefile: Keeping onefile build directory '/tmp/claude-0/-home-user-python-to-exe/0679a7d4-5b85-58b2-850f-8732ea649bc4/scratchpad/sample/out3/build/nuitka/hello.onefile-build'.
+Nuitka: Keeping dist folder '/tmp/claude-0/-home-user-python-to-exe/0679a7d4-5b85-58b2-850f-8732ea649bc4/scratchpad/sample/out3/build/nuitka/hello.dist' for inspection, no need to use it.
+Nuitka: Keeping build directory '/tmp/claude-0/-home-user-python-to-exe/0679a7d4-5b85-58b2-850f-8732ea649bc4/scratchpad/sample/out3/build/nuitka/hello.build'.
+Nuitka: Successfully created '/tmp/claude-0/-home-user-python-to-exe/0679a7d4-5b85-58b2-850f-8732ea649bc4/scratchpad/sample/out3/dist/hello'.
+Nuitka-Reports: Compilation report written to file '/tmp/claude-0/-home-user-python-to-exe/0679a7d4-5b85-58b2-850f-8732ea649bc4/scratchpad/sample/out3/build/hello-nuitka-report.xml'.

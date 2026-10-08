@@ -1,7 +1,18 @@
 {
   "schema": 1,
-  "description": "What popular packages need to survive PyInstaller. Keyed by IMPORT name. Fields: pip (distribution name when it differs from the import name), hidden_imports, collect_data, collect_submodules, collect_all, copy_metadata, data_dirs (project folders the package expects next to the script), console_streams (writes to sys.stdout/sys.stderr directly, so it crashes in a windowed EXE), qt_binding, large (adds tens of MB or more), notes {ar, en}.",
+  "description": "What popular packages need to survive PyInstaller. Keyed by IMPORT name. Fields: pip (distribution name when it differs from the import name), hidden_imports, collect_data, collect_submodules, collect_all, copy_metadata, data_dirs (project folders the package expects next to the script), console_streams (writes to sys.stdout/sys.stderr directly, so it crashes in a windowed EXE), qt_binding, large (adds tens of MB or more), notes {ar, en}, engines {nuitka: {plugins, notes}} (2.0: what another engine needs on top of the PyInstaller fields).",
   "packages": {
+    "tkinter": {
+      "engines": {
+        "nuitka": {
+          "plugins": ["tk-inter"],
+          "notes": {
+            "ar": "Nuitka لا يضمّن ملفات Tcl/Tk إلا بالإضافة tk-inter.",
+            "en": "Nuitka bundles the Tcl/Tk files only with the tk-inter plugin."
+          }
+        }
+      }
+    },
     "PIL": {"pip": "Pillow"},
     "cv2": {
       "pip": "opencv-python",
@@ -206,7 +217,11 @@
         "en": "Kivy on Windows needs a .spec that adds kivy_deps (sdl2/glew) — see Kivy's packaging documentation."
       }
     },
-    "PyQt5": {"qt_binding": true, "large": true},
+    "PyQt5": {
+      "qt_binding": true,
+      "large": true,
+      "engines": {"nuitka": {"plugins": ["pyqt5"]}}
+    },
     "PyQt6": {"qt_binding": true, "large": true},
     "PySide2": {"qt_binding": true, "large": true},
     "PySide6": {"qt_binding": true, "large": true}

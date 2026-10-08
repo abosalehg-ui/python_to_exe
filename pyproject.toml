@@ -39,6 +39,11 @@ dependencies = [
 release = [
     "keyring>=23",
 ]
+# 2.0: the Nuitka build engine (also offered, with consent, on first use).
+# "onefile" is upstream's extra: zstandard, to compress one-file builds.
+nuitka = [
+    "nuitka[onefile]>=4.2,<5",
+]
 dev = [
     "pytest>=7.0",
     "pytest-cov>=4.0",

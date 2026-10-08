@@ -1,0 +1,15 @@
+37577 _bz2.so
+159201 _codecs_cn.so
+167625 _codecs_hk.so
+44745 _codecs_iso2022.so
+282137 _codecs_jp.so
+146913 _codecs_kr.so
+122337 _codecs_tw.so
+59305 _lzma.so
+63865 _multibytecodec.so
+26 data/config.yaml
+85457 libbz2.so.1.0
+193585 libexpat.so.1
+211257 liblzma.so.5
+2690457 yaml/_yaml.so
+15868041 yamlapp

@@ -146,13 +146,17 @@ def plan_environment(
     source: str,
     root: str,
     base_python: str,
-    pyinstaller_requirement: str,
+    pyinstaller_requirement,
     uv: str = "",
     recreate: bool = False,
     knowledge_path: Optional[str] = None,
     platform: Optional[str] = None,
 ) -> EnvPlan:
-    """Commands to build the project's environment from ``base_python``."""
+    """Commands to build the project's environment from ``base_python``.
+
+    ``pyinstaller_requirement`` is the build engine's requirement — one string,
+    or several (Nuitka on Linux also needs ``patchelf``: ``Engine.requirements``).
+    """
     env_dir = env_dir_for(source, root)
     python = env_python(env_dir, platform)
     plan = EnvPlan(env_dir=env_dir, python=python, uv=uv)
@@ -162,7 +166,9 @@ def plan_environment(
             plan.setup.append([uv, "venv", "--python", base_python, env_dir])
         else:
             plan.setup.append([base_python, "-m", "venv", env_dir])
-    plan.setup.append(_pip(python, uv) + [pyinstaller_requirement])
+    tools = ([pyinstaller_requirement] if isinstance(pyinstaller_requirement, str)
+             else list(pyinstaller_requirement))
+    plan.setup.append(_pip(python, uv) + tools)
 
     requirements = project_requirements(source, knowledge_path)
     plan.requirements = requirements

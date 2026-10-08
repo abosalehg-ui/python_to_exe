@@ -16,10 +16,11 @@ from py2exe_gui.core.engines.base import (
     UnknownEngineError,
     features_used,
 )
+from py2exe_gui.core.engines.nuitka import NuitkaEngine
 from py2exe_gui.core.engines.pyinstaller import PyInstallerEngine
 
 _ENGINES: Dict[str, Engine] = {
-    engine.name: engine for engine in (PyInstallerEngine(),)
+    engine.name: engine for engine in (PyInstallerEngine(), NuitkaEngine())
 }
 
 
@@ -50,6 +51,7 @@ __all__ = [
     "FEATURES",
     "MAX_LOG_PERCENT",
     "Engine",
+    "NuitkaEngine",
     "PyInstallerEngine",
     "Stage",
     "StageTracker",

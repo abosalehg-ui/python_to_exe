@@ -178,6 +178,19 @@ class Engine:
     missing_markers: Tuple[str, ...] = ()
     #: The finding code reported when it is not installed.
     missing_code: str = ""
+    #: How Version Info reaches the build: "file" (written to a file and
+    #: passed by path) or "options" (``metadata_options``).
+    version_info_mode: str = "file"
+    #: False when the engine may stop to ask a question on stdin (Nuitka's
+    #: download prompt): the build then runs with stdin closed, so an
+    #: unattended build answers "no" instead of hanging.
+    interactive_stdin: bool = True
+    #: Regex for the folder a frozen program runs from (stripped from paths
+    #: in its tracebacks); None keeps the default (PyInstaller's).
+    bundle_prefix = None
+    #: How a fix's option is written into ``extra_args``: "--flag value"
+    #: ("space") or "--flag=value" ("equals").
+    flag_style: str = "space"
 
     # Features
 
@@ -196,12 +209,21 @@ class Engine:
     def version_command(self, python: str) -> List[str]:
         return [python, "-m", self.module, "--version"]
 
+    def requirements(self, platform: Optional[str] = None) -> Tuple[str, ...]:
+        """What ``pip install`` needs for this engine (offered, never automatic)."""
+        return ()
+
+    def version_env(self) -> Dict[str, str]:
+        """Extra environment for ``version_command`` (e.g. no update check)."""
+        return {}
+
     def version(self, python: str, timeout: float = 60.0, run=None) -> str:
         """The installed version as the engine prints it, or '' when absent."""
         try:
+            extra = self.version_env()
             completed = (run or subprocess.run)(
                 self.version_command(python), capture_output=True, text=True,
-                timeout=timeout,
+                timeout=timeout, env=dict(os.environ, **extra) if extra else None,
             )
         except (OSError, subprocess.SubprocessError):
             return ""
@@ -230,6 +252,31 @@ class Engine:
     ) -> Tuple[Optional[List[str]], Optional[str]]:
         """``(command, None)`` or ``(None, user-facing error)``."""
         raise NotImplementedError
+
+    def build_env(self, python: str, base_env: Optional[Dict[str, str]] = None
+                  ) -> Optional[Dict[str, str]]:
+        """The environment to build in, or None to inherit the app's."""
+        return None
+
+    def consent_options(self) -> List[str]:
+        """Options allowed only with the user's explicit consent (downloads)."""
+        return []
+
+    def metadata_options(self, info, platform: Optional[str] = None) -> List[str]:
+        """Version Info as options, for engines whose ``version_info_mode`` is "options"."""
+        return []
+
+    def prepare_output(self, config: BuildConfig) -> None:
+        """Create any folder the engine expects to exist before it runs."""
+
+    def translate_flag(self, flag: str, argument: str) -> Optional[List[Tuple[str, str]]]:
+        """This engine's equivalent of a fix's ``--flag argument``.
+
+        Fixes are written in PyInstaller's vocabulary. Returns the options to
+        use instead (usually one), or None when the engine has no equivalent —
+        the fix is then reported as unsupported and never passed on.
+        """
+        return [(flag, argument)]
 
     def progress_tracker(self) -> StageTracker:
         return StageTracker(self.stages)

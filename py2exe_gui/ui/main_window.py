@@ -53,7 +53,6 @@ from py2exe_gui.core import (
     PresetLibrary,
     apply_fixes,
     build_iscc_command,
-    build_pyinstaller_command,
     build_signtool_command,
     check_for_update,
     dedupe_findings,
@@ -72,7 +71,6 @@ from py2exe_gui.core import (
     make_record,
     needs_diagnostic_run,
     parse_requirements,
-    read_warn_findings,
     readiness_score,
     redact_password,
     resolve_languages,
@@ -87,7 +85,9 @@ from py2exe_gui.core.build_report import (
     sha256_file,
     write_report,
 )
+from py2exe_gui.core.build_runner import popen_options
 from py2exe_gui.core.diagnostics import build_name, build_root
+from py2exe_gui.core.engines import engine_for
 from py2exe_gui.core.fixes import (
     ORIGIN_BUILD,
     ORIGIN_RUNTIME,
@@ -130,7 +130,7 @@ from py2exe_gui.core.runtime_kit import (
 )
 from py2exe_gui.core.sandbox import generate_wsb, sandbox_available, wsb_for_output
 from py2exe_gui.core.size_analyzer import (
-    analyze_build,
+    analyze,
     exclude_suggestions,
     format_size,
     group_label_key,
@@ -277,6 +277,8 @@ class MainWindow(QMainWindow):
         # One import checker per foreign interpreter (isolated environments),
         # so the doctor asks each one in a single subprocess, not per module.
         self._checkers = {}
+        # Set by the person, for the next build only (Nuitka's downloads).
+        self._allow_downloads_once = False
         self._size_view = None
         self._last_report_path = ""
         # The open project file ('' = none) and the state it was saved in,
@@ -923,6 +925,46 @@ class MainWindow(QMainWindow):
 
     # ─── Build pipeline ─────────────────────────────────────────────────
 
+    def ask_download_consent(self, tool: str) -> bool:
+        """Ask before letting the engine download a tool; True allows the next build."""
+        reply = QMessageBox.question(
+            self, S.MSG_CONFIRM, S.MSG_NUITKA_DOWNLOAD_CONFIRM.format(tool=tool or "?"),
+            QMessageBox.Yes | QMessageBox.No, QMessageBox.No,
+        )
+        if reply != QMessageBox.Yes:
+            return False
+        self._allow_downloads_once = True
+        self._append_log(S.LOG_NUITKA_DOWNLOAD_ALLOWED)
+        return True
+
+    def _ensure_engine(self, engine, python: str = "") -> bool:
+        """The build engine is installed in ``python``, or installed with consent."""
+        if engine.name == "pyinstaller":
+            return self._ensure_pyinstaller(python)
+        python = python or sys.executable
+        if engine.is_available(python):
+            return True
+        install_cmd = [python, "-m", "pip", "install", *engine.requirements()]
+        reply = QMessageBox.question(
+            self, S.MSG_CONFIRM,
+            S.MSG_INSTALL_ENGINE_CONFIRM.format(engine=engine.display_name,
+                                                cmd=quote_command(install_cmd)),
+            QMessageBox.Yes | QMessageBox.No, QMessageBox.No,
+        )
+        if reply != QMessageBox.Yes:
+            self._append_log(S.LOG_INSTALL_ENGINE_DECLINED.format(engine=engine.display_name))
+            return False
+        self._append_log(S.LOG_INSTALL_ENGINE.format(engine=engine.display_name))
+        self._append_log(quote_command(install_cmd))
+        try:
+            subprocess.run(install_cmd, capture_output=True, check=True, timeout=1200)
+        except (OSError, subprocess.SubprocessError) as e:
+            QMessageBox.critical(self, S.MSG_ERROR, S.ERR_INSTALL_ENGINE_FAIL.format(
+                engine=engine.display_name, error=str(e)))
+            return False
+        self._append_log(S.LOG_INSTALL_ENGINE_OK.format(engine=engine.display_name))
+        return True
+
     def _ensure_pyinstaller(self, python: str = "") -> bool:
         """Check for PyInstaller, offering to install it with explicit consent.
 
@@ -967,17 +1009,28 @@ class MainWindow(QMainWindow):
 
     def start_conversion(self):
         config = self._current_config()
-        version_path = self._materialize_version_file()
-        if version_path:
-            config.version_file = version_path
-        manifest_path = self._materialize_manifest_file()
-        if manifest_path:
-            config.manifest_file = manifest_path
+        engine = engine_for(config)
+        native = []
+        if engine.version_info_mode == "options":
+            native += engine.metadata_options(self._current_project().version_info)
+        else:
+            version_path = self._materialize_version_file()
+            if version_path:
+                config.version_file = version_path
+        if engine.supports("manifest"):
+            manifest_path = self._materialize_manifest_file()
+            if manifest_path:
+                config.manifest_file = manifest_path
+        # Consent to downloads is given for one build at a time, by a person.
+        if self._allow_downloads_once:
+            self._allow_downloads_once = False
+            native += engine.consent_options()
 
         # Every early return below must clean up the temp files created above;
         # one path used to skip that and leak into %TEMP%.
         python = self.build_python(config)
-        cmd, error = build_pyinstaller_command(config, python_executable=python)
+        cmd, error = engine.build_command(config, python_executable=python,
+                                          extra_options=native)
         if error:
             self._cleanup_temp_files()
             QMessageBox.warning(self, S.MSG_WARNING, error)
@@ -988,8 +1041,8 @@ class MainWindow(QMainWindow):
             QMessageBox.warning(self, S.MSG_WARNING, kit_error)
             return
         if kit_options:
-            cmd, _error = build_pyinstaller_command(
-                config, python_executable=python, extra_options=kit_options
+            cmd, _error = engine.build_command(
+                config, python_executable=python, extra_options=native + kit_options
             )
             self._append_log(S.LOG_KIT_EMBEDDED_FMT.format(
                 services=", ".join(self._runtime_service_labels(config))
@@ -1005,11 +1058,19 @@ class MainWindow(QMainWindow):
                 self.create_build_env(then_build=True)
             return
 
-        if not self._ensure_pyinstaller(python):
+        if not self._ensure_engine(engine, python):
             self._cleanup_temp_files()
             return
         if python != sys.executable:
             self._append_log(S.LOG_ENV_PYTHON.format(python=python))
+        if engine.name != "pyinstaller":
+            self._append_log(S.LOG_ENGINE_BUILD.format(engine=engine.display_name))
+        try:
+            engine.prepare_output(config)
+        except OSError as e:
+            self._cleanup_temp_files()
+            QMessageBox.critical(self, S.MSG_ERROR, str(e))
+            return
         self._build_command = list(cmd)
 
         self._build_start_time = time.monotonic()
@@ -1035,7 +1096,10 @@ class MainWindow(QMainWindow):
         self.progress_bar.setValue(0)
         self.progress_bar.setFormat(S.PROGRESS_CONVERTING)
 
-        self.conversion_thread = ConversionThread(cmd, work_dir)
+        self.conversion_thread = ConversionThread(
+            cmd, work_dir, stages=engine.stages,
+            popen_kwargs=popen_options(engine.name, engine.build_env(python)),
+        )
         self.conversion_thread.log_signal.connect(self._append_log)
         self.conversion_thread.log_signal.connect(self._build_output.append)
         self.conversion_thread.progress_signal.connect(self.progress_bar.setValue)
@@ -1048,7 +1112,7 @@ class MainWindow(QMainWindow):
         self.tray.show()
 
     def _on_stage_changed(self, stage_key: str):
-        """Name the phase PyInstaller has reached on the progress bar."""
+        """Name the phase the engine has reached on the progress bar."""
         label = getattr(S, f"STAGE_{stage_key.upper()}", "")
         if label:
             self.progress_bar.setFormat(S.PROGRESS_STAGE_FMT.format(stage=label))
@@ -1083,7 +1147,7 @@ class MainWindow(QMainWindow):
             previous = previous_size(
                 self.history.records, built.source, snapshot.get("output_name", "")
             )
-            size_report = analyze_build(built)
+            size_report = analyze(built)
 
         if snapshot:
             record = make_record(
@@ -1136,15 +1200,23 @@ class MainWindow(QMainWindow):
             QMessageBox.information(self, S.MSG_SUCCESS, message)
         else:
             self.progress_bar.setFormat(S.PROGRESS_FAILED)
-            if message != S.CONV_CANCELLED:
+            declined = [f for f in diagnosed if f.code == "nuitka_download_declined"]
+            if declined:
+                # The engine stopped to ask for a download; only a person says yes.
+                if self.ask_download_consent(declined[0].params.get("tool", "")):
+                    self.start_conversion()
+            elif message != S.CONV_CANCELLED:
                 QMessageBox.critical(self, S.MSG_ERROR, message)
 
     def preview_command(self):
-        """Show the PyInstaller command that would be executed."""
+        """Show the command the selected engine would run."""
         config = self._current_config()
-        cmd, error = build_pyinstaller_command(
+        engine = engine_for(config)
+        kit = preview_options(config) if engine.supports("runtime_kit") else []
+        native = engine.metadata_options(self._current_project().version_info)
+        cmd, error = engine.build_command(
             config, python_executable=self.build_python(config),
-            extra_options=preview_options(config),
+            extra_options=native + kit,
         )
         if error:
             QMessageBox.warning(self, S.MSG_WARNING, error)
@@ -1477,6 +1549,23 @@ class MainWindow(QMainWindow):
 
     # ─── Project doctor ─────────────────────────────────────────────────
 
+    def on_engine_changed(self):
+        """Another engine: re-examine, and say what it cannot do here."""
+        if not hasattr(self, "_doctor_timer"):
+            return  # still building the window
+        self._schedule_doctor()
+        self.refresh_engine_status()
+
+    def refresh_engine_status(self):
+        if not hasattr(self, "main_tab"):
+            return
+        config = self._current_config()
+        engine = engine_for(config)
+        missing = engine.unsupported_features(config)
+        missing += [f for f in self._current_project().features_used()
+                    if not engine.supports(f) and f not in missing]
+        self.main_tab.set_engine_status(missing)
+
     def _schedule_doctor(self, *_args):
         self._doctor_timer.start()
 
@@ -1505,11 +1594,13 @@ class MainWindow(QMainWindow):
             extra.append(Finding("env_not_created", "warning"))
         else:
             is_installed = self._installed_checker(config)
-        report = examine(source, config, is_installed=is_installed)
+        report = examine(source, config, is_installed=is_installed,
+                         extra_features=self._current_project().features_used())
         self._doctor_findings = sort_findings(report.findings + extra)
         self._source_imports = report.imports
         self._refresh_doctor_view()
         self.refresh_env_view()
+        self.refresh_engine_status()
 
     def _refresh_doctor_view(self):
         source = self._source_path()
@@ -1579,8 +1670,9 @@ class MainWindow(QMainWindow):
             source=config.source,
             source_imports=self._source_imports,
             is_installed=self._installed_checker(config),
+            engine=config.engine,
         )
-        findings += read_warn_findings(
+        findings += engine_for(config).build_findings(
             config,
             local_module_names(os.path.dirname(os.path.abspath(config.source))),
             min_mtime=self._build_wall_start,
@@ -1598,6 +1690,7 @@ class MainWindow(QMainWindow):
                 source=config.source,
                 source_imports=self._source_imports,
                 is_installed=self._installed_checker(config),
+                engine=config.engine,
             )
         if findings:
             self._set_build_findings(self._build_findings + findings, config.source)
@@ -1623,22 +1716,27 @@ class MainWindow(QMainWindow):
         # The same services as the real app (its code may import them), minus
         # anything that would stop on a dialog or reach the network.
         kit_options, error = self._runtime_kit_options(diag, diagnostic=True)
+        engine = engine_for(diag)
         if not error:
-            cmd, error = build_pyinstaller_command(
+            cmd, error = engine.build_command(
                 diag, python_executable=python, extra_options=kit_options
             )
         if error:
             QMessageBox.warning(self, S.MSG_WARNING, error)
             return
-        if not self._ensure_pyinstaller(python):
+        if not self._ensure_engine(engine, python):
             return
+        engine.prepare_output(diag)
 
         self.convert_btn.setEnabled(False)
         self.doctor_tab.diagnose_btn.setEnabled(False)
         self.progress_bar.setRange(0, 0)  # busy: no stage tracking here
 
         timeout = max(8.0, float(self.deploy_tab.smoke_timeout.value()))
-        self.diagnostic_thread = DiagnosticThread(cmd, diag, timeout=timeout)
+        self.diagnostic_thread = DiagnosticThread(
+            cmd, diag, timeout=timeout,
+            popen_kwargs=popen_options(engine.name, engine.build_env(python)),
+        )
         self.diagnostic_thread.log_signal.connect(self._append_log)
         self.diagnostic_thread.finished_signal.connect(
             lambda built, output, build_log: self._on_diagnostic_finished(
@@ -1659,12 +1757,12 @@ class MainWindow(QMainWindow):
         if built:
             findings = diagnose_output(
                 output, origin=ORIGIN_RUNTIME, source=config.source,
-                source_imports=imports, is_installed=checker,
+                source_imports=imports, is_installed=checker, engine=config.engine,
             )
         else:
             findings = diagnose_output(
                 build_log, origin=ORIGIN_BUILD, source=config.source,
-                source_imports=imports, is_installed=checker,
+                source_imports=imports, is_installed=checker, engine=config.engine,
             )
         # The diagnostic run is the freshest evidence: it replaces, not adds to,
         # what the last build reported.
@@ -1734,8 +1832,9 @@ class MainWindow(QMainWindow):
             QMessageBox.warning(self, S.MSG_WARNING, S.ERR_ENV_PYTHON_MISSING.format(path=base))
             return
 
+        tools = engine_for(self._current_config()).requirements() or PYINSTALLER_REQUIREMENT
         plan = plan_environment(
-            source, ENVS_ROOT, base, PYINSTALLER_REQUIREMENT,
+            source, ENVS_ROOT, base, tools,
             uv=find_uv(), recreate=recreate,
         )
         commands = "\n\n".join(quote_command(c) for c in plan.all_commands())
@@ -1864,7 +1963,7 @@ class MainWindow(QMainWindow):
         config = self._current_config()
         if not config.source:
             return
-        report = analyze_build(config)
+        report = analyze(config)
         if not report.ok:
             self._size_view = None
             self._refresh_size_view()
@@ -1880,7 +1979,7 @@ class MainWindow(QMainWindow):
             "title", "details", "result", "success", "failed", "size_on_disk",
             "contents", "duration", "previous", "app", "date", "source", "output",
             "mode", "onefile", "onedir", "environment", "python", "pyinstaller",
-            "platform", "breakdown", "package", "size", "share", "largest_files",
+            "platform", "breakdown", "package", "size", "share", "largest_files", "engine",
             "findings", "options", "none", "runtime_kit",
         )
         return {key: getattr(S, f"REPORT_{key.upper()}") for key in keys}
@@ -1888,7 +1987,7 @@ class MainWindow(QMainWindow):
     def _write_build_report(self, config, report, previous, duration, success):
         output = report.output_path or output_path_for(config)
         exe = output if os.path.isfile(output) else locate_built_executable(
-            build_root(config), build_name(config), config.onefile
+            build_root(config), build_name(config), config.onefile, engine=config.engine
         ) or ""
         groups = []
         for group, size in report.ranked(20):
@@ -1914,6 +2013,8 @@ class MainWindow(QMainWindow):
             environment=S.REPORT_ENV_ISOLATED if config.isolated_env else S.REPORT_ENV_CURRENT,
             python_version=versions.get("python", ""),
             pyinstaller_version=versions.get("pyinstaller", ""),
+            engine=(f"Nuitka {versions.get('nuitka', '')}".strip()
+                    if config.engine == "nuitka" else ""),
             platform=versions.get("platform", ""),
             command=self._build_command,
             groups=groups,
@@ -1954,6 +2055,9 @@ class MainWindow(QMainWindow):
 
     def _runtime_kit_options(self, config: BuildConfig, diagnostic: bool = False):
         """Write the kit for ``config``; returns (PyInstaller options, error text)."""
+        engine = engine_for(config)
+        if config.runtime_kit.enabled and not engine.supports("runtime_kit"):
+            return [], S.ERR_KIT_NEEDS_PYINSTALLER.format(engine=engine.display_name)
         try:
             options, errors = write_kit(
                 config, self._runtime_texts(), rtl=self._rtl(), diagnostic=diagnostic
@@ -2162,6 +2266,7 @@ class MainWindow(QMainWindow):
             config.output_dir or os.path.dirname(config.source),
             config.output_name or os.path.splitext(os.path.basename(config.source))[0],
             config.onefile,
+            engine=config.engine,
         )
         if not exe_path:
             self._last_built_exe = ""
@@ -2233,6 +2338,7 @@ class MainWindow(QMainWindow):
             config.output_dir or os.path.dirname(config.source),
             config.output_name or os.path.splitext(os.path.basename(config.source))[0],
             config.onefile,
+            engine=config.engine,
         )
         if not exe_path:
             return "", config.onefile
@@ -2670,7 +2776,8 @@ class MainWindow(QMainWindow):
         checker = self._installed_checker(project.build)
 
         def doctor(ctx):
-            return examine(ctx.project.build.source, ctx.project.build, is_installed=checker)
+            return examine(ctx.project.build.source, ctx.project.build, is_installed=checker,
+                           extra_features=ctx.project.features_used())
 
         options = ReleaseOptions(
             version=project.version,

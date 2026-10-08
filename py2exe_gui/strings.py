@@ -885,6 +885,7 @@ class Ar:
     SIZE_GROUP_RUNTIME = "مفسّر بايثون ومكوّناته"
     SIZE_GROUP_STDLIB = "مكتبة بايثون القياسية"
     SIZE_GROUP_SCRIPT = "كودك"
+    SIZE_GROUP_COMPILED = "الكود المُصرَّف ومفسّر بايثون (Nuitka)"
     SIZE_INDIRECT_FMT = (
         "💡 {size} من مكتبات لا يستوردها كودك مباشرة ({names}). كثير منها تبعيات "
         "حقيقية، لكن البناء في بيئة معزولة يتخلص مما جاء لمجرد أنه مثبت."
@@ -930,6 +931,7 @@ class Ar:
     REPORT_ENV_CURRENT = "بايثون الحالي"
     REPORT_PYTHON = "Python"
     REPORT_PYINSTALLER = "PyInstaller"
+    REPORT_ENGINE = "محرك البناء"
     REPORT_PLATFORM = "النظام"
     REPORT_BREAKDOWN = "ما بداخل الـ EXE"
     REPORT_PACKAGE = "المكتبة"
@@ -1408,6 +1410,134 @@ class Ar:
     CLI_RELEASE_CONFIRM = "سيُنفَّذ الإصدار {version} كما في القائمة أعلاه بالضبط."
     CLI_RELEASE_FAILED = "❌ توقّف الإصدار. ما سبق الخطوة الفاشلة اكتمل، ويمكن إعادة المحاولة بأمان."
     CLI_RELEASE_DONE = "✅ صدر {version}\n   الملفات: {path}\n   GitHub: {url}"
+
+
+    # ── 2.0: محركات البناء (PyInstaller وNuitka) ─────────────────────────
+    ENGINE_LABEL = "محرك البناء:"
+    ENGINE_TIP = "PyInstaller يجمّع البايتكود مع مفسّر بايثون؛ Nuitka يترجم الكود إلى C ثم إلى ملف تنفيذي."
+    ENGINE_DESC_PYINSTALLER = "PyInstaller: الأوسع توافقاً والأسرع بناءً. الافتراضي."
+    ENGINE_DESC_NUITKA = (
+        "Nuitka: يترجم وحدات برنامجك إلى C مُصرَّف بدل بايتكود داخل أرشيف. "
+        "غالباً ما يقلّل ذلك البلاغات الكاذبة من مكافحات الفيروسات ويصعّب استخراج الكود، "
+        "لكنه لا يمنعه: المنطق ما زال داخل الملف ويمكن تحليله عكسياً. "
+        "البناء أبطأ بكثير لأنه يشغّل مترجم C."
+    )
+    ENGINE_UNSUPPORTED_FMT = "⚠️ لا يدعمه {engine}: {features}"
+    ENGINE_ALL_SUPPORTED = "✅ كل ما يطلبه المشروع يدعمه هذا المحرك."
+
+    FEATURE_ONEFILE = "ملف واحد"
+    FEATURE_ONEDIR = "مجلد"
+    FEATURE_WINDOWED = "بلا نافذة Console"
+    FEATURE_ICON = "الأيقونة"
+    FEATURE_VERSION_INFO = "معلومات الإصدار"
+    FEATURE_SPLASH = "شاشة البداية"
+    FEATURE_MANIFEST = "ملف Manifest"
+    FEATURE_UPX = "ضغط UPX"
+    FEATURE_STRIP = "إزالة رموز التنقيح"
+    FEATURE_OPTIMIZE = "تحسين البايتكود"
+    FEATURE_CLEAN = "تنظيف الذاكرة المؤقتة"
+    FEATURE_DATA_FILES = "ملفات البيانات"
+    FEATURE_HIDDEN_IMPORTS = "الاستيرادات المخفية"
+    FEATURE_EXCLUDE_MODULES = "استبعاد الوحدات"
+    FEATURE_RUNTIME_KIT = "مكتبة التشغيل"
+    FEATURE_SIZE_REPORT = "تقرير الحجم"
+    FEATURE_WARN_FILE = "ملف warn"
+
+    STAGE_NUITKA_PYTHON = "ترجمة بايثون وتحسينها"
+    STAGE_NUITKA_C_SOURCE = "توليد كود C"
+    STAGE_NUITKA_C_COMPILE = "ترجمة C"
+    STAGE_NUITKA_C_LINK = "الربط"
+    STAGE_NUITKA_ONEFILE = "إنشاء الملف الواحد"
+
+    DOCTOR_UNSUPPORTED_HEADER = "لا مقابل له في هذا المحرك (لن يُطبَّق):"
+
+    FINDING_ENGINE_FEATURE_UNSUPPORTED_TITLE = "{engine} لا يدعم: {feature}"
+    FINDING_ENGINE_FEATURE_UNSUPPORTED_DETAIL = (
+        "المشروع يطلب «{feature}» والمحرك {engine} لا يملك خياراً لذلك، فلن يُمرَّر "
+        "إليه. أطفئ الخيار أو ابنِ بمحرك آخر إن كنت تحتاجه."
+    )
+    FINDING_NUITKA_MISSING_TITLE = "Nuitka غير مثبّت في مفسّر البناء"
+    FINDING_NUITKA_MISSING_DETAIL = (
+        "اخترت محرك Nuitka لكن مفسّر البناء لا يجده. عند البناء سيُعرض عليك تثبيته "
+        "(pip install nuitka)، ولن يُثبَّت شيء دون موافقتك."
+    )
+    FINDING_NUITKA_PYTHON_UNSUPPORTED_TITLE = "Nuitka {nuitka} لا يدعم Python {version}"
+    FINDING_NUITKA_PYTHON_UNSUPPORTED_DETAIL = (
+        "إصدار Python هذا أحدث مما يدعمه Nuitka. ابنِ ببيئة Python أقدم، أو حدّث Nuitka، "
+        "أو استخدم PyInstaller."
+    )
+    FINDING_NUITKA_PYTHON_EXPERIMENTAL_TITLE = "دعم Nuitka {nuitka} لـ Python {version} تجريبي"
+    FINDING_NUITKA_PYTHON_EXPERIMENTAL_DETAIL = (
+        "Nuitka نفسه يصف دعم هذا الإصدار بأنه تجريبي. قد ينجح البناء، لكن للإصدار "
+        "النهائي استخدم إصدار Python مدعوماً رسمياً."
+    )
+    FINDING_NUITKA_NO_COMPILER_TITLE = "لا يوجد مترجم C (gcc أو clang)"
+    FINDING_NUITKA_NO_COMPILER_DETAIL = (
+        "Nuitka يحتاج مترجم C. ثبّت gcc (مثلاً: sudo apt install gcc) أو clang، "
+        "أو حدّد المترجم بمتغير البيئة CC."
+    )
+    FINDING_NUITKA_NO_COMPILER_MACOS_TITLE = "لا يوجد مترجم C (clang)"
+    FINDING_NUITKA_NO_COMPILER_MACOS_DETAIL = (
+        "Nuitka يحتاج clang. ثبّت أدوات سطر الأوامر من Apple: xcode-select --install"
+    )
+    FINDING_NUITKA_NO_COMPILER_WINDOWS_TITLE = "لم يُعثر على MSVC ولا MinGW"
+    FINDING_NUITKA_NO_COMPILER_WINDOWS_DETAIL = (
+        "Nuitka يحتاج مترجم C: ثبّت Visual Studio Build Tools (مكوّن C++)، أو اسمح "
+        "لـ Nuitka بتنزيل MinGW عندما يطلب ذلك أثناء البناء. التنزيل لا يتم أبداً "
+        "دون موافقتك."
+    )
+    FINDING_NUITKA_TOOL_MISSING_TITLE = "الأداة {tool} غير موجودة"
+    FINDING_NUITKA_TOOL_MISSING_DETAIL = (
+        "Nuitka على Linux لا يبني مجلداً أو ملفاً واحداً دون {tool}. ثبّتها بمدير حزم "
+        "النظام (patchelf: sudo apt install patchelf، أو pip install patchelf في بيئة "
+        "البناء؛ readelf ضمن الحزمة binutils)."
+    )
+    FINDING_NUITKA_COMPILER_FAILED_TITLE = "فشل تشغيل مترجم C"
+    FINDING_NUITKA_COMPILER_FAILED_DETAIL = (
+        "Nuitka لم يستطع تشغيل المترجم {compiler}. تأكد أن gcc أو clang مثبّت وأن "
+        "متغير CC (إن ضُبط) يشير إلى مترجم موجود."
+    )
+    FINDING_NUITKA_PLUGIN_NEEDED_TITLE = "Nuitka يطلب الإضافة {plugin}"
+    FINDING_NUITKA_PLUGIN_NEEDED_DETAIL = "سبب Nuitka: {reason}"
+    FINDING_NUITKA_PLUGIN_FOR_PACKAGE_TITLE = "{package} يحتاج إضافة Nuitka: {plugin}"
+    FINDING_NUITKA_PLUGIN_FOR_PACKAGE_DETAIL = (
+        "دون هذه الإضافة لا يضمّن Nuitka ملفات {package} اللازمة وقت التشغيل."
+    )
+    FINDING_NUITKA_DOWNLOAD_DECLINED_TITLE = "Nuitka يحتاج تنزيل {tool}"
+    FINDING_NUITKA_DOWNLOAD_DECLINED_DETAIL = (
+        "طلب Nuitka تنزيل أداة ولم يُسمح له، فتوقّف البناء: {reason}\n"
+        "يمكنك السماح بالتنزيل لهذا البناء فقط من زر «اسمح بالتنزيل وأعد البناء»."
+    )
+
+    MSG_INSTALL_ENGINE_CONFIRM = (
+        "{engine} غير مثبّت في مفسّر البناء. هل تسمح بتثبيته الآن من PyPI؟\n\n"
+        "الأمر الذي سيُنفَّذ:\n{cmd}\n\n"
+        "سيتم تنزيل حزم من الإنترنت."
+    )
+    LOG_INSTALL_ENGINE = "⏳ تثبيت {engine}..."
+    LOG_INSTALL_ENGINE_OK = "✅ تم تثبيت {engine}."
+    LOG_INSTALL_ENGINE_DECLINED = "⚠️ رُفض تثبيت {engine} — أُلغي البناء"
+    ERR_INSTALL_ENGINE_FAIL = "فشل تثبيت {engine}:\n{error}"
+    MSG_NUITKA_DOWNLOAD_CONFIRM = (
+        "Nuitka يحتاج تنزيل أداة ليكمل البناء: {tool}\n\n"
+        "سيُضاف الخيار --assume-yes-for-downloads لهذا البناء فقط، فيُنزّل Nuitka "
+        "الأداة من مصدرها الرسمي ويحفظها في ذاكرته المؤقتة.\n\nهل تسمح؟"
+    )
+    LOG_NUITKA_DOWNLOAD_ALLOWED = "✅ سُمح لـ Nuitka بالتنزيل لهذا البناء."
+    LOG_ENGINE_BUILD = "⚙️ المحرك: {engine}"
+    ERR_KIT_NEEDS_PYINSTALLER = (
+        "مكتبة التشغيل تُضمَّن عبر --runtime-hook الخاص بـ PyInstaller، ولا مقابل له في "
+        "{engine}. أطفئ خدمات مكتبة التشغيل أو ابنِ بـ PyInstaller."
+    )
+    BTN_ALLOW_DOWNLOAD_REBUILD = "📥 اسمح بالتنزيل وأعد البناء"
+    CLI_DOWNLOAD_CONFIRM = "Nuitka يطلب تنزيل {tool} (لهذا البناء فقط، --assume-yes-for-downloads)."
+    CLI_ENGINE_MISSING = "❌ {engine} غير مثبّت في {python}. ثبّته: {cmd}"
+
+    CLI_HELP_ENGINE = "محرك البناء لهذه المرة (يتجاوز build.engine في ملف المشروع)"
+    CLI_HELP_ALLOW_DOWNLOADS = "السماح لـ Nuitka بتنزيل أدوات يحتاجها (مترجم، dependency walker...) لهذا البناء"
+
+    ENGINE_SHORT_PYINSTALLER = "الأوسع توافقاً والأسرع بناءً (الافتراضي)"
+    ENGINE_SHORT_NUITKA = "يترجم إلى C: بناء أبطأ، واستخراج الكود أصعب لا مستحيل"
 
 
 class En:
@@ -2305,6 +2435,7 @@ class En:
     SIZE_GROUP_RUNTIME = "Python interpreter and runtime"
     SIZE_GROUP_STDLIB = "Python standard library"
     SIZE_GROUP_SCRIPT = "Your code"
+    SIZE_GROUP_COMPILED = "Compiled code and the Python runtime (Nuitka)"
     SIZE_INDIRECT_FMT = (
         "💡 {size} comes from libraries your code doesn't import directly ({names}). "
         "Many are real dependencies, but building in an isolated environment sheds "
@@ -2351,6 +2482,7 @@ class En:
     REPORT_ENV_CURRENT = "Current Python"
     REPORT_PYTHON = "Python"
     REPORT_PYINSTALLER = "PyInstaller"
+    REPORT_ENGINE = "Build engine"
     REPORT_PLATFORM = "Platform"
     REPORT_BREAKDOWN = "What's inside"
     REPORT_PACKAGE = "Library"
@@ -2838,6 +2970,134 @@ class En:
     CLI_RELEASE_CONFIRM = "Release {version} will do exactly what is listed above."
     CLI_RELEASE_FAILED = "❌ The release stopped. Everything before the failed step is done, and running it again is safe."
     CLI_RELEASE_DONE = "✅ Released {version}\n   Files: {path}\n   GitHub: {url}"
+
+
+    # ── 2.0: build engines (PyInstaller and Nuitka) ───────────────────────
+    ENGINE_LABEL = "Build engine:"
+    ENGINE_TIP = "PyInstaller bundles bytecode with a Python interpreter; Nuitka translates the code to C, then to an executable."
+    ENGINE_DESC_PYINSTALLER = "PyInstaller: the widest compatibility and the fastest builds. The default."
+    ENGINE_DESC_NUITKA = (
+        "Nuitka: compiles your program's modules to C instead of shipping bytecode in an "
+        "archive. That typically draws fewer antivirus false positives and makes extracting "
+        "the code harder — not impossible: the logic is still in the binary and can be "
+        "reverse engineered. Builds are much slower, because a C compiler runs."
+    )
+    ENGINE_UNSUPPORTED_FMT = "⚠️ Not supported by {engine}: {features}"
+    ENGINE_ALL_SUPPORTED = "✅ This engine supports everything the project asks for."
+
+    FEATURE_ONEFILE = "one file"
+    FEATURE_ONEDIR = "folder"
+    FEATURE_WINDOWED = "no console window"
+    FEATURE_ICON = "icon"
+    FEATURE_VERSION_INFO = "Version Info"
+    FEATURE_SPLASH = "splash screen"
+    FEATURE_MANIFEST = "manifest"
+    FEATURE_UPX = "UPX compression"
+    FEATURE_STRIP = "strip symbols"
+    FEATURE_OPTIMIZE = "bytecode optimization"
+    FEATURE_CLEAN = "clean cache"
+    FEATURE_DATA_FILES = "data files"
+    FEATURE_HIDDEN_IMPORTS = "hidden imports"
+    FEATURE_EXCLUDE_MODULES = "excluded modules"
+    FEATURE_RUNTIME_KIT = "Runtime Kit"
+    FEATURE_SIZE_REPORT = "size report"
+    FEATURE_WARN_FILE = "warn file"
+
+    STAGE_NUITKA_PYTHON = "Compiling and optimizing Python"
+    STAGE_NUITKA_C_SOURCE = "Generating C code"
+    STAGE_NUITKA_C_COMPILE = "Compiling C"
+    STAGE_NUITKA_C_LINK = "Linking"
+    STAGE_NUITKA_ONEFILE = "Creating the single file"
+
+    DOCTOR_UNSUPPORTED_HEADER = "No equivalent in this engine (will not be applied):"
+
+    FINDING_ENGINE_FEATURE_UNSUPPORTED_TITLE = "{engine} does not support: {feature}"
+    FINDING_ENGINE_FEATURE_UNSUPPORTED_DETAIL = (
+        "The project asks for “{feature}” and {engine} has no option for it, so it will not "
+        "be passed on. Turn the option off, or build with another engine if you need it."
+    )
+    FINDING_NUITKA_MISSING_TITLE = "Nuitka is not installed in the build interpreter"
+    FINDING_NUITKA_MISSING_DETAIL = (
+        "You chose the Nuitka engine but the build interpreter cannot find it. Building "
+        "will offer to install it (pip install nuitka); nothing is installed without your consent."
+    )
+    FINDING_NUITKA_PYTHON_UNSUPPORTED_TITLE = "Nuitka {nuitka} does not support Python {version}"
+    FINDING_NUITKA_PYTHON_UNSUPPORTED_DETAIL = (
+        "This Python is newer than Nuitka supports. Build in an older Python environment, "
+        "update Nuitka, or use PyInstaller."
+    )
+    FINDING_NUITKA_PYTHON_EXPERIMENTAL_TITLE = "Nuitka {nuitka} supports Python {version} only experimentally"
+    FINDING_NUITKA_PYTHON_EXPERIMENTAL_DETAIL = (
+        "Nuitka itself calls its support for this version experimental. The build may work, "
+        "but for a release use an officially supported Python."
+    )
+    FINDING_NUITKA_NO_COMPILER_TITLE = "No C compiler (gcc or clang)"
+    FINDING_NUITKA_NO_COMPILER_DETAIL = (
+        "Nuitka needs a C compiler. Install gcc (e.g. sudo apt install gcc) or clang, or "
+        "name the compiler with the CC environment variable."
+    )
+    FINDING_NUITKA_NO_COMPILER_MACOS_TITLE = "No C compiler (clang)"
+    FINDING_NUITKA_NO_COMPILER_MACOS_DETAIL = (
+        "Nuitka needs clang. Install Apple's command line tools: xcode-select --install"
+    )
+    FINDING_NUITKA_NO_COMPILER_WINDOWS_TITLE = "Neither MSVC nor MinGW was found"
+    FINDING_NUITKA_NO_COMPILER_WINDOWS_DETAIL = (
+        "Nuitka needs a C compiler: install Visual Studio Build Tools (the C++ workload), or "
+        "let Nuitka download MinGW when it asks during the build. It never downloads "
+        "without your consent."
+    )
+    FINDING_NUITKA_TOOL_MISSING_TITLE = "{tool} is missing"
+    FINDING_NUITKA_TOOL_MISSING_DETAIL = (
+        "On Linux, Nuitka cannot build a folder or a single file without {tool}. Install it "
+        "with the system package manager (patchelf: sudo apt install patchelf, or pip install "
+        "patchelf into the build environment; readelf comes with binutils)."
+    )
+    FINDING_NUITKA_COMPILER_FAILED_TITLE = "The C compiler could not be run"
+    FINDING_NUITKA_COMPILER_FAILED_DETAIL = (
+        "Nuitka could not run the compiler {compiler}. Make sure gcc or clang is installed and "
+        "that CC, if set, names a compiler that exists."
+    )
+    FINDING_NUITKA_PLUGIN_NEEDED_TITLE = "Nuitka asks for the {plugin} plugin"
+    FINDING_NUITKA_PLUGIN_NEEDED_DETAIL = "Nuitka's reason: {reason}"
+    FINDING_NUITKA_PLUGIN_FOR_PACKAGE_TITLE = "{package} needs a Nuitka plugin: {plugin}"
+    FINDING_NUITKA_PLUGIN_FOR_PACKAGE_DETAIL = (
+        "Without this plugin Nuitka leaves out files {package} needs at run time."
+    )
+    FINDING_NUITKA_DOWNLOAD_DECLINED_TITLE = "Nuitka needs to download {tool}"
+    FINDING_NUITKA_DOWNLOAD_DECLINED_DETAIL = (
+        "Nuitka asked to download a tool, was not allowed to, and stopped: {reason}\n"
+        "You can allow the download for this build only with “Allow download and rebuild”."
+    )
+
+    MSG_INSTALL_ENGINE_CONFIRM = (
+        "{engine} is not installed in the build interpreter. Install it now from PyPI?\n\n"
+        "Command to run:\n{cmd}\n\n"
+        "Packages will be downloaded from the internet."
+    )
+    LOG_INSTALL_ENGINE = "⏳ Installing {engine}..."
+    LOG_INSTALL_ENGINE_OK = "✅ {engine} installed."
+    LOG_INSTALL_ENGINE_DECLINED = "⚠️ {engine} installation declined — build cancelled"
+    ERR_INSTALL_ENGINE_FAIL = "Failed to install {engine}:\n{error}"
+    MSG_NUITKA_DOWNLOAD_CONFIRM = (
+        "Nuitka needs to download a tool to finish the build: {tool}\n\n"
+        "--assume-yes-for-downloads will be added for this build only: Nuitka downloads the "
+        "tool from its official source and keeps it in its cache.\n\nAllow it?"
+    )
+    LOG_NUITKA_DOWNLOAD_ALLOWED = "✅ Nuitka may download for this build."
+    LOG_ENGINE_BUILD = "⚙️ Engine: {engine}"
+    ERR_KIT_NEEDS_PYINSTALLER = (
+        "The Runtime Kit is embedded through PyInstaller's --runtime-hook, which {engine} has "
+        "no equivalent for. Turn the Runtime Kit services off or build with PyInstaller."
+    )
+    BTN_ALLOW_DOWNLOAD_REBUILD = "📥 Allow download and rebuild"
+    CLI_DOWNLOAD_CONFIRM = "Nuitka asks to download {tool} (this build only, --assume-yes-for-downloads)."
+    CLI_ENGINE_MISSING = "❌ {engine} is not installed in {python}. Install it: {cmd}"
+
+    CLI_HELP_ENGINE = "the build engine for this run (overrides build.engine in the project file)"
+    CLI_HELP_ALLOW_DOWNLOADS = "let Nuitka download tools it needs (a compiler, dependency walker...) for this build"
+
+    ENGINE_SHORT_PYINSTALLER = "widest compatibility, fastest builds (default)"
+    ENGINE_SHORT_NUITKA = "compiles to C: slower builds; extraction harder, not impossible"
 
 
 LOCALES = {"ar": Ar, "en": En}

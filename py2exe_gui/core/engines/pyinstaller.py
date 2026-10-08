@@ -68,6 +68,13 @@ _RE_ICON_FORMAT = re.compile(
 )
 
 
+#: Options PyInstaller fixes use; anything another engine names is not one.
+_OWN_FLAGS = frozenset({
+    "--collect-data", "--collect-submodules", "--collect-all", "--copy-metadata",
+    "--exclude-module", "--collect-binaries", "--hidden-import",
+})
+
+
 class PyInstallerEngine(Engine):
     name = NAME
     display_name = "PyInstaller"
@@ -164,6 +171,15 @@ class PyInstallerEngine(Engine):
         cmd.append(config.source)
 
         return cmd, None
+
+    def requirements(self, platform: Optional[str] = None) -> Tuple[str, ...]:
+        from py2exe_gui.constants import PYINSTALLER_REQUIREMENT
+
+        return (PYINSTALLER_REQUIREMENT,)
+
+    def translate_flag(self, flag: str, argument: str) -> Optional[List[Tuple[str, str]]]:
+        """PyInstaller's own options pass; another engine's (Nuitka plugins) do not."""
+        return [(flag, argument)] if flag in _OWN_FLAGS else None
 
     def locate_output(self, config: BuildConfig) -> str:
         """The EXE (one-file) or the app folder (folder mode) under dist/."""

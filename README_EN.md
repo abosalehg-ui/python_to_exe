@@ -24,6 +24,7 @@ version metadata, build history, and a Windows manifest editor.
 | **Windows Sandbox** *(1.4)* | Generates a `.wsb` that runs the build on a clean, throw-away Windows (output mapped read-only) |
 | **Runtime Kit** *(1.5)* | Optional `p2e_runtime` package embedded in *your* EXE, one checkbox per service: `resource_path()`, a rotating log file for windowed apps, a crash reporter (saved report + native dialog, nothing sent), single instance. Standard library only, Python 3.8+, works with tkinter, Qt and console apps. Nothing on by default, no telemetry |
 | **Signed self-updater** *(1.5)* | `update.json` signed with **Ed25519** (pure-Python verifier that passes the RFC 8032 test vectors); HTTPS only, redirects to HTTP refused, size and SHA-256 checked before anything is replaced. One-file EXEs swap in place and restart; folder builds launch a verified installer. Key pair and a *Create signed update.json* helper in the app |
+| **Nuitka engine** *(2.0)* | Choose **PyInstaller** or **Nuitka** (`engine` in `p2e.toml`, or `build --engine nuitka`). Nuitka compiles your modules to C: typically fewer antivirus false positives and extraction made **harder, not impossible**; builds are slower because a C compiler runs. What an engine cannot do (Runtime Kit, manifest...) is named before building; fixes are translated to Nuitka's options or marked as having no equivalent — no engine ever gets an option it does not have. The doctor checks the C compiler (MSVC/MinGW on Windows, gcc/clang elsewhere), the Python version and, on Linux, `patchelf`/`readelf`. **No download without your consent**: if Nuitka asks to download a tool, you are asked, for that build only. The size lab reads Nuitka's compilation report |
 | **Project file** *(1.6)* | One `p2e.toml` in your repository describes the whole project — build, Version Info, manifest, installer, signing (never the password), Runtime Kit and release settings. Paths are relative to the file, so a fresh checkout builds the same way. The GUI, presets, history and the command line all use this one model |
 | **Command line** *(1.6)* | `py2exe-gui init / doctor / build / size / env / release`, headless, no PyQt5 needed — for CI and scripts. Build logs stream with stage markers |
 | **One-click release** *(1.6)* | Version bump everywhere at once → notes drafted from `git log` → doctor gate → build → sign → installer → portable ZIP → `SHA256SUMS.txt` → signed `update.json` → git tag → GitHub release → winget manifests. A dry run shows every action first; nothing is tagged or uploaded before you confirm |
@@ -164,7 +165,7 @@ headless and never imports PyQt5. Every command takes `--project PATH`
 |---|---|
 | `py2exe-gui init app.py [--name N] [--set-version X.Y.Z] [--force]` | Create `p2e.toml` for a script |
 | `py2exe-gui doctor [--json]` | The project doctor; exit code 1 if it finds errors |
-| `py2exe-gui build [--strict] [--yes]` | Run the doctor, then build (in the isolated environment if the project says so). The log streams with `==> [stage] NN%` markers. `--strict` stops on doctor errors |
+| `py2exe-gui build [--strict] [--yes] [--engine nuitka] [--allow-downloads]` | Run the doctor, then build (in the isolated environment if the project says so). The log streams with `==> [stage] NN%` markers. `--strict` stops on doctor errors. `--engine` picks the engine for this run; `--allow-downloads` lets Nuitka download what it needs (otherwise you are asked) |
 | `py2exe-gui size [--json]` | The size lab on the last build |
 | `py2exe-gui env create\|lock\|delete [--yes]` | The isolated build environment |
 | `py2exe-gui release (--set-version X.Y.Z \| --bump major\|minor\|patch) [--notes FILE] [--dry-run] [--push-tag] [--no-tag] [--no-publish] [--allow-doctor-errors] [--yes]` | The release pipeline (below) |
@@ -469,7 +470,10 @@ py2exe_gui/
 ├── core/                 # UI-independent, fully tested
 │   ├── engines/          # build engines behind one Engine interface (2.0)
 │   │   ├── base.py       #   interface, feature matrix, stage tracker
-│   │   └── pyinstaller.py#   command, phases, output, log patterns
+│   │   ├── pyinstaller.py#   command, phases, output, log patterns
+│   │   ├── nuitka.py     #   Nuitka, mapped from its own --help (4.2.2)
+│   │   ├── nuitka_report.py # size lab from Nuitka's --report XML
+│   │   └── prerequisites.py # C compiler, Python version, patchelf checks
 │   ├── builder.py        # command-line helpers (+ compatibility shim)
 │   ├── config.py
 │   ├── dependency_analyzer.py
@@ -537,8 +541,8 @@ See [IDEAS.md](IDEAS.md) for the full roadmap. Currently:
 - ✅ **1.6:** `p2e.toml` project file as the single settings model, headless
   command line, one-click release (GitHub Releases, checksums, signed
   update manifest, winget manifests)
-- 🚧 **2.0 (in progress):** ✅ engine layer `core/engines/` (milestone 1);
-  next Nuitka, compare mode, CI for all platforms, licensing, projects
+- 🚧 **2.0 (in progress):** ✅ engine layer `core/engines/` (milestone 1),
+  ✅ Nuitka engine (milestone 2); next compare mode, CI for all platforms, licensing, projects
   workspace, PySide6 — see [PRODUCT_ROADMAP.md](PRODUCT_ROADMAP.md)
 - ⏳ **Next:** venv management, multi-file projects, Linux/macOS installers,
   `.spec` editor, VirusTotal, PySide6 migration —

@@ -1,0 +1,4 @@
+Traceback (most recent call last):
+  File "/tmp/onefile_11797_385002_KaQje6Kmucs/hello.py", line 14, in <module>
+  File "/tmp/onefile_11797_385002_KaQje6Kmucs/hello.py", line 8, in main
+FileNotFoundError: [Errno 2] No such file or directory: '/tmp/onefile_11797_385002_KaQje6Kmucs/data/greeting.json'

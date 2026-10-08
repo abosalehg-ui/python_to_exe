@@ -13,7 +13,8 @@ import time
 from PyQt5.QtCore import QThread, pyqtSignal
 
 from py2exe_gui.core.batch_runner import CANCELLED, FAILED, RUNNING, SUCCESS, job_config
-from py2exe_gui.core.builder import build_pyinstaller_command
+from py2exe_gui.core.build_runner import popen_options
+from py2exe_gui.core.engines import engine_for
 from py2exe_gui.strings import S
 
 
@@ -94,10 +95,16 @@ class BatchThread(QThread):
         config = job_config(job, self.base_config)
         python = self.python_for(config) if self.python_for else None
         options, error = self.options_for(config) if self.options_for else ([], None)
+        engine = engine_for(config)
         if not error:
-            command, error = build_pyinstaller_command(
+            command, error = engine.build_command(
                 config, python_executable=python, extra_options=options
             )
+        if not error:
+            try:
+                engine.prepare_output(config)
+            except OSError as e:
+                error = str(e)
         if error:
             job.message = error
             self.log_signal.emit(error)
@@ -112,6 +119,7 @@ class BatchThread(QThread):
                 bufsize=1,
                 universal_newlines=True,
                 cwd=config.output_dir or None,
+                **popen_options(engine.name, engine.build_env(python or "")),
             )
         except (OSError, ValueError) as e:
             job.message = str(e)

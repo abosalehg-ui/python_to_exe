@@ -30,6 +30,22 @@ _FLAG_FIELDS = (
 
 QT_BINDINGS = ("PyQt5", "PyQt6", "PySide2", "PySide6")
 
+#: 2.0: optional per-engine hints, under ``"engines": {"<engine>": {...}}``.
+#: PyInstaller's needs stay in the top-level fields (every entry predates
+#: the other engines), so only the other engines have a section.
+ENGINE_HINT_ENGINES = ("nuitka",)
+#: Allowed keys of an engine section: ``plugins`` (Nuitka plugins the package
+#: needs, ``--enable-plugins``) and ``notes`` ({ar, en}).
+ENGINE_HINT_KEYS = ("plugins", "notes")
+
+
+@dataclass(frozen=True)
+class EngineHints:
+    """What one package needs from one engine beyond the common fields."""
+
+    plugins: Tuple[str, ...] = ()
+    notes: Dict[str, str] = field(default_factory=dict, hash=False, compare=False)
+
 
 def default_is_installed(module: str) -> bool:
     """Whether ``module`` can be imported by the Python that runs the build.
@@ -59,21 +75,39 @@ class PackageInfo:
     qt_binding: bool = False
     large: bool = False
     notes: Dict[str, str] = field(default_factory=dict, hash=False, compare=False)
+    engines: Dict[str, EngineHints] = field(default_factory=dict, hash=False, compare=False)
 
     @property
     def pip_name(self) -> str:
         """What to ``pip install`` — the import name unless the entry says otherwise."""
         return self.pip or self.name
 
-    def build_fixes(self) -> Tuple[Fix, ...]:
-        """The config changes this package needs, as fixes."""
+    def build_fixes(self, engine: str = "pyinstaller") -> Tuple[Fix, ...]:
+        """The config changes this package needs, as fixes.
+
+        In PyInstaller's vocabulary (``fixes.localize_fixes`` translates them
+        for another engine), plus that engine's own needs (Nuitka plugins).
+        """
         fixes = [Fix("hidden_import", m) for m in self.hidden_imports]
         for attr, flag in _FLAG_FIELDS:
             fixes.extend(flag_fix(flag, arg) for arg in getattr(self, attr))
+        fixes.extend(self.engine_fixes(engine))
         return tuple(fixes)
 
-    def note(self, locale: str) -> str:
-        return self.notes.get(locale) or self.notes.get("en", "")
+    def engine_fixes(self, engine: str) -> Tuple[Fix, ...]:
+        """Only what ``engine`` needs on top of the common fields."""
+        hints = self.engines.get(engine)
+        if hints is None:
+            return ()
+        return tuple(flag_fix("--enable-plugins", p) for p in hints.plugins)
+
+    def note(self, locale: str, engine: str = "") -> str:
+        text = self.notes.get(locale) or self.notes.get("en", "")
+        hints = self.engines.get(engine)
+        if hints is not None and hints.notes:
+            extra = hints.notes.get(locale) or hints.notes.get("en", "")
+            text = f"{text} {extra}".strip()
+        return text
 
 
 def _entry(name: str, raw: dict) -> PackageInfo:
@@ -87,6 +121,7 @@ def _entry(name: str, raw: dict) -> PackageInfo:
     if not isinstance(notes, dict):
         raise ValueError(f"{name}.notes must be an object")
     return PackageInfo(
+        engines=_engine_hints(name, raw.get("engines", {})),
         name=name,
         pip=str(raw.get("pip", "")),
         hidden_imports=strings("hidden_imports"),
@@ -100,6 +135,29 @@ def _entry(name: str, raw: dict) -> PackageInfo:
         large=bool(raw.get("large", False)),
         notes={str(k): str(v) for k, v in notes.items()},
     )
+
+
+def _engine_hints(name: str, raw) -> Dict[str, EngineHints]:
+    if not isinstance(raw, dict):
+        raise ValueError(f"{name}.engines must be an object")
+    hints = {}
+    for engine, section in raw.items():
+        where = f"{name}.engines.{engine}"
+        if engine not in ENGINE_HINT_ENGINES:
+            raise ValueError(f"{where}: unknown engine")
+        if not isinstance(section, dict):
+            raise ValueError(f"{where} must be an object")
+        unknown = set(section) - set(ENGINE_HINT_KEYS)
+        if unknown:
+            raise ValueError(f"{where}: unknown keys {sorted(unknown)}")
+        plugins = section.get("plugins", [])
+        if not isinstance(plugins, list) or not all(isinstance(p, str) and p for p in plugins):
+            raise ValueError(f"{where}.plugins must be a list of strings")
+        notes = section.get("notes", {})
+        if not isinstance(notes, dict):
+            raise ValueError(f"{where}.notes must be an object")
+        hints[engine] = EngineHints(tuple(plugins), {str(k): str(v) for k, v in notes.items()})
+    return hints
 
 
 def parse_knowledge(data: dict) -> Dict[str, PackageInfo]:

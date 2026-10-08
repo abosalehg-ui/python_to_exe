@@ -23,8 +23,9 @@ class DiagnosticThread(QThread):
     #: (built_ok, exe_output, build_log)
     finished_signal = pyqtSignal(bool, str, str)
 
-    def __init__(self, command, config, timeout: float = 8.0):
+    def __init__(self, command, config, timeout: float = 8.0, popen_kwargs=None):
         super().__init__()
+        self.popen_kwargs = dict(popen_kwargs or {})
         self.command = command
         self.config = config
         self.timeout = timeout
@@ -43,6 +44,7 @@ class DiagnosticThread(QThread):
                 text=True,
                 bufsize=1,
                 cwd=self.config.output_dir,
+                **self.popen_kwargs,
             )
             for line in self.process.stdout:
                 if self.is_cancelled:
@@ -62,7 +64,8 @@ class DiagnosticThread(QThread):
             return
 
         exe = locate_built_executable(
-            self.config.output_dir, build_name(self.config), self.config.onefile
+            self.config.output_dir, build_name(self.config), self.config.onefile,
+            engine=self.config.engine,
         )
         if not exe:
             self.log_signal.emit(S.LOG_SMOKE_NOT_FOUND)

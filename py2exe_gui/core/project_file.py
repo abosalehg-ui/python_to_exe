@@ -160,6 +160,15 @@ class ProjectConfig:
     signing: SigningSettings = field(default_factory=SigningSettings)
     release: ReleaseSettings = field(default_factory=ReleaseSettings)
 
+    def features_used(self) -> List[str]:
+        """Engine features this project uses outside ``BuildConfig`` (2.0)."""
+        used = []
+        if not self.version_info.is_empty():
+            used.append("version_info")
+        if self.manifest.enabled:
+            used.append("manifest")
+        return used
+
     def display_name(self) -> str:
         if self.name:
             return self.name
