@@ -13,8 +13,8 @@ from dataclasses import dataclass, field, replace
 from typing import Callable, Dict, List, Optional
 
 from py2exe_gui.core.build_stages import BuildStageTracker
-from py2exe_gui.core.builder import build_pyinstaller_command
 from py2exe_gui.core.diagnostics import build_name, build_root
+from py2exe_gui.core.engines import engine_for, get_engine
 from py2exe_gui.core.fixes import Finding
 from py2exe_gui.core.manifest_generator import generate_manifest
 from py2exe_gui.core.runtime_kit import write_kit
@@ -32,6 +32,8 @@ class PreparedBuild:
     #: Runtime Kit problems (findings) that stop the build.
     kit_errors: List[Finding] = field(default_factory=list)
     services: List[str] = field(default_factory=list)
+    #: The engine the command runs (``core/engines``).
+    engine: str = "pyinstaller"
 
     def cleanup(self) -> None:
         for path in self.temp_files:
@@ -75,8 +77,9 @@ def prepare_build(project, python: str, texts: Optional[Dict[str, str]] = None,
         prepared.temp_files.append(path)
         config.manifest_file = path
 
-    command, error = build_pyinstaller_command(config, python_executable=python,
-                                               platform=platform)
+    engine = engine_for(config)
+    command, error = engine.build_command(config, python_executable=python,
+                                          platform=platform)
     if error:
         prepared.error = error
         prepared.cleanup()
@@ -87,23 +90,24 @@ def prepare_build(project, python: str, texts: Optional[Dict[str, str]] = None,
         prepared.cleanup()
         return prepared
     if options:
-        command, _ = build_pyinstaller_command(config, python_executable=python,
-                                               platform=platform, extra_options=options)
+        command, _ = engine.build_command(config, python_executable=python,
+                                          platform=platform, extra_options=options)
         prepared.services = config.runtime_kit.enabled_services()
     prepared.command = command
     prepared.cwd = build_root(config)
+    prepared.engine = engine.name
     return prepared
 
 
 def stream_command(command: List[str], cwd: str, on_line: Callable[[str], None],
                    on_stage: Optional[Callable[[str, int], None]] = None,
-                   popen=None) -> int:
+                   popen=None, engine: str = "pyinstaller") -> int:
     """Run ``command``, passing each output line on; returns the exit code.
 
-    ``on_stage(stage_key, percent)`` is called whenever PyInstaller enters a
+    ``on_stage(stage_key, percent)`` is called whenever the engine enters a
     new phase, so a terminal can print a marker line for it.
     """
-    tracker = BuildStageTracker()
+    tracker = BuildStageTracker(get_engine(engine).stages)
     last = tracker.stage
     process = (popen or subprocess.Popen)(
         command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True,
@@ -132,7 +136,8 @@ def run_build(prepared: PreparedBuild, on_line: Callable[[str], None],
         prepared.cleanup()
         return BuildOutcome(False, error=prepared.error or "cannot build")
     try:
-        code = stream_command(prepared.command, prepared.cwd, on_line, on_stage, popen)
+        code = stream_command(prepared.command, prepared.cwd, on_line, on_stage, popen,
+                              engine=prepared.engine)
     except OSError as e:
         return BuildOutcome(False, error=str(e))
     finally:

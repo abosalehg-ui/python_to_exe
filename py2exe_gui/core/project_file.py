@@ -31,13 +31,14 @@ from typing import Any, Callable, Dict, List, Optional, Tuple
 from py2exe_gui.core import toml_writer
 from py2exe_gui.core.builder import find_dangerous_args
 from py2exe_gui.core.code_signer import SigningConfig
-from py2exe_gui.core.config import BuildConfig, RuntimeKitConfig
+from py2exe_gui.core.config import DEFAULT_ENGINE, KNOWN_ENGINES, BuildConfig, RuntimeKitConfig
 from py2exe_gui.core.installer import InstallerConfig
 from py2exe_gui.core.manifest_generator import ManifestConfig
 from py2exe_gui.core.version_info import VersionInfo
 
 PROJECT_FILE_NAME = "p2e.toml"
-SCHEMA_VERSION = 1
+#: 1 — 1.6; 2 — 2.0 adds ``build.engine``.
+SCHEMA_VERSION = 2
 DEFAULT_TIMESTAMP_URL = "http://timestamp.digicert.com"
 
 FILE_COMMENT = (
@@ -405,9 +406,25 @@ def untrusted_flags(build: BuildConfig) -> List[str]:
 
 # ── Schema versions ───────────────────────────────────────────────────────
 
+def _schema_1_to_2(data: dict) -> dict:
+    """2.0: every 1.6 project was built with PyInstaller; say so explicitly.
+
+    The bump is what keeps an older app from opening a file that names an
+    engine it does not have: it refuses schema 2 ("written by a newer
+    version") instead of silently building a Nuitka project with PyInstaller.
+    """
+    build = data.get("build")
+    if isinstance(build, dict):
+        build = dict(build)
+        build.setdefault("engine", DEFAULT_ENGINE)
+        data["build"] = build
+    elif build is None:
+        data["build"] = {"engine": DEFAULT_ENGINE}
+    return data
+
+
 #: ``MIGRATIONS[n]`` turns a schema-``n`` document into schema ``n + 1``.
-#: Empty while there is only schema 1; the loader already runs the chain.
-MIGRATIONS: Dict[int, Callable[[dict], dict]] = {}
+MIGRATIONS: Dict[int, Callable[[dict], dict]] = {1: _schema_1_to_2}
 
 
 def migrate(data: dict) -> dict:
@@ -494,6 +511,10 @@ def project_from_document(data: dict, base_dir: str, pathmod=os.path
     for name in _BUILD_NOT_STORED:
         if name in data.get("build", {}):
             warnings.append(f"build.{name}: not a project setting, ignored")
+    if build.engine not in KNOWN_ENGINES:
+        # Never fall back silently: a project that asks for an engine this
+        # version lacks would otherwise be built with a different one.
+        raise ProjectFileError("unknown_engine", build.engine)
     build.runtime_kit = _section_from_dict(RuntimeKitConfig(), resolved("runtime_kit"),
                                            "runtime_kit", warnings)
     project.build = build

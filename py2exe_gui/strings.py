@@ -1172,7 +1172,7 @@ class Ar:
     PROJECT_ERR_GENERIC = "ملف المشروع غير صالح ({code}): {detail}"
     PROJECT_ERR_UNREADABLE = "تعذّرت قراءة الملف: {detail}"
     PROJECT_ERR_SYNTAX = "الملف ليس TOML صالحاً: {detail}"
-    PROJECT_ERR_SCHEMA_MISSING = "الملف لا يحدّد رقم المخطط (schema = 1) — هل هو ملف مشروع لهذا التطبيق؟"
+    PROJECT_ERR_SCHEMA_MISSING = "الملف لا يحدّد رقم المخطط (schema = 2) — هل هو ملف مشروع لهذا التطبيق؟"
     PROJECT_ERR_SCHEMA_INVALID = "رقم المخطط غير صالح: {detail}"
     PROJECT_ERR_SCHEMA_NEWER = "الملف مكتوب بإصدار أحدث من التطبيق (المخطط {detail}). حدّث التطبيق لفتحه."
     PROJECT_ERR_NOT_A_TABLE = "محتوى الملف ليس جدول إعدادات."
@@ -1180,6 +1180,7 @@ class Ar:
     PROJECT_ERR_FORBIDDEN_EXECUTABLE = "رُفض الملف: «{detail}» يحدّد برنامجاً للتشغيل (مفسّر أو أداة). هذا إعداد خاص بجهازك ولا يُقبل من ملف مشترك."
     PROJECT_ERR_SECRET_VALUE = "رُفض الملف: القيمة في «{detail}» تبدو رمز GitHub أو مفتاحاً خاصاً. لا تحفظ الأسرار في ملف المشروع."
     PROJECT_ERR_TOML_UNAVAILABLE = "قراءة TOML تحتاج الحزمة tomli على Python أقدم من 3.11: {detail}"
+    PROJECT_ERR_UNKNOWN_ENGINE = "الملف يطلب محرك بناء لا يعرفه هذا الإصدار: «{detail}». حدّث التطبيق أو غيّر build.engine."
 
     # Release tab
     RELEASE_HINT = "من رفع الإصدار إلى نشره على GitHub في خطوة واحدة. «تجربة دون تنفيذ» تعرض كل ما سيحدث دون أن تغيّر شيئاً، ولا يُنشأ وسم ولا يُرفع ملف قبل تأكيدك."
@@ -2601,7 +2602,7 @@ class En:
     PROJECT_ERR_GENERIC = "Invalid project file ({code}): {detail}"
     PROJECT_ERR_UNREADABLE = "Could not read the file: {detail}"
     PROJECT_ERR_SYNTAX = "Not valid TOML: {detail}"
-    PROJECT_ERR_SCHEMA_MISSING = "The file has no schema number (schema = 1) — is it a project file for this app?"
+    PROJECT_ERR_SCHEMA_MISSING = "The file has no schema number (schema = 2) — is it a project file for this app?"
     PROJECT_ERR_SCHEMA_INVALID = "Invalid schema number: {detail}"
     PROJECT_ERR_SCHEMA_NEWER = "The file was written by a newer version of the app (schema {detail}). Update the app to open it."
     PROJECT_ERR_NOT_A_TABLE = "The file does not contain a settings table."
@@ -2609,6 +2610,7 @@ class En:
     PROJECT_ERR_FORBIDDEN_EXECUTABLE = "Refused: “{detail}” names a program to run (an interpreter or a tool). That is a setting of your machine and is never taken from a shared file."
     PROJECT_ERR_SECRET_VALUE = "Refused: the value of “{detail}” looks like a GitHub token or a private key. Never store secrets in the project file."
     PROJECT_ERR_TOML_UNAVAILABLE = "Reading TOML needs the tomli package on Python older than 3.11: {detail}"
+    PROJECT_ERR_UNKNOWN_ENGINE = "The file asks for a build engine this version does not know: “{detail}”. Update the app or change build.engine."
 
     # Release tab
     RELEASE_HINT = "From version bump to a published GitHub release in one go. “Dry run” shows everything that would happen without changing anything, and nothing is tagged or uploaded before you confirm."
