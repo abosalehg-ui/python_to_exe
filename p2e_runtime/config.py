@@ -62,6 +62,14 @@ class UpdaterConfig:
 
 
 @dataclass(frozen=True)
+class LicensingConfig:
+    """2.0: offline licence keys (``p2e_runtime.license``). Public half only."""
+
+    product: str = ""
+    public_key: str = ""
+
+
+@dataclass(frozen=True)
 class RuntimeConfig:
     app_name: str = "app"
     app_version: str = ""
@@ -72,10 +80,11 @@ class RuntimeConfig:
     crash: Optional[CrashConfig] = None
     single_instance: Optional[SingleInstanceConfig] = None
     updater: Optional[UpdaterConfig] = None
+    licensing: Optional[LicensingConfig] = None
 
     def enabled(self) -> List[str]:
         names = []
-        for name in ("resource_path", "logs", "crash", "single_instance", "updater"):
+        for name in ("resource_path", "logs", "crash", "single_instance", "updater", "licensing"):
             if getattr(self, name):
                 names.append(name)
         return names
@@ -168,6 +177,17 @@ def parse_config(data: Any) -> RuntimeConfig:
             allow_insecure_localhost=section.get("allow_insecure_localhost") is True,
         )
 
+    licensing = None
+    section = _section(services, "licensing")
+    if section is not None:
+        public_key = _str(section, "public_key").strip().lower()
+        if len(public_key) != 64 or any(c not in "0123456789abcdef" for c in public_key):
+            raise ValueError("licensing.public_key must be 64 hex characters")
+        licensing = LicensingConfig(
+            product=_str(section, "product").strip() or _str(app, "name", "app") or "app",
+            public_key=public_key,
+        )
+
     return RuntimeConfig(
         app_name=_str(app, "name", "app") or "app",
         app_version=_str(app, "version"),
@@ -178,6 +198,7 @@ def parse_config(data: Any) -> RuntimeConfig:
         crash=crash,
         single_instance=single,
         updater=updater,
+        licensing=licensing,
     )
 
 

@@ -8,7 +8,10 @@ wx and console apps alike. Every service is off unless ``p2e_runtime.json``
 * log redirection — a windowed app's missing stdout/stderr go to a log file;
 * crash reporter — a saved report and a dialog instead of a silent exit;
 * single instance — a second copy shows a message and exits;
-* signed self-updater — ``p2e_runtime.updates.check()`` / ``apply()``.
+* signed self-updater — ``p2e_runtime.updates.check()`` / ``apply()``;
+* offline licence keys — ``p2e_runtime.license.check(key)`` (2.0): verified
+  with the public key bundled in the app; a deterrent, not a lock (see the
+  module's note).
 
 There is no telemetry, and nothing touches the network unless the developer
 configured an update URL *and* the app calls the updater (or opted in to a
