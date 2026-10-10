@@ -5,6 +5,7 @@ standing in for a built EXE. POSIX only where a shebang is needed.
 """
 
 import os
+import signal
 import stat
 import subprocess
 import sys
@@ -15,7 +16,7 @@ import pytest
 
 import p2e_runtime
 from py2exe_gui.core import startup_bench as sb
-from py2exe_gui.core.process_tree import group_kwargs, kill_tree
+from py2exe_gui.core.process_tree import group_kwargs, kill_tree, leads_own_group
 from py2exe_gui.core.smoke_test import run_smoke_test
 
 posix_only = pytest.mark.skipif(sys.platform == "win32", reason="needs a shebang script")
@@ -145,7 +146,8 @@ def test_output_after_the_timeout_does_not_count():
             return b""
 
     class Process:
-        pid = 1
+        # A made-up pid: kill_tree must not signal anyone's group for it.
+        pid = 2 ** 22 + 4321
         returncode = None
 
         def __init__(self):
@@ -220,3 +222,33 @@ def test_kill_tree_survives_a_vanished_process():
     process = SimpleNamespace(pid=2 ** 22 + 12345, poll=lambda: 0,
                               kill=lambda: (_ for _ in ()).throw(OSError("gone")))
     kill_tree(process, "linux")  # no exception
+
+
+@posix_only
+def test_kill_tree_never_signals_a_group_the_program_does_not_lead(monkeypatch):
+    """Regression: a stand-in process with ``pid = 1`` made ``kill_tree`` send
+    SIGKILL to process group 1 — the whole CI runner, or a container's init.
+    Only a process that leads its own group (``group_kwargs``) is a target."""
+    signalled = []
+    monkeypatch.setattr(os, "killpg", lambda pgid, sig: signalled.append(pgid))
+    for pid in (1, 0, -1, os.getpid(), os.getppid(), os.getpgid(0), None, "7", True):
+        process = SimpleNamespace(pid=pid, poll=lambda: None, kill=lambda: None)
+        kill_tree(process, "linux")
+    assert signalled == []
+    assert not leads_own_group(os.getpid())
+    assert not leads_own_group(1)
+
+
+@posix_only
+def test_kill_tree_signals_the_group_a_program_leads(monkeypatch):
+    process = subprocess.Popen([sys.executable, "-c", "import time; time.sleep(30)"],
+                               **group_kwargs())
+    try:
+        assert leads_own_group(process.pid)
+        signalled = []
+        monkeypatch.setattr(os, "killpg", lambda pgid, sig: signalled.append((pgid, sig)))
+        kill_tree(process, "linux")
+        assert signalled == [(process.pid, signal.SIGKILL)]
+    finally:
+        process.kill()
+        process.wait()
