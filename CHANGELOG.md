@@ -68,6 +68,11 @@ follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 #### Fixed
 - The smoke test and the benchmark now end the whole process group on a
   timeout; PyInstaller onefile children were left running before.
+- `kill_tree` only signals a process group the program itself leads. A test
+  stand-in with `pid = 1` made it send SIGKILL to process group 1, which
+  took down the whole GitHub Actions runner (every CI run since milestone 3
+  died after 45 minutes with no logs) and a container's init when the suite
+  ran locally.
 - Engines create the output folder before building.
 
 ### 2.0.0-dev — Every platform, every engine (milestone 2: Nuitka)
