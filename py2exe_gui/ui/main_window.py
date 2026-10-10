@@ -66,6 +66,7 @@ from py2exe_gui.core import (
     generate_manifest,
     generate_version_file,
     installer_output_path,
+    licensing,
     local_module_names,
     locate_built_executable,
     make_record,
@@ -168,7 +169,7 @@ from py2exe_gui.core.venv_manager import (
     quote_command,
     write_metadata,
 )
-from py2exe_gui.paths import envs_dir, signing_key_path
+from py2exe_gui.paths import envs_dir, license_key_path, signing_key_path
 from py2exe_gui.strings import (
     LOCALE_LAYOUT,
     S,
@@ -199,6 +200,7 @@ from py2exe_gui.ui.env_thread import EnvThread
 from py2exe_gui.ui.finding_text import finding_detail, finding_title, fix_label, service_label
 from py2exe_gui.ui.icon_studio_dialog import IconStudioDialog
 from py2exe_gui.ui.installer_thread import InstallerThread
+from py2exe_gui.ui.license_dialog import LicenseGeneratorDialog
 from py2exe_gui.ui.package_thread import PackageThread
 from py2exe_gui.ui.post_build_thread import PostBuildThread
 from py2exe_gui.ui.release_thread import ReleaseThread
@@ -232,6 +234,8 @@ ENVS_ROOT = envs_dir()
 # The Runtime Kit's private update-signing key (per-user config folder).
 # A module global for the same reason.
 SIGNING_KEY_FILE = signing_key_path()
+# 2.0: the private licence-signing key, kept the same way in its own file.
+LICENSE_KEY_FILE = license_key_path()
 
 # The OS keyring used for the GitHub token (``credentials.DEFAULT`` = the real
 # ``keyring`` package, if installed). A module global so tests use a fake one.
@@ -2163,6 +2167,7 @@ class MainWindow(QMainWindow):
 
     def refresh_signing_key(self):
         self.runtime_tab.show_key(read_public_key(SIGNING_KEY_FILE), SIGNING_KEY_FILE)
+        self.runtime_tab.show_license_key(read_public_key(LICENSE_KEY_FILE), LICENSE_KEY_FILE)
 
     def use_my_public_key(self):
         public = read_public_key(SIGNING_KEY_FILE)
@@ -2206,19 +2211,22 @@ class MainWindow(QMainWindow):
 
     def export_signing_key(self):
         """Back up the private key — after a warning, and never into the project."""
+        self._export_key(SIGNING_KEY_FILE, S.MSG_KIT_KEY_EXPORT_WARNING,
+                         S.DIALOG_KIT_KEY_EXPORT, S.LOG_KIT_KEY_EXPORTED)
+
+    def _export_key(self, key_file: str, warning: str, title: str, log_fmt: str):
         try:
-            key = read_key_file(SIGNING_KEY_FILE)
+            key = read_key_file(key_file)
         except (OSError, ValueError) as e:
             QMessageBox.warning(self, S.MSG_WARNING, S.ERR_KIT_KEY_READ.format(error=str(e)))
             return
         reply = QMessageBox.warning(
-            self, S.MSG_CONFIRM, S.MSG_KIT_KEY_EXPORT_WARNING,
-            QMessageBox.Yes | QMessageBox.No, QMessageBox.No,
+            self, S.MSG_CONFIRM, warning, QMessageBox.Yes | QMessageBox.No, QMessageBox.No,
         )
         if reply != QMessageBox.Yes:
             return
         path, _ = QFileDialog.getSaveFileName(
-            self, S.DIALOG_KIT_KEY_EXPORT, "update_signing_key.json", S.DIALOG_FILTER_KEY
+            self, title, os.path.basename(key_file), S.DIALOG_FILTER_KEY
         )
         if not path:
             return
@@ -2232,12 +2240,14 @@ class MainWindow(QMainWindow):
         except OSError as e:
             QMessageBox.critical(self, S.MSG_ERROR, S.ERR_KIT_KEY_WRITE.format(error=str(e)))
             return
-        self._append_log(S.LOG_KIT_KEY_EXPORTED.format(path=path))
+        self._append_log(log_fmt.format(path=path))
 
     def import_signing_key(self):
-        path, _ = QFileDialog.getOpenFileName(
-            self, S.DIALOG_KIT_KEY_IMPORT, "", S.DIALOG_FILTER_KEY
-        )
+        self._import_key(SIGNING_KEY_FILE, S.DIALOG_KIT_KEY_IMPORT,
+                         S.MSG_KIT_KEY_REPLACE_CONFIRM, S.LOG_KIT_KEY_IMPORTED)
+
+    def _import_key(self, key_file: str, title: str, replace_fmt: str, log_fmt: str):
+        path, _ = QFileDialog.getOpenFileName(self, title, "", S.DIALOG_FILTER_KEY)
         if not path:
             return
         try:
@@ -2245,28 +2255,92 @@ class MainWindow(QMainWindow):
         except (OSError, ValueError) as e:
             QMessageBox.warning(self, S.MSG_WARNING, S.ERR_KIT_KEY_READ.format(error=str(e)))
             return
-        existing = read_public_key(SIGNING_KEY_FILE)
+        existing = read_public_key(key_file)
         if existing == key.public_hex:
-            self._append_log(S.LOG_KIT_KEY_IMPORTED.format(fingerprint=fingerprint(existing)))
+            self._append_log(log_fmt.format(fingerprint=fingerprint(existing)))
             return
-        if existing or os.path.exists(SIGNING_KEY_FILE):
+        if existing or os.path.exists(key_file):
             reply = QMessageBox.question(
                 self, S.MSG_CONFIRM,
-                S.MSG_KIT_KEY_REPLACE_CONFIRM.format(fingerprint=fingerprint(existing) or "?"),
+                replace_fmt.format(fingerprint=fingerprint(existing) or "?"),
                 QMessageBox.Yes | QMessageBox.No, QMessageBox.No,
             )
             if reply != QMessageBox.Yes:
                 return
         try:
-            backup = backup_existing(SIGNING_KEY_FILE)
-            write_key_file(SIGNING_KEY_FILE, key)
+            backup = backup_existing(key_file)
+            write_key_file(key_file, key)
         except OSError as e:
             QMessageBox.critical(self, S.MSG_ERROR, S.ERR_KIT_KEY_WRITE.format(error=str(e)))
             return
         if backup:
             self._append_log(S.LOG_KIT_KEY_REPLACED.format(path=backup))
-        self._append_log(S.LOG_KIT_KEY_IMPORTED.format(fingerprint=fingerprint(key.public_hex)))
+        self._append_log(log_fmt.format(fingerprint=fingerprint(key.public_hex)))
         self.refresh_signing_key()
+
+    # ─── Offline licensing (2.0) ────────────────────────────────────────
+
+    def use_my_license_key(self):
+        public = read_public_key(LICENSE_KEY_FILE)
+        if public:
+            self.runtime_tab.license_public_key.setText(public)
+
+    def create_license_key(self):
+        """Create the licence key pair. Replacing one needs a hard yes."""
+        existing = read_public_key(LICENSE_KEY_FILE)
+        if existing or os.path.exists(LICENSE_KEY_FILE):
+            reply = QMessageBox.question(
+                self, S.MSG_CONFIRM,
+                S.MSG_KIT_LICENSE_KEY_REPLACE_CONFIRM.format(
+                    fingerprint=fingerprint(existing) or "?"),
+                QMessageBox.Yes | QMessageBox.No, QMessageBox.No,
+            )
+            if reply != QMessageBox.Yes:
+                return
+        try:
+            key, backup = licensing.replace_key(LICENSE_KEY_FILE)
+        except OSError as e:
+            QMessageBox.critical(self, S.MSG_ERROR, S.ERR_KIT_KEY_WRITE.format(error=str(e)))
+            return
+        if backup:
+            self._append_log(S.LOG_KIT_KEY_REPLACED.format(path=backup))
+        self._append_log(S.LOG_KIT_LICENSE_KEY_CREATED.format(
+            fingerprint=fingerprint(key.public_hex)))
+        self.refresh_signing_key()
+        if self.runtime_tab.service_checks["licensing"].isChecked():
+            self.runtime_tab.license_public_key.setText(key.public_hex)
+
+    def export_license_key(self):
+        self._export_key(LICENSE_KEY_FILE, S.MSG_KIT_LICENSE_KEY_EXPORT_WARNING,
+                         S.DIALOG_KIT_LICENSE_KEY_EXPORT, S.LOG_KIT_LICENSE_KEY_EXPORTED)
+
+    def import_license_key(self):
+        self._import_key(LICENSE_KEY_FILE, S.DIALOG_KIT_LICENSE_KEY_IMPORT,
+                         S.MSG_KIT_LICENSE_KEY_REPLACE_CONFIRM, S.LOG_KIT_LICENSE_KEY_IMPORTED)
+
+    def _issue_license(self, request):
+        """Sign one licence with the stored key; logs the public facts only."""
+        key = read_key_file(LICENSE_KEY_FILE)
+        text = licensing.issue(request, key)
+        self._append_log(S.LOG_KIT_LICENSE_ISSUED.format(
+            name=request.name, product=request.product,
+            expiry=request.expiry or S.KIT_LICENSE_NO_EXPIRY, length=len(text),
+        ))
+        return text
+
+    def open_license_generator(self):
+        """The licence dialog; refuses to open without a key rather than
+        creating one behind the developer's back."""
+        if not read_public_key(LICENSE_KEY_FILE):
+            QMessageBox.warning(self, S.MSG_WARNING, S.ERR_KIT_LICENSE_NO_KEY)
+            return
+        config = self._current_config()
+        product = config.runtime_kit.license_product.strip()
+        if not product and (config.source or config.output_name):
+            product = build_name(config)
+        dialog = LicenseGeneratorDialog(self._issue_license, product, self)
+        self._license_dialog = dialog  # tests reach it; the user sees it modal
+        dialog.exec_()
 
     def publish_update(self):
         """Write and sign update.json for a new build. Uploads nothing."""

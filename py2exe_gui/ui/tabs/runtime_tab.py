@@ -106,11 +106,13 @@ class RuntimeTab(BaseTab):
         layout.addWidget(_muted(S.KIT_HINT))
         layout.addWidget(self._build_services_group())
         layout.addWidget(self._build_updater_group())
+        layout.addWidget(self._build_license_group())
         layout.addWidget(self._build_publish_group())
         layout.addWidget(self._build_preview_group())
         layout.addStretch(1)
 
         self.show_key("", "")
+        self.show_license_key("", "")
         self.show_preview("", "")
 
     # ── Services ───────────────────────────────────────────────────────────
@@ -227,6 +229,70 @@ class RuntimeTab(BaseTab):
         self.publish_btn.setEnabled(self._has_key)
         self._sync_enabled()
 
+    # ── Licensing (2.0) ────────────────────────────────────────────────────
+
+    def _build_license_group(self) -> QGroupBox:
+        self.license_group = QGroupBox(S.GROUP_KIT_LICENSE)
+        box = QVBoxLayout(self.license_group)
+        honesty = _muted(S.KIT_LICENSE_HONESTY)
+        honesty.setObjectName("warningNotice")
+        box.addWidget(honesty)
+
+        form = QFormLayout()
+        self.license_product = _ltr_line(S.KIT_LICENSE_PRODUCT_PLACEHOLDER)
+        form.addRow(bidi(S.KIT_LICENSE_PRODUCT_LABEL), self.license_product)
+        key_row = QHBoxLayout()
+        self.license_public_key = _ltr_line(S.KIT_LICENSE_PUBLIC_KEY_PLACEHOLDER)
+        self.license_use_key_btn = QPushButton(S.BTN_KIT_LICENSE_USE_MY_KEY)
+        self.license_use_key_btn.setAccessibleName(S.BTN_KIT_LICENSE_USE_MY_KEY)
+        self.license_use_key_btn.clicked.connect(self.window_action("use_my_license_key"))
+        key_row.addWidget(self.license_public_key, stretch=1)
+        key_row.addWidget(self.license_use_key_btn)
+        form.addRow(S.KIT_LICENSE_PUBLIC_KEY_LABEL, key_row)
+        box.addLayout(form)
+        for line in (self.license_product, self.license_public_key):
+            line.textChanged.connect(self._changed)
+        box.addWidget(_muted(S.KIT_LICENSE_API_HINT))
+
+        self.license_key_status = QLabel()
+        self.license_key_status.setWordWrap(True)
+        self.license_key_status.setTextInteractionFlags(Qt.TextSelectableByMouse)
+        box.addWidget(self.license_key_status)
+
+        buttons = QHBoxLayout()
+        self.license_key_create_btn = QPushButton(S.BTN_KIT_LICENSE_KEY_CREATE)
+        self.license_key_create_btn.clicked.connect(self.window_action("create_license_key"))
+        self.license_key_export_btn = QPushButton(S.BTN_KIT_LICENSE_KEY_EXPORT)
+        self.license_key_export_btn.clicked.connect(self.window_action("export_license_key"))
+        self.license_key_import_btn = QPushButton(S.BTN_KIT_LICENSE_KEY_IMPORT)
+        self.license_key_import_btn.clicked.connect(self.window_action("import_license_key"))
+        self.license_issue_btn = QPushButton(S.BTN_KIT_LICENSE_ISSUE)
+        self.license_issue_btn.setObjectName("successBtn")
+        self.license_issue_btn.clicked.connect(self.window_action("open_license_generator"))
+        for button in (self.license_key_create_btn, self.license_key_export_btn,
+                       self.license_key_import_btn, self.license_issue_btn):
+            button.setAccessibleName(button.text())
+            buttons.addWidget(button)
+        buttons.addStretch(1)
+        box.addLayout(buttons)
+        return self.license_group
+
+    def show_license_key(self, public_hex: str, path: str):
+        """Show whether a licence key exists (its public half only, ever)."""
+        from py2exe_gui.core.update_signing import fingerprint
+
+        if public_hex:
+            rtl = LOCALE_LAYOUT.get(current_locale(), "ltr") == "rtl"
+            wrap = code_run if rtl else str
+            self.license_key_status.setText(bidi(S.KIT_LICENSE_KEY_STATUS_FMT).format(
+                fingerprint=wrap(fingerprint(public_hex)), path=wrap(path)
+            ))
+        else:
+            self.license_key_status.setText(bidi(S.KIT_LICENSE_KEY_STATUS_NONE))
+        self._has_license_key = bool(public_hex)
+        self.license_key_export_btn.setEnabled(self._has_license_key)
+        self._sync_enabled()
+
     # ── Publish ────────────────────────────────────────────────────────────
 
     def _build_publish_group(self) -> QGroupBox:
@@ -321,6 +387,9 @@ class RuntimeTab(BaseTab):
             update_public_key=self.public_key.text().strip(),
             update_check_on_start=self.check_on_start.isChecked(),
             installer_args=self.installer_args.text().strip(),
+            licensing=checks["licensing"].isChecked(),
+            license_product=self.license_product.text().strip(),
+            license_public_key=self.license_public_key.text().strip(),
         )
 
     def set_kit_config(self, kit: RuntimeKitConfig):
@@ -336,6 +405,8 @@ class RuntimeTab(BaseTab):
             self.public_key.setText(kit.update_public_key)
             self.check_on_start.setChecked(kit.update_check_on_start)
             self.installer_args.setText(kit.installer_args)
+            self.license_product.setText(kit.license_product)
+            self.license_public_key.setText(kit.license_public_key)
         finally:
             self._loading = False
         self._changed()
@@ -351,6 +422,12 @@ class RuntimeTab(BaseTab):
                        self.public_key, self.check_on_start):
             widget.setEnabled(updater)
         self.use_key_btn.setEnabled(updater and getattr(self, "_has_key", False))
+        licensing = self.service_checks["licensing"].isChecked()
+        for widget in (self.license_product, self.license_public_key):
+            widget.setEnabled(licensing)
+        self.license_use_key_btn.setEnabled(
+            licensing and getattr(self, "_has_license_key", False)
+        )
         self.support_url.setEnabled(self.service_checks["crash_reporter"].isChecked())
         self.instance_message.setEnabled(self.service_checks["single_instance"].isChecked())
 
