@@ -65,6 +65,12 @@ def envs_dir(platform: Optional[str] = None, env: Optional[dict] = None) -> str:
     return os.path.join(cache_dir(platform, env), "build_envs")
 
 
+def tools_dir(platform: Optional[str] = None, env: Optional[dict] = None) -> str:
+    """Where downloaded helper tools live (2.0: ``appimagetool``). Per user,
+    beside the build environments, never inside a project."""
+    return os.path.join(cache_dir(platform, env), "tools")
+
+
 def ensure_config_dir() -> str:
     """Create the config directory if needed and return it.
 

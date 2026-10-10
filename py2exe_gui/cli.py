@@ -28,8 +28,10 @@ EXIT_CONSENT = 4  # a step needed a yes it did not get
 EXIT_TOOL = 5  # a required tool is missing (PyInstaller, the environment...)
 EXIT_INTERRUPTED = 130
 
-COMMANDS = ("init", "doctor", "build", "size", "compare", "env", "release")
+COMMANDS = ("init", "doctor", "build", "size", "compare", "env", "release", "package", "ci")
 SIGN_PASSWORD_ENV = "P2E_SIGN_PASSWORD"
+#: 2.0: the ``codesign`` identity for the macOS bundle (a CI secret, never a file).
+MACOS_SIGN_ENV = "P2E_MACOS_SIGN_IDENTITY"
 LANG_ENV = "P2E_LANG"
 
 #: Where isolated environments and the update-signing key live. None means
@@ -186,8 +188,31 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--no-publish", action="store_true", help=S.CLI_HELP_NO_PUBLISH)
     p.add_argument("--api-url", default="https://api.github.com", metavar="URL",
                    help=S.CLI_HELP_API_URL)
+    p.add_argument("--allow-downloads", dest="allow_downloads", action="store_true",
+                   help=S.CLI_HELP_ALLOW_DOWNLOADS_PACKAGE)
+    p.add_argument("--yes", "-y", action="store_true", help=S.CLI_HELP_YES)
+
+    p = command("package", S.CLI_HELP_PACKAGE)
+    p.add_argument("--format", action="append", choices=package_choices(), metavar="FORMAT",
+                   help=S.CLI_HELP_FORMAT.format(formats=", ".join(package_choices())))
+    p.add_argument("--allow-downloads", dest="allow_downloads", action="store_true",
+                   help=S.CLI_HELP_ALLOW_DOWNLOADS_PACKAGE)
+    p.add_argument("--json", action="store_true", help=S.CLI_HELP_JSON)
+    p.add_argument("--yes", "-y", action="store_true", help=S.CLI_HELP_YES)
+
+    p = command("ci", S.CLI_HELP_CI)
+    p.add_argument("--print", dest="print_only", action="store_true", help=S.CLI_HELP_CI_PRINT)
+    p.add_argument("--python", default="", metavar="X.Y", help=S.CLI_HELP_CI_PYTHON)
+    p.add_argument("--tool", default="", metavar="REQUIREMENT", help=S.CLI_HELP_CI_TOOL)
+    p.add_argument("--branch", default="main", metavar="NAME", help=S.CLI_HELP_CI_BRANCH)
     p.add_argument("--yes", "-y", action="store_true", help=S.CLI_HELP_YES)
     return parser
+
+
+def package_choices() -> List[str]:
+    from py2exe_gui.core.platform_support import PACKAGE_FORMATS
+
+    return list(PACKAGE_FORMATS)
 
 
 # ── Shared helpers ────────────────────────────────────────────────────────
@@ -749,6 +774,8 @@ def cmd_release(args, console: Console) -> int:
             push_tag=args.push_tag, publish=not args.no_publish, sign_password=password,
             signing_key_path=_signing_key_path(), api_url=args.api_url,
             allow_insecure_localhost=ALLOW_INSECURE_LOCALHOST, notes_titles=notes_titles(),
+            allow_downloads=bool(args.allow_downloads),
+            macos_sign_identity=os.environ.get(MACOS_SIGN_ENV, "").strip(),
         )
 
     def context(dry_run: bool) -> ReleaseContext:
@@ -782,9 +809,114 @@ def cmd_release(args, console: Console) -> int:
     return EXIT_OK
 
 
+def cmd_package(args, console: Console) -> int:
+    """Package the last build: an AppImage and a .deb on Linux, a .dmg on macOS."""
+    from py2exe_gui.core.packagers import get_packager, run_packaging, spec_from_project
+    from py2exe_gui.core.platform_support import (
+        PLATFORM_LABELS,
+        is_supported,
+        required_platform,
+    )
+    from py2exe_gui.core.release import artifacts
+    from py2exe_gui.core.release.versioning import is_semver
+    from py2exe_gui.core.size_analyzer import format_size
+    from py2exe_gui.strings import S
+    from py2exe_gui.ui.finding_text import finding_title
+
+    loaded = _load(args, console)
+    project = loaded.project
+    formats = list(args.format or project.packaging.enabled_formats())
+    if not formats:
+        raise CliExit(EXIT_USAGE, S.CLI_PACKAGE_NONE.format(formats=", ".join(package_choices())))
+    progress = console.error if args.json else console.print
+    here = []
+    for name in formats:
+        if is_supported(name):
+            here.append(name)
+        else:
+            progress(S.CLI_PACKAGE_OTHER_PLATFORM.format(
+                format=get_packager(name).display_name,
+                platform=PLATFORM_LABELS.get(required_platform(name), "?")))
+    if not here:
+        raise CliExit(EXIT_FAILED, S.CLI_PACKAGE_NOTHING_HERE)
+    built = artifacts.built_output(project.build)
+    if not built:
+        raise CliExit(EXIT_FAILED, S.CLI_SIZE_NO_BUILD)
+    version = project.version if is_semver(project.version) else "0.0.0"
+    out_dir = artifacts.release_dir(project.build, version)
+    spec = spec_from_project(project, built, version, out_dir,
+                             sign_identity=os.environ.get(MACOS_SIGN_ENV, "").strip())
+
+    def consent(url: str, folder: str) -> bool:
+        if args.allow_downloads:
+            progress(S.CLI_APPIMAGETOOL_ALLOWED.format(url=url, path=folder))
+            return True
+        return console.confirm(S.CLI_APPIMAGETOOL_CONFIRM.format(url=url, path=folder))
+
+    results = run_packaging(spec, here, log=progress, download_consent=consent)
+    failed = [r for r in results if not r.ok]
+    if args.json:
+        console.print(json.dumps([{
+            "format": r.format, "ok": r.ok, "path": r.path, "size_bytes": r.size_bytes,
+            "error_code": r.error_code, "error": r.error,
+            "findings": [{"code": f.code, "params": dict(f.params)} for f in r.findings],
+            "commands": [" ".join(c) for c in r.commands],
+        } for r in results], ensure_ascii=False, indent=2))
+        return EXIT_FAILED if failed else EXIT_OK
+    for result in results:
+        label = get_packager(result.format).display_name
+        for finding in result.findings:
+            console.print(f"  • [{finding.code}] {finding_title(finding)}")
+        if result.ok:
+            console.print(S.CLI_PACKAGE_DONE.format(format=label, path=result.path,
+                                                    size=format_size(result.size_bytes)))
+        else:
+            console.print(S.CLI_PACKAGE_FAILED.format(format=label,
+                                                      error=result.error or result.error_code))
+    return EXIT_FAILED if failed else EXIT_OK
+
+
+def cmd_ci(args, console: Console) -> int:
+    """Preview, then (with a yes) write the GitHub Actions workflow."""
+    from py2exe_gui.core.ci_generator import (
+        options_for,
+        render_workflow,
+        repo_root,
+        workflow_path,
+        write_workflow,
+    )
+    from py2exe_gui.strings import S
+    from py2exe_gui.ui.finding_text import finding_title
+
+    loaded = _load(args, console)
+    project_dir = os.path.dirname(loaded.path)
+    root = repo_root(project_dir)
+    opts, findings = options_for(loaded.project, loaded.path, root, python_version=args.python,
+                                 tool_requirement=args.tool, branch=args.branch)
+    for finding in findings:
+        console.error(f"[{finding.code}] {finding_title(finding)}")
+    if any(f.severity == "error" for f in findings):
+        raise CliExit(EXIT_PROJECT, S.CLI_CI_BLOCKED)
+    text = render_workflow(opts)
+    path = workflow_path(root or project_dir)
+    console.print(S.CLI_CI_PREVIEW.format(path=path))
+    console.print(text)
+    if opts.secrets_used():
+        console.print(S.CLI_CI_SECRETS.format(names=", ".join(opts.secrets_used())))
+    if args.print_only:
+        return EXIT_OK
+    question = S.CLI_CI_CONFIRM_OVERWRITE if os.path.exists(path) else S.CLI_CI_CONFIRM
+    if not console.confirm(question.format(path=path)):
+        raise CliExit(EXIT_CONSENT, S.CLI_DECLINED)
+    write_workflow(text, path)
+    console.print(S.CLI_CI_WRITTEN.format(path=path))
+    return EXIT_OK
+
+
 HANDLERS = {
     "init": cmd_init, "doctor": cmd_doctor, "build": cmd_build, "size": cmd_size,
-    "env": cmd_env, "release": cmd_release, "compare": cmd_compare,
+    "env": cmd_env, "release": cmd_release, "compare": cmd_compare, "package": cmd_package,
+    "ci": cmd_ci,
 }
 
 

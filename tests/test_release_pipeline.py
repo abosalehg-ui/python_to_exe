@@ -193,8 +193,8 @@ def test_full_release_against_git_and_the_fake_api(repo):
     s = statuses(results)
     assert s == {"version": DONE, "notes": DONE, "doctor": DONE, "build": DONE,
                  "sign": SKIPPED, "installer": SKIPPED, "portable_zip": DONE,
-                 "checksums": DONE, "update_manifest": SKIPPED, "tag": DONE,
-                 "publish": DONE, "winget": DONE}, results
+                 "packages": SKIPPED, "checksums": DONE, "update_manifest": SKIPPED,
+                 "tag": DONE, "publish": DONE, "winget": DONE}, results
 
     # Version bumped everywhere and committed, then tagged.
     reloaded = load_project(str(repo / "p2e.toml")).project

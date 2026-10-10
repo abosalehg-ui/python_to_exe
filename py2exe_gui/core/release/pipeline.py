@@ -1,6 +1,6 @@
 """One release, step by step: version → notes → doctor → build → sign →
-installer → portable ZIP → checksums → update manifest → git tag → GitHub
-release → winget manifest.
+installer → portable ZIP → packages (AppImage, .deb, .dmg) → checksums →
+update manifest → git tag → GitHub release → winget manifest.
 
 Every step is a function of the ``ReleaseContext`` that returns a
 ``StepResult``: a status, a reason *code* (the UI translates it) and the
@@ -41,7 +41,7 @@ from py2exe_gui.core.release.versioning import apply_version, normalize, parse_s
 from py2exe_gui.core.runtime_kit import preview_options
 
 STEPS = (
-    "version", "notes", "doctor", "build", "sign", "installer", "portable_zip",
+    "version", "notes", "doctor", "build", "sign", "installer", "portable_zip", "packages",
     "checksums", "update_manifest", "tag", "publish", "winget",
 )
 
@@ -91,6 +91,11 @@ class ReleaseOptions:
     allow_insecure_localhost: bool = False
     notes_titles: Optional[Dict[str, str]] = None
     platform: str = sys.platform
+    #: 2.0: the packages step may fetch ``appimagetool`` (shown in the plan as
+    #: a command; the GUI's confirmation and ``--allow-downloads`` are the yes).
+    allow_downloads: bool = False
+    #: 2.0: ``codesign`` identity for the macOS bundle ('' = unsigned).
+    macos_sign_identity: str = field(default="", repr=False)
 
 
 class ReleaseContext:
@@ -366,6 +371,80 @@ def step_portable_zip(ctx: ReleaseContext) -> StepResult:
     return _result("portable_zip", DONE, "zip_ok", [Action(WRITE, target)])
 
 
+#: The ``ctx.files`` keys of the packages, by format.
+_PACKAGE_KEYS = {"appimage": "package_appimage", "deb": "package_deb", "dmg": "package_dmg"}
+
+
+def step_packages(ctx: ReleaseContext) -> StepResult:
+    from py2exe_gui.core.packagers import (
+        get_packager,
+        preflight,
+        run_packaging,
+        spec_from_project,
+    )
+    from py2exe_gui.core.packagers.appimage import appimagetool_url
+    from py2exe_gui.core.platform_support import is_supported
+
+    formats = ctx.project.packaging.enabled_formats()
+    if not formats:
+        return _result("packages", SKIPPED, "packages_off")
+    here = [f for f in formats if is_supported(f, ctx.options.platform)]
+    if not here:
+        return _result("packages", SKIPPED, "packages_other_platform",
+                       formats=", ".join(get_packager(f).display_name for f in formats))
+    built = ctx.files.get("built", "") or (artifacts.built_output(ctx.project.build)
+                                           if ctx.dry_run else "")
+    spec = spec_from_project(ctx.project, built, ctx.version, ctx.out_dir,
+                             sign_identity=ctx.options.macos_sign_identity)
+    checks = preflight(spec, here, ctx.options.platform)
+    actions = []
+    download = None
+    for name in here:
+        packager = get_packager(name)
+        blocking = [f for f in checks[name] if f.severity == "error"
+                    and not (ctx.dry_run and f.code == "package_no_build")]
+        if blocking == [f for f in blocking if f.code == "appimagetool_missing"] and blocking:
+            # Fetching the tool is an action of its own, listed before the build.
+            download = Action(RUN, f"download {appimagetool_url(spec.machine())} "
+                                   f"→ {packager.tools_dir}")
+            if ctx.dry_run or ctx.options.allow_downloads:
+                blocking = []
+        if blocking:
+            return _result("packages", FAILED, "packages_blocked", format=packager.display_name,
+                           codes=", ".join(f.code for f in blocking))
+        for command in packager.plan(spec):
+            actions.append(Action(RUN, " ".join(command)))
+        actions.append(Action(WRITE, packager.output_path(spec)))
+    if download:
+        actions.insert(0, download)
+    if ctx.dry_run:
+        return _result("packages", PLANNED, "packages_ok", actions, count=len(here),
+                       formats=", ".join(get_packager(f).display_name for f in here))
+    results = run_packaging(
+        spec, here, log=ctx.log, platform=ctx.options.platform,
+        download_consent=(lambda _url, _dir: True) if ctx.options.allow_downloads else None,
+    )
+    for result in results:
+        for finding in result.findings:
+            ctx.log(f"[{result.format}] {finding.code}")
+        if not result.ok:
+            return _result("packages", FAILED, "packages_failed",
+                           format=get_packager(result.format).display_name,
+                           error=redact(result.error or result.error_code, ctx.secrets))
+        ctx.files[_PACKAGE_KEYS[result.format]] = result.path
+    return _result("packages", DONE, "packages_ok", actions, count=len(results),
+                   formats=", ".join(get_packager(r.format).display_name for r in results))
+
+
+def _package_files(ctx: ReleaseContext, results: Dict[str, StepResult]) -> List[str]:
+    if not ctx.dry_run:
+        return artifacts.existing([ctx.files.get(k) for k in _PACKAGE_KEYS.values()])
+    step = results.get("packages")
+    if not step or step.status != PLANNED:
+        return []
+    return [a.target for a in step.actions if a.kind == WRITE]
+
+
 def _collect_exe(ctx: ReleaseContext) -> None:
     """Copy the (signed) one-file EXE into the release folder, once."""
     if ("exe" in ctx.files or ctx.dry_run or not ctx.project.build.onefile
@@ -382,7 +461,8 @@ def _binary_files(ctx: ReleaseContext, results: Dict[str, StepResult]) -> List[s
     """The release's binaries — real paths, or predicted ones in a dry run."""
     if not ctx.dry_run:
         return artifacts.existing([ctx.files.get(k) for k in ("exe", "installer",
-                                                               "portable_zip")])
+                                                               "portable_zip")]
+                                  ) + _package_files(ctx, results)
     paths = []
     if _exe_planned(ctx):
         paths.append(ctx.exe_target())
@@ -391,7 +471,7 @@ def _binary_files(ctx: ReleaseContext, results: Dict[str, StepResult]) -> List[s
         paths.append(installer_output_path(ctx.installer_config()))
     if ctx.project.release.assets.portable_zip:
         paths.append(ctx.zip_target())
-    return paths
+    return paths + _package_files(ctx, results)
 
 
 def step_checksums(ctx: ReleaseContext, results: Dict[str, StepResult]) -> StepResult:
@@ -510,7 +590,8 @@ def _upload_files(ctx: ReleaseContext, results: Dict[str, StepResult]) -> List[s
                           if a.kind == WRITE and a.target.startswith(ctx.out_dir)
                           and a.target not in paths]
         return paths
-    keys = ("exe", "installer", "portable_zip", "checksums", "update_json", "update_sig")
+    keys = ("exe", "installer", "portable_zip", *_PACKAGE_KEYS.values(), "checksums",
+            "update_json", "update_sig")
     return [ctx.files[k] for k in keys if ctx.files.get(k)]
 
 
@@ -617,6 +698,7 @@ _STEP_FUNCS = {
     "sign": step_sign,
     "installer": step_installer,
     "portable_zip": step_portable_zip,
+    "packages": step_packages,
     "checksums": step_checksums,
     "update_manifest": step_update_manifest,
     "tag": step_tag,

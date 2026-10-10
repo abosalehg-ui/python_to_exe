@@ -15,7 +15,7 @@ from PyQt5.QtWidgets import QMessageBox  # noqa: E402
 from py2exe_gui.core.build_runner import BuildOutcome  # noqa: E402
 from py2exe_gui.core.project_file import ProjectConfig, load_project, save_project  # noqa: E402
 from py2exe_gui.core.release import credentials  # noqa: E402
-from py2exe_gui.core.release.pipeline import Confirmation, ReleaseOptions  # noqa: E402
+from py2exe_gui.core.release.pipeline import STEPS, Confirmation, ReleaseOptions  # noqa: E402
 from py2exe_gui.strings import Ar, En, set_locale  # noqa: E402
 from py2exe_gui.ui.dialogs import ReleaseConfirmDialog  # noqa: E402
 from tests.conftest import MemoryKeyring  # noqa: E402
@@ -241,7 +241,7 @@ def test_blocked_plan_is_reported(qapp, window, repo, monkeypatch):
     window.start_release()
     wait_release(qapp, window)
     assert shown == [Ar.RELEASE_RESULT_BLOCKED]
-    publish = window.release_tab.step_texts()[10]
+    publish = window.release_tab.step_texts()[STEPS.index("publish")]
     assert publish.startswith("❌") and Ar.RELEASE_REASON_NO_TOKEN in plain(publish)
 
 

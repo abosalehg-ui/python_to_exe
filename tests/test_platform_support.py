@@ -3,16 +3,27 @@
 import pytest
 
 from py2exe_gui.core.platform_support import (
+    APPIMAGE,
     CODE_SIGNING,
+    DEB,
+    DMG,
     INSTALLER,
+    LINUX_ONLY,
+    MACOS_ONLY,
     MANIFEST,
+    PACKAGE_FORMATS,
+    PLATFORM_LABELS,
     SMOKE_TEST,
     SPLASH,
     VERSION_INFO,
     WINDOWS_ONLY,
+    is_linux,
+    is_macos,
     is_supported,
     is_windows,
+    package_formats,
     platform_label,
+    required_platform,
     unsupported_features,
 )
 
@@ -57,15 +68,48 @@ def test_unsupported_features_lists_all_four_off_windows():
         MANIFEST,
         VERSION_INFO,
         INSTALLER,
+        DMG,
+    }
+    assert set(unsupported_features("darwin")) == {
+        CODE_SIGNING, MANIFEST, VERSION_INFO, INSTALLER, APPIMAGE, DEB,
     }
 
 
-def test_unsupported_features_is_empty_on_windows():
-    assert unsupported_features("win32") == []
+def test_windows_cannot_build_the_linux_and_macos_packages():
+    """2.0: the package formats are the one thing Windows lacks."""
+    assert unsupported_features("win32") == [APPIMAGE, DEB, DMG]
 
 
 def test_unsupported_features_order_is_stable():
-    assert unsupported_features("linux") == unsupported_features("darwin")
+    """Windows-only first, then Linux-only, then macOS-only — the banner order."""
+    assert unsupported_features("win32") == list(LINUX_ONLY + MACOS_ONLY)
+    assert unsupported_features("linux")[:4] == list(WINDOWS_ONLY)
+
+
+# ── 2.0: package formats ───────────────────────────────────────────────────
+
+
+def test_package_formats_per_platform():
+    assert package_formats("linux") == [APPIMAGE, DEB]
+    assert package_formats("darwin") == [DMG]
+    assert package_formats("win32") == []
+    assert PACKAGE_FORMATS == LINUX_ONLY + MACOS_ONLY
+
+
+@pytest.mark.parametrize("feature,host", [
+    (CODE_SIGNING, "windows"), (INSTALLER, "windows"), (APPIMAGE, "linux"), (DEB, "linux"),
+    (DMG, "macos"), (SPLASH, ""), ("something_new", ""),
+])
+def test_required_platform(feature, host):
+    assert required_platform(feature) == host
+    if host:
+        assert PLATFORM_LABELS[host] in ("Windows", "Linux", "macOS")
+
+
+def test_is_linux_and_is_macos():
+    assert is_linux("linux") and is_linux("linux2") and not is_linux("darwin")
+    assert is_macos("darwin") and not is_macos("linux") and not is_macos("win32")
+    assert isinstance(is_linux(), bool) and isinstance(is_macos(), bool)
 
 
 @pytest.mark.parametrize(
