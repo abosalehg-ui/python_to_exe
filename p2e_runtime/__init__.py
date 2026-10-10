@@ -18,6 +18,7 @@ The converter's runtime hook calls ``install()`` before the app's own code.
 """
 
 import importlib
+import os
 import sys
 from typing import Optional, Union
 
@@ -41,6 +42,12 @@ __all__ = [
 
 _config: Optional[RuntimeConfig] = None
 _installed = False
+
+#: The converter's start-up benchmark sets this to "1": the kit then reports
+#: "ready" and exits before the app's own code runs (``startup_bench.py``).
+PROBE_ENV = "P2E_RUNTIME_PROBE"
+PROBE_EXIT_CODE = 77
+PROBE_MARKER = "P2E_RUNTIME_READY"
 
 
 def _service(name: str):
@@ -92,7 +99,11 @@ def install(config: Union[RuntimeConfig, str, None] = None) -> Optional[RuntimeC
     _config = config
     _installed = True
 
+    probing = os.environ.get(PROBE_ENV) == "1"
     steps = (_start_logs, _start_crash_reporter, _start_single_instance, _start_updater)
+    if probing:
+        # Everything a real start does, except reaching the network.
+        steps = steps[:-1]
     for step in steps:
         try:
             step(config)
@@ -100,7 +111,25 @@ def install(config: Union[RuntimeConfig, str, None] = None) -> Optional[RuntimeC
             raise
         except Exception as e:
             _warn(f"{step.__name__[7:]} not started: {e!r}")
+    if probing:
+        _report_ready()
     return config
+
+
+def _report_ready() -> None:
+    """Say "ready" (when there is a stdout) and exit with the probe's code.
+
+    The exit code is what the benchmark relies on: a windowed program has no
+    stdout to print to. ``os._exit`` so no atexit handler or dialog runs.
+    """
+    stream = sys.__stdout__
+    if stream is not None:
+        try:
+            stream.write(PROBE_MARKER + "\n")
+            stream.flush()
+        except Exception:
+            pass
+    os._exit(PROBE_EXIT_CODE)
 
 
 def _start_logs(config: RuntimeConfig) -> None:

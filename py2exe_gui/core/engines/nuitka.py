@@ -246,6 +246,7 @@ class NuitkaEngine(Engine):
         return os.path.join(self._root(config), "dist", stem)
 
     def prepare_output(self, config: BuildConfig) -> None:
+        super().prepare_output(config)
         for folder in (os.path.dirname(self.report_path(config)),
                        os.path.join(self._root(config), "dist")):
             os.makedirs(folder, exist_ok=True)

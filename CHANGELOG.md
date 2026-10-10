@@ -5,6 +5,23 @@ follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### 2.0.0-dev — Every platform, every engine (milestone 3: compare mode)
+
+#### Added
+- **Compare mode** (`core/compare.py`): builds the same project with
+  PyInstaller and Nuitka into `<output>/p2e_compare/<engine>` and shows size,
+  build time, start-up time, smoke result and unsupported features side by
+  side, with a recommendation and its reasons. Size tab button, and
+  `py2exe-gui compare [--runs N] [--timeout S] [--json]`.
+- **Start-up benchmark** (`core/startup_bench.py`): several runs, median of
+  one method: process exit, the Runtime Kit probe (`P2E_RUNTIME_PROBE=1`),
+  first output, or "still running after N s". The method is always shown.
+
+#### Fixed
+- The smoke test and the benchmark now end the whole process group on a
+  timeout; PyInstaller onefile children were left running before.
+- Engines create the output folder before building.
+
 ### 2.0.0-dev — Every platform, every engine (milestone 2: Nuitka)
 
 #### Added

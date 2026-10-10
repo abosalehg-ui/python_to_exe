@@ -346,19 +346,27 @@ QPlainTextEdit#codeView {{
     font-size: {pt_log};
     color: {log_text};
 }}
-QListWidget, QTreeWidget {{
+QListWidget, QTreeWidget, QTableWidget {{
     background-color: {input_bg};
+    color: {text};
     border: 2px solid {input_border};
     border-radius: 6px;
     padding: 5px;
 }}
-QListWidget::item, QTreeWidget::item {{
+QTableWidget {{
+    gridline-color: {input_border};
+}}
+QListWidget::item, QTreeWidget::item, QTableWidget::item {{
     padding: 5px;
     border-radius: 4px;
 }}
-QListWidget::item:selected, QTreeWidget::item:selected {{
+QListWidget::item:selected, QTreeWidget::item:selected, QTableWidget::item:selected {{
     background-color: {accent};
     color: {on_accent};
+}}
+QHeaderView, QTableCornerButton::section {{
+    background-color: {input_bg};
+    border: none;
 }}
 QHeaderView::section {{
     background-color: {input_bg};
