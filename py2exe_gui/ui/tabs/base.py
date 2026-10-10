@@ -15,7 +15,14 @@ from PyQt5.QtWidgets import (
     QWidget,
 )
 
-from py2exe_gui.core.platform_support import platform_label, unsupported_features
+from py2exe_gui.core.platform_support import (
+    LINUX,
+    MACOS,
+    WINDOWS,
+    platform_label,
+    required_platform,
+    unsupported_features,
+)
 from py2exe_gui.strings import S
 
 # Feature key → the locale attribute naming it. Kept beside the banner helper
@@ -25,6 +32,15 @@ _FEATURE_LABELS = {
     "manifest": "FEATURE_MANIFEST",
     "version_info": "FEATURE_VERSION_INFO",
     "installer": "FEATURE_INSTALLER",
+    "appimage": "FEATURE_APPIMAGE",
+    "deb": "FEATURE_DEB",
+    "dmg": "FEATURE_DMG",
+}
+# The host a feature needs → the banner text naming it.
+_NOTICE_FORMATS = {
+    WINDOWS: "PLATFORM_WINDOWS_ONLY_FMT",
+    LINUX: "PLATFORM_LINUX_ONLY_FMT",
+    MACOS: "PLATFORM_MACOS_ONLY_FMT",
 }
 
 
@@ -102,12 +118,15 @@ def platform_notice(*features, platform=None):
     if not affected:
         return None
 
-    names = S.LIST_SEPARATOR.join(getattr(S, _FEATURE_LABELS[f]) for f in affected)
-    label = QLabel(
-        S.PLATFORM_WINDOWS_ONLY_FMT.format(
-            platform=platform_label(platform), features=names
-        )
-    )
+    # One paragraph per host the features need (Windows, Linux, macOS).
+    paragraphs = []
+    for host, attr in _NOTICE_FORMATS.items():
+        here = [f for f in affected if required_platform(f) == host]
+        if here:
+            names = S.LIST_SEPARATOR.join(getattr(S, _FEATURE_LABELS[f]) for f in here)
+            paragraphs.append(getattr(S, attr).format(platform=platform_label(platform),
+                                                      features=names))
+    label = QLabel("\n".join(paragraphs))
     label.setObjectName("warningNotice")
     label.setWordWrap(True)
     label.setAccessibleName(label.text())

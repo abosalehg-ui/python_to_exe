@@ -33,6 +33,8 @@ ALL_PARAMS = {
     # 2.0: engines
     "engine": "Nuitka", "feature": "manifest", "nuitka": "4.2.2", "plugin": "tk-inter",
     "reason": "Tkinter needs TCL included.", "tool": "patchelf", "compiler": "gcc",
+    # 2.0: packagers and the CI generator
+    "format": "AppImage", "platform": "linux", "root": "/repo",
 }
 
 

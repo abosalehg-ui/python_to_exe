@@ -70,6 +70,11 @@ FINDING_CODES = (
     "nuitka_python_experimental", "nuitka_no_compiler", "nuitka_no_compiler_macos",
     "nuitka_no_compiler_windows", "nuitka_tool_missing", "nuitka_compiler_failed",
     "nuitka_plugin_needed", "nuitka_plugin_for_package", "nuitka_download_declined",
+    # 2.0: packagers (core/packagers) and the CI generator (core/ci_generator)
+    "package_wrong_platform", "package_no_build", "package_tool_missing",
+    "appimagetool_missing", "appimagetool_download_failed", "package_version_missing",
+    "package_icon_placeholder", "package_icon_icns", "package_maintainer_missing",
+    "package_failed", "ci_output_outside_repo", "ci_not_git", "ci_signing_not_configured",
 )
 
 # Penalty per finding when computing the readiness score.

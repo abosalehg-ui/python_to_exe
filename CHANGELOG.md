@@ -5,6 +5,54 @@ follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### 2.0.0-dev — Every platform, every engine (milestone 4: CI generator and Linux/macOS packagers)
+
+#### Added
+- **Packagers** (`core/packagers/`): one `Packager` interface for an
+  **AppImage** (`appimagetool`), a **`.deb`** (`dpkg-deb`, with
+  `DEBIAN/control`, a `.desktop` entry and a hicolor icon) and a **`.dmg`**
+  (`hdiutil`, an `.app` bundle with `Info.plist`, optional `codesign`). The
+  package metadata lives in a new `[packaging]` section of `p2e.toml`; the
+  formats a host cannot build are named before the build
+  (`platform_support`: AppImage and `.deb` are Linux-only, `.dmg` macOS-only).
+- **Consent before any download**: `appimagetool` and the AppImage runtime
+  file are fetched only after a yes (GUI question, CLI prompt,
+  `--allow-downloads`), into the per-user tools folder, and the tool is run
+  with `--runtime-file` so it never goes online during a build. The SHA-256
+  of each download is logged and compared with the one recorded here.
+- **Release step `packages`** between the portable ZIP and the checksums:
+  the packages are checksummed and uploaded with the release.
+- **CI generator** (`core/ci_generator.py`): writes
+  `.github/workflows/p2e-release.yml` into the project's repository — a
+  Windows/macOS/Linux matrix that installs the command line (no Qt), runs
+  `py2exe-gui release --no-tag --no-publish` against `p2e.toml` with pip
+  and build caching, uploads the release folder, and a tag-triggered (`v*`)
+  job that merges the checksums and creates the GitHub Release with `gh`.
+  Secrets (`WINDOWS_CERT_BASE64`, `WINDOWS_CERT_PASSWORD`, `MACOS_*`) are
+  referenced as `${{ secrets.NAME }}` only; a test pushes secret-looking
+  values through every input and checks none reaches the output. Options in
+  a new `[ci]` section.
+- **Nothing is written without a preview**: the GUI shows the whole file
+  with its path and the secret names and writes only on *Write the file*;
+  `py2exe-gui ci` prints it and asks (or takes `--yes`; `--print` only shows).
+- **Platforms tab** (`🌍`): package formats and metadata, *Build packages
+  from the last build*, GitHub Actions options and the preview button.
+- Command line: `py2exe-gui package [--format appimage|deb|dmg] [--yes]
+  [--allow-downloads] [--json]`, `py2exe-gui ci [--yes] [--print] [--python
+  X.Y] [--tool REQ] [--branch NAME]`, `release --allow-downloads`, and
+  `P2E_MACOS_SIGN_IDENTITY` for the `.dmg`.
+- Icons for Linux packages with the standard library only: a `.png` as is,
+  a `.ico` holding a PNG or a 32-bit BMP converted, otherwise a plain
+  placeholder tile (reported as a warning).
+
+#### Verified
+- Real `.deb` and AppImage built in a Linux container from a PyInstaller
+  one-file build, inspected (`dpkg-deb -I/-c`, `--appimage-extract`) and run;
+  the full CI command `release --yes --no-tag --no-publish --allow-downloads`
+  produced the binary, the ZIP, both packages and `SHA256SUMS.txt` in 9 s.
+  `actionlint` 1.7.7 accepts the generated workflow. The `.dmg`, Windows
+  signing and macOS notarization steps were **not** executed (no such host).
+
 ### 2.0.0-dev — Every platform, every engine (milestone 3: compare mode)
 
 #### Added
@@ -20,6 +68,11 @@ follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 #### Fixed
 - The smoke test and the benchmark now end the whole process group on a
   timeout; PyInstaller onefile children were left running before.
+- `kill_tree` only signals a process group the program itself leads. A test
+  stand-in with `pid = 1` made it send SIGKILL to process group 1, which
+  took down the whole GitHub Actions runner (every CI run since milestone 3
+  died after 45 minutes with no logs) and a container's init when the suite
+  ran locally.
 - Engines create the output folder before building.
 
 ### 2.0.0-dev — Every platform, every engine (milestone 2: Nuitka)

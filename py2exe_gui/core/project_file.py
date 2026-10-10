@@ -146,6 +146,38 @@ class ReleaseSettings:
 
 
 @dataclass
+class PackagingSettings:
+    """2.0: Linux and macOS packages (``core/packagers``). Which formats, and
+    the metadata a ``.desktop`` entry, a ``control`` file and an ``Info.plist``
+    ask for. Never a tool path: ``appimagetool`` is found or fetched by the app."""
+
+    appimage: bool = False
+    deb: bool = False
+    dmg: bool = False
+    maintainer: str = ""  # "Name <email>" (Debian requires one)
+    homepage: str = ""
+    description: str = ""
+    categories: str = "Utility"  # freedesktop categories, ";"-separated
+    identifier: str = ""  # reverse-DNS bundle identifier (macOS)
+    deb_section: str = "utils"
+    deb_depends: str = ""
+
+    def enabled_formats(self) -> List[str]:
+        return [name for name in ("appimage", "deb", "dmg") if getattr(self, name)]
+
+
+@dataclass
+class CiSettings:
+    """2.0: options for the generated GitHub Actions workflow
+    (``core/ci_generator``). Secrets are named in the workflow, never here."""
+
+    python_version: str = "3.12"
+    sign_windows: bool = False
+    notarize_macos: bool = False
+    allow_doctor_errors: bool = False
+
+
+@dataclass
 class ProjectConfig:
     """Everything that describes a project, in one place."""
 
@@ -159,6 +191,8 @@ class ProjectConfig:
     installer: InstallerConfig = field(default_factory=InstallerConfig)
     signing: SigningSettings = field(default_factory=SigningSettings)
     release: ReleaseSettings = field(default_factory=ReleaseSettings)
+    packaging: PackagingSettings = field(default_factory=PackagingSettings)
+    ci: CiSettings = field(default_factory=CiSettings)
 
     def features_used(self) -> List[str]:
         """Engine features this project uses outside ``BuildConfig`` (2.0)."""
@@ -214,7 +248,7 @@ class ProjectConfig:
 
 
 #: Sections of ProjectConfig besides ``build``, in file order.
-SECTIONS = ("version_info", "manifest", "installer", "signing", "release")
+SECTIONS = ("version_info", "manifest", "installer", "signing", "release", "packaging", "ci")
 
 
 def sections_in(data: Any) -> List[str]:

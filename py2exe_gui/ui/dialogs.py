@@ -217,5 +217,63 @@ class ReleaseConfirmDialog(QDialog):
         return "\n\n".join(blocks) or S.RELEASE_CONFIRM_NOTHING
 
 
+class CiPreviewDialog(QDialog):
+    """The whole GitHub Actions workflow, before a byte of it is written.
+
+    The text is read-only and left-to-right (it is YAML), the path it goes to
+    is shown in full, an existing file is flagged, and the secrets the file
+    names are listed — by name, which is all the file ever holds of them.
+    """
+
+    def __init__(self, text: str, path: str, exists: bool, secrets, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle(S.CI_DIALOG_TITLE)
+        self.setMinimumSize(760, 560)
+        self.setLayoutDirection(_inherited_direction(parent))
+        self._text = text
+
+        layout = QVBoxLayout(self)
+        heading = QLabel(S.CI_DIALOG_HEADING.format(path=_ltr(path)))
+        heading.setWordWrap(True)
+        heading.setObjectName("aboutHeading")
+        heading.setTextInteractionFlags(Qt.TextSelectableByMouse)
+        layout.addWidget(heading)
+        if exists:
+            warning = QLabel(S.CI_DIALOG_OVERWRITE_NOTE)
+            warning.setObjectName("warningNotice")
+            warning.setWordWrap(True)
+            layout.addWidget(warning)
+
+        self.text_view = QTextEdit()
+        self.text_view.setReadOnly(True)
+        self.text_view.setLayoutDirection(Qt.LeftToRight)
+        self.text_view.setLineWrapMode(QTextEdit.NoWrap)
+        self.text_view.setPlainText(text)
+        self.text_view.setAccessibleName(S.CI_DIALOG_TITLE)
+        layout.addWidget(self.text_view, 1)
+
+        secrets_note = QLabel(S.CI_DIALOG_SECRETS.format(names=_ltr(", ".join(secrets)))
+                              if secrets else S.CI_DIALOG_NO_SECRETS)
+        secrets_note.setWordWrap(True)
+        layout.addWidget(secrets_note)
+        note = QLabel(S.CI_DIALOG_NOTE)
+        note.setWordWrap(True)
+        layout.addWidget(note)
+
+        buttons = QDialogButtonBox()
+        copy_btn = buttons.addButton(S.BTN_COPY_WORKFLOW, QDialogButtonBox.ActionRole)
+        copy_btn.clicked.connect(self._copy_to_clipboard)
+        self.write_btn = buttons.addButton(S.BTN_WRITE_WORKFLOW, QDialogButtonBox.AcceptRole)
+        self.write_btn.setObjectName("successBtn")
+        buttons.addButton(S.BTN_CANCEL_WORKFLOW, QDialogButtonBox.RejectRole)
+        buttons.accepted.connect(self.accept)
+        buttons.rejected.connect(self.reject)
+        layout.addWidget(buttons)
+
+    def _copy_to_clipboard(self):
+        QApplication.clipboard().setText(self._text)
+        self.setWindowTitle(f"{S.CI_DIALOG_TITLE} — {S.MSG_COPIED}")
+
+
 def _ltr(text: str) -> str:
     return f"⁦{text}⁩"

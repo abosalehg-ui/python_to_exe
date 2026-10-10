@@ -189,6 +189,7 @@ from py2exe_gui.ui.compare_thread import CompareThread
 from py2exe_gui.ui.conversion_thread import ConversionThread
 from py2exe_gui.ui.diagnostic_thread import DiagnosticThread
 from py2exe_gui.ui.dialogs import (
+    CiPreviewDialog,
     CommandPreviewDialog,
     PresetNameDialog,
     ReleaseConfirmDialog,
@@ -198,6 +199,7 @@ from py2exe_gui.ui.env_thread import EnvThread
 from py2exe_gui.ui.finding_text import finding_detail, finding_title, fix_label, service_label
 from py2exe_gui.ui.icon_studio_dialog import IconStudioDialog
 from py2exe_gui.ui.installer_thread import InstallerThread
+from py2exe_gui.ui.package_thread import PackageThread
 from py2exe_gui.ui.post_build_thread import PostBuildThread
 from py2exe_gui.ui.release_thread import ReleaseThread
 from py2exe_gui.ui.tabs import (
@@ -209,13 +211,14 @@ from py2exe_gui.ui.tabs import (
     HistoryTab,
     InstallerTab,
     MainTab,
+    PlatformsTab,
     ReleaseTab,
     RuntimeTab,
     SizeTab,
     TemplatesTab,
     VersionInfoTab,
 )
-from py2exe_gui.ui.tabs.size_tab import size_text
+from py2exe_gui.ui.tabs.size_tab import ltr, size_text
 from py2exe_gui.ui.tray import BuildTray
 
 # Tabs shown in simple mode. Eight tabs at once is a lot to meet when all you
@@ -233,6 +236,8 @@ SIGNING_KEY_FILE = signing_key_path()
 # The OS keyring used for the GitHub token (``credentials.DEFAULT`` = the real
 # ``keyring`` package, if installed). A module global so tests use a fake one.
 KEYRING = credentials.DEFAULT
+#: 2.0: the codesign identity for a macOS bundle (an environment variable, never a file).
+MACOS_SIGN_ENV = "P2E_MACOS_SIGN_IDENTITY"
 
 # Recent projects kept in the settings file.
 RECENT_PROJECTS_MAX = 8
@@ -293,6 +298,8 @@ class MainWindow(QMainWindow):
         self.project_name = ""
         self._saved_snapshot = None
         self.release_thread = None
+        self.package_thread = None
+        self._last_packages_dir = ""
         self._release_after_plan = False
         self._last_release_dir = ""
         self._modified_timer = QTimer(self)
@@ -363,6 +370,7 @@ class MainWindow(QMainWindow):
         self.size_tab = SizeTab(self)
         self.runtime_tab = RuntimeTab(self)
         self.release_tab = ReleaseTab(self)
+        self.platforms_tab = PlatformsTab(self)
         self.advanced_tab = AdvancedTab(self)
         self.version_info_tab = VersionInfoTab(self)
         self.deploy_tab = DeployTab(self)
@@ -379,6 +387,7 @@ class MainWindow(QMainWindow):
             ("size", self.size_tab, S.TAB_SIZE),
             ("runtime", self.runtime_tab, S.TAB_RUNTIME),
             ("release", self.release_tab, S.TAB_RELEASE),
+            ("platforms", self.platforms_tab, S.TAB_PLATFORMS),
             ("advanced", self.advanced_tab, S.TAB_ADVANCED),
             ("version_info", self.version_info_tab, S.TAB_VERSION_INFO),
             ("deploy", self.deploy_tab, S.TAB_DEPLOY),
@@ -393,6 +402,7 @@ class MainWindow(QMainWindow):
         self._project_tabs = (
             self.main_tab, self.advanced_tab, self.deploy_tab, self.size_tab,
             self.runtime_tab, self.version_info_tab, self.installer_tab, self.release_tab,
+            self.platforms_tab,
         )
 
         self.tabs = QTabWidget()
@@ -956,7 +966,7 @@ class MainWindow(QMainWindow):
     def _build_in_progress(self) -> bool:
         for thread in (
             self.conversion_thread, self.batch_thread, self.diagnostic_thread, self.env_thread,
-            self.release_thread, self.compare_thread,
+            self.release_thread, self.compare_thread, self.package_thread,
         ):
             if thread and thread.isRunning():
                 return True
@@ -2856,6 +2866,10 @@ class MainWindow(QMainWindow):
             iscc_path=self.installer_tab.inst_iscc_path.text().strip(),
             signing_key_path=SIGNING_KEY_FILE,
             notes_titles=notes_titles(),
+            # The plan lists "download appimagetool" as a command; the
+            # confirmation dialog that shows it is the consent for the real run.
+            allow_downloads=not dry_run,
+            macos_sign_identity=os.environ.get(MACOS_SIGN_ENV, "").strip(),
         )
         return ReleaseContext(
             project, options, project_path=self.project_path, python=python,
@@ -2938,6 +2952,126 @@ class MainWindow(QMainWindow):
     def open_release_folder(self):
         if self._last_release_dir and os.path.isdir(self._last_release_dir):
             QDesktopServices.openUrl(QUrl.fromLocalFile(self._last_release_dir))
+
+    # ─── Platforms: packages and the CI workflow (2.0) ──────────────────
+
+    def build_packages(self):
+        """Package the last build for this host, with consent for any download."""
+        from py2exe_gui.core.packagers import get_packager, spec_from_project
+        from py2exe_gui.core.packagers.appimage import appimagetool_url
+        from py2exe_gui.core.platform_support import is_supported, platform_label
+        from py2exe_gui.core.release import artifacts
+
+        if self._build_in_progress():
+            QMessageBox.warning(self, S.MSG_WARNING, S.MSG_COMPARE_BUSY)
+            return
+        project = self._current_project()
+        formats = project.packaging.enabled_formats()
+        if not formats:
+            QMessageBox.warning(self, S.MSG_WARNING, S.MSG_PACKAGES_NONE_SELECTED)
+            return
+        here = [f for f in formats if is_supported(f)]
+        if not here:
+            QMessageBox.warning(self, S.MSG_WARNING,
+                                S.MSG_PACKAGES_NONE_HERE.format(platform=platform_label()))
+            return
+        built = artifacts.built_output(project.build)
+        if not built:
+            QMessageBox.warning(self, S.MSG_WARNING, S.MSG_PACKAGES_NO_BUILD)
+            return
+        version = project.version if is_semver(project.version) else "0.0.0"
+        out_dir = artifacts.release_dir(project.build, version)
+        spec = spec_from_project(project, built, version, out_dir,
+                                 sign_identity=os.environ.get(MACOS_SIGN_ENV, "").strip())
+        allow_download = False
+        if "appimage" in here and not get_packager("appimage").tool_path():
+            packager = get_packager("appimage")
+            reply = QMessageBox.question(
+                self, S.MSG_CONFIRM,
+                S.MSG_APPIMAGETOOL_CONFIRM.format(url=appimagetool_url(spec.machine()),
+                                                  path=packager.tools_dir),
+                QMessageBox.Yes | QMessageBox.No, QMessageBox.No,
+            )
+            if reply == QMessageBox.Yes:
+                allow_download = True
+            else:
+                self._append_log(S.LOG_APPIMAGETOOL_DECLINED)
+                here = [f for f in here if f != "appimage"]
+                if not here:
+                    return
+        self._append_log(S.LOG_PACKAGES_START.format(
+            formats=", ".join(get_packager(f).display_name for f in here)))
+        self.platforms_tab.set_running(True)
+        self.platforms_tab.show_packages_result("", bool(self._last_packages_dir))
+        self.convert_btn.setEnabled(False)
+        self.package_thread = PackageThread(spec, here, allow_download)
+        self.package_thread.log_signal.connect(self._append_log)
+        self.package_thread.finished_signal.connect(self._on_packages_finished)
+        self.package_thread.start()
+
+    def _on_packages_finished(self, results):
+        from py2exe_gui.core.packagers import get_packager
+
+        self.platforms_tab.set_running(False)
+        self.convert_btn.setEnabled(True)
+        done = []
+        for result in results:
+            label = get_packager(result.format).display_name
+            for finding in result.findings:
+                self._append_log(f"  • [{finding.code}] {finding_title(finding)}")
+            if result.ok:
+                done.append(result)
+                self._append_log(S.LOG_PACKAGE_DONE.format(
+                    format=label, path=result.path, size=size_text(result.size_bytes)))
+            else:
+                self._append_log(S.LOG_PACKAGE_FAILED.format(
+                    format=label, error=result.error or result.error_code))
+        folder = os.path.dirname(done[0].path) if done else ""
+        if folder:
+            self._last_packages_dir = folder
+        all_ok = bool(results) and len(done) == len(results)
+        text = (S.PACKAGES_RESULT_DONE.format(count=ltr(str(len(done))), folder=ltr(folder))
+                if all_ok else S.PACKAGES_RESULT_FAILED)
+        self.platforms_tab.show_packages_result(text, bool(self._last_packages_dir))
+        self._notify_build_result(all_ok, S.RELEASE_STEP_PACKAGES)
+
+    def open_packages_folder(self):
+        if self._last_packages_dir and os.path.isdir(self._last_packages_dir):
+            QDesktopServices.openUrl(QUrl.fromLocalFile(self._last_packages_dir))
+
+    def generate_ci_workflow(self):
+        """Preview the GitHub Actions workflow; write it only on "Write the file"."""
+        from py2exe_gui.core.ci_generator import (
+            options_for,
+            render_workflow,
+            repo_root,
+            workflow_path,
+            write_workflow,
+        )
+
+        if not self.project_path:
+            QMessageBox.warning(self, S.MSG_WARNING, S.MSG_CI_NEEDS_PROJECT)
+            return
+        project = self._current_project()
+        project_dir = os.path.dirname(self.project_path)
+        root = repo_root(project_dir)
+        opts, findings = options_for(project, self.project_path, root,
+                                     tool_requirement=self.platforms_tab.tool_requirement())
+        for finding in findings:
+            self._append_log(f"[{finding.code}] {finding_title(finding)}")
+        problems = [finding_title(f) for f in findings if f.severity == "error"]
+        if problems:
+            QMessageBox.warning(self, S.MSG_WARNING,
+                                S.MSG_CI_BLOCKED.format(problems="\n".join(problems)))
+            return
+        text = render_workflow(opts)
+        path = workflow_path(root or project_dir)
+        dialog = CiPreviewDialog(text, path, os.path.exists(path), opts.secrets_used(), self)
+        if not dialog.exec_():
+            self._append_log(S.LOG_CI_CANCELLED)
+            return
+        write_workflow(text, path)
+        self._append_log(S.LOG_CI_WRITTEN.format(path=path))
 
     # ─── Shortcuts ──────────────────────────────────────────────────────
 
