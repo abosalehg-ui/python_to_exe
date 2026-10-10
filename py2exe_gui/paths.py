@@ -106,6 +106,16 @@ def signing_key_path() -> str:
     return os.path.join(config_dir(), "signing", "update_signing_key.json")
 
 
+def license_key_path() -> str:
+    """2.0: the private key that signs licence keys.
+
+    Same folder, same owner-only rules and same file format as the update
+    key, but a key of its own: handing the licence key to a colleague who
+    issues licences must not let them publish updates.
+    """
+    return os.path.join(config_dir(), "signing", "license_signing_key.json")
+
+
 def legacy_path(name: str) -> str:
     """Path of an old CWD-relative file, for one-time migration."""
     return os.path.abspath(name)

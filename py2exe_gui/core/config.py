@@ -6,6 +6,7 @@ from typing import Any, List
 # Runtime Kit services, in the order the UI lists them.
 RUNTIME_SERVICES = (
     "resource_path", "log_redirect", "crash_reporter", "single_instance", "updater",
+    "licensing",
 )
 
 
@@ -36,6 +37,8 @@ class RuntimeKitConfig:
     crash_reporter: bool = False
     single_instance: bool = False
     updater: bool = False
+    #: 2.0: offline licence keys checked with ``p2e_runtime.license``.
+    licensing: bool = False
 
     app_version: str = ""
     support_url: str = ""
@@ -45,6 +48,10 @@ class RuntimeKitConfig:
     update_check_on_start: bool = False
     #: Arguments for a folder build's installer, e.g. "/SILENT".
     installer_args: str = ""
+    #: The product name a licence must carry ('' = the app's name) and the
+    #: public half of the licence key. The private half is never here.
+    license_product: str = ""
+    license_public_key: str = ""
 
     def enabled_services(self) -> List[str]:
         return [name for name in RUNTIME_SERVICES if getattr(self, name)]
