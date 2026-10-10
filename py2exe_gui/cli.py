@@ -28,7 +28,8 @@ EXIT_CONSENT = 4  # a step needed a yes it did not get
 EXIT_TOOL = 5  # a required tool is missing (PyInstaller, the environment...)
 EXIT_INTERRUPTED = 130
 
-COMMANDS = ("init", "doctor", "build", "size", "compare", "env", "release", "package", "ci")
+COMMANDS = ("init", "doctor", "build", "size", "compare", "env", "release", "package", "ci",
+            "license")
 SIGN_PASSWORD_ENV = "P2E_SIGN_PASSWORD"
 #: 2.0: the ``codesign`` identity for the macOS bundle (a CI secret, never a file).
 MACOS_SIGN_ENV = "P2E_MACOS_SIGN_IDENTITY"
@@ -38,6 +39,8 @@ LANG_ENV = "P2E_LANG"
 #: the per-user defaults (``paths``); tests point them at a temporary folder.
 ENVS_ROOT: Optional[str] = None
 SIGNING_KEY_FILE: Optional[str] = None
+#: 2.0: the licence-signing key (its own file, the same folder and rules).
+LICENSE_KEY_FILE: Optional[str] = None
 
 #: Tests only: lets ``release`` talk to a local fake API over http. Not
 #: reachable from an argument, an environment variable or a project file.
@@ -206,6 +209,20 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--tool", default="", metavar="REQUIREMENT", help=S.CLI_HELP_CI_TOOL)
     p.add_argument("--branch", default="main", metavar="NAME", help=S.CLI_HELP_CI_BRANCH)
     p.add_argument("--yes", "-y", action="store_true", help=S.CLI_HELP_YES)
+
+    p = command("license", S.CLI_HELP_LICENSE)
+    p.add_argument("action", choices=("issue", "key", "verify"))
+    p.add_argument("key_text", nargs="?", default="", metavar="KEY",
+                   help=S.CLI_HELP_LICENSE_KEY_TEXT)
+    p.add_argument("--name", default="", help=S.CLI_HELP_LICENSE_NAME)
+    p.add_argument("--email", default="", help=S.CLI_HELP_LICENSE_EMAIL)
+    p.add_argument("--product", default="", help=S.CLI_HELP_LICENSE_PRODUCT)
+    p.add_argument("--expiry", default="", metavar="YYYY-MM-DD", help=S.CLI_HELP_LICENSE_EXPIRY)
+    p.add_argument("--feature", action="append", default=[], metavar="NAME",
+                   help=S.CLI_HELP_LICENSE_FEATURE)
+    p.add_argument("--create-key", dest="create_key", action="store_true",
+                   help=S.CLI_HELP_LICENSE_CREATE)
+    p.add_argument("--yes", "-y", action="store_true", help=S.CLI_HELP_YES)
     return parser
 
 
@@ -269,6 +286,12 @@ def _signing_key_path() -> str:
     from py2exe_gui.paths import signing_key_path
 
     return SIGNING_KEY_FILE or signing_key_path()
+
+
+def _license_key_path() -> str:
+    from py2exe_gui.paths import license_key_path
+
+    return LICENSE_KEY_FILE or license_key_path()
 
 
 def _env_dir(project) -> str:
@@ -913,10 +936,105 @@ def cmd_ci(args, console: Console) -> int:
     return EXIT_OK
 
 
+def _license_product(args, console: Console) -> str:
+    """``--product``, else the app's name from the project file beside us."""
+    from py2exe_gui.core.diagnostics import build_name
+    from py2exe_gui.strings import S
+
+    if args.product.strip():
+        return args.product.strip()
+    if os.path.isfile(os.path.abspath(args.project)):
+        project = _load(args, console).project
+        if project.build.source or project.build.output_name:
+            return project.build.runtime_kit.license_product.strip() or build_name(project.build)
+    raise CliExit(EXIT_PROJECT, S.CLI_LICENSE_PRODUCT_REQUIRED)
+
+
+def _license_key(args, console: Console):
+    """The stored licence key; created with a yes (or ``--create-key``)."""
+    from py2exe_gui.core.licensing import load_or_create_key
+    from py2exe_gui.core.update_signing import fingerprint, read_key_file
+    from py2exe_gui.strings import S
+
+    path = _license_key_path()
+    if os.path.exists(path):
+        try:
+            return read_key_file(path)
+        except (OSError, ValueError) as e:
+            raise CliExit(EXIT_PROJECT, S.ERR_KIT_KEY_READ.format(error=str(e))) from None
+    if not args.create_key and not console.confirm(S.CLI_LICENSE_CONFIRM_CREATE.format(path=path)):
+        raise CliExit(EXIT_CONSENT, S.CLI_LICENSE_NO_KEY.format(path=path))
+    try:
+        key, _created = load_or_create_key(path)
+    except OSError as e:
+        raise CliExit(EXIT_FAILED, S.ERR_KIT_KEY_WRITE.format(error=str(e))) from None
+    console.print(S.CLI_LICENSE_KEY_CREATED.format(fingerprint=fingerprint(key.public_hex),
+                                                   path=path))
+    return key
+
+
+def cmd_license(args, console: Console) -> int:
+    """Issue, show the key pair, or check a key — all offline, all local."""
+    from p2e_runtime import license as runtime_license
+    from py2exe_gui.core.licensing import LicenseRequest, issue, validate_request
+    from py2exe_gui.core.update_signing import fingerprint, read_public_key
+    from py2exe_gui.strings import S
+
+    path = _license_key_path()
+    if args.action == "key":
+        public = read_public_key(path)
+        if not public:
+            if not args.create_key:
+                raise CliExit(EXIT_PROJECT, S.CLI_LICENSE_NO_KEY.format(path=path))
+            public = _license_key(args, console).public_hex
+        console.print(S.CLI_LICENSE_KEY_STATUS.format(
+            fingerprint=fingerprint(public), public=public, path=path))
+        console.print(S.KIT_LICENSE_HONESTY)
+        return EXIT_OK
+
+    if args.action == "verify":
+        if not args.key_text.strip():
+            raise CliExit(EXIT_USAGE, S.CLI_LICENSE_KEY_REQUIRED)
+        public = read_public_key(path)
+        if not public:
+            raise CliExit(EXIT_PROJECT, S.CLI_LICENSE_NO_KEY.format(path=path))
+        status, info = runtime_license.inspect(args.key_text, public, args.product.strip())
+        label = getattr(S, f"CLI_LICENSE_STATUS_{status.upper()}")
+        if info is None:
+            console.print(label)
+        else:
+            console.print(S.CLI_LICENSE_VERIFY_FMT.format(
+                status=label, name=info.name, product=info.product,
+                expiry=info.expiry or S.KIT_LICENSE_NO_EXPIRY,
+                features=", ".join(info.features) or S.CLI_LICENSE_NO_FEATURES,
+            ))
+        return EXIT_OK if status == runtime_license.STATUS_VALID else EXIT_FAILED
+
+    request = LicenseRequest(
+        name=args.name.strip(), email=args.email.strip(), product=_license_product(args, console),
+        expiry=args.expiry.strip(), features=tuple(dict.fromkeys(f.strip() for f in args.feature)),
+    )
+    problems = validate_request(request)
+    if problems:
+        console.error(S.CLI_LICENSE_CANNOT_ISSUE)
+        for code, value in problems:
+            template = getattr(S, f"LICENSE_ERR_{code.upper()}", code)
+            console.error("  • " + template.format(value=value))
+        raise CliExit(EXIT_USAGE)
+    key = _license_key(args, console)
+    text = issue(request, key)
+    console.print(S.CLI_LICENSE_ISSUED.format(
+        name=request.name, product=request.product,
+        expiry=request.expiry or S.KIT_LICENSE_NO_EXPIRY, length=len(text)))
+    console.print(text)
+    console.print(S.KIT_LICENSE_HONESTY)
+    return EXIT_OK
+
+
 HANDLERS = {
     "init": cmd_init, "doctor": cmd_doctor, "build": cmd_build, "size": cmd_size,
     "env": cmd_env, "release": cmd_release, "compare": cmd_compare, "package": cmd_package,
-    "ci": cmd_ci,
+    "ci": cmd_ci, "license": cmd_license,
 }
 
 
