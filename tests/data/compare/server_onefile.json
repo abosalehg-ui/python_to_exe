@@ -1,0 +1,96 @@
+{
+  "folder": "/tmp/claude-0/-home-user-python-to-exe/0679a7d4-5b85-58b2-850f-8732ea649bc4/scratchpad/fx_server_onefile/p2e_compare",
+  "engines": [
+    {
+      "engine": "pyinstaller",
+      "built": true,
+      "error": "",
+      "findings": [],
+      "build_seconds": 6.418,
+      "output": "/tmp/claude-0/-home-user-python-to-exe/0679a7d4-5b85-58b2-850f-8732ea649bc4/scratchpad/fx_server_onefile/p2e_compare/pyinstaller/dist/serverapp",
+      "size_bytes": 7471632,
+      "smoke": {
+        "passed": true,
+        "returncode": null
+      },
+      "startup": {
+        "method": "first_output",
+        "timeout": 3.0,
+        "median_seconds": 0.1343461940000168,
+        "runs": [
+          {
+            "method": "first_output",
+            "seconds": 0.1343461940000168
+          },
+          {
+            "method": "first_output",
+            "seconds": 0.15300424099999077
+          },
+          {
+            "method": "first_output",
+            "seconds": 0.1287803300000121
+          }
+        ]
+      },
+      "unsupported": []
+    },
+    {
+      "engine": "nuitka",
+      "built": true,
+      "error": "",
+      "findings": [],
+      "build_seconds": 21.971,
+      "output": "/tmp/claude-0/-home-user-python-to-exe/0679a7d4-5b85-58b2-850f-8732ea649bc4/scratchpad/fx_server_onefile/p2e_compare/nuitka/dist/serverapp",
+      "size_bytes": 4163800,
+      "smoke": {
+        "passed": true,
+        "returncode": null
+      },
+      "startup": {
+        "method": "first_output",
+        "timeout": 3.0,
+        "median_seconds": 0.08270768299999531,
+        "runs": [
+          {
+            "method": "first_output",
+            "seconds": 0.08374704300001667
+          },
+          {
+            "method": "first_output",
+            "seconds": 0.08270768299999531
+          },
+          {
+            "method": "first_output",
+            "seconds": 0.06812322299998641
+          }
+        ]
+      },
+      "unsupported": []
+    }
+  ],
+  "recommendation": "nuitka",
+  "reasons": [
+    {
+      "code": "startup_faster",
+      "engine": "nuitka",
+      "other": "pyinstaller",
+      "fast": 0.08270768299999531,
+      "slow": 0.1343461940000168,
+      "method": "first_output"
+    },
+    {
+      "code": "smaller",
+      "engine": "nuitka",
+      "other": "pyinstaller",
+      "small": 4163800,
+      "big": 7471632
+    },
+    {
+      "code": "builds_faster",
+      "engine": "pyinstaller",
+      "other": "nuitka",
+      "fast": 6.417948881000015,
+      "slow": 21.970503461999982
+    }
+  ]
+}

@@ -1,0 +1,95 @@
+{
+  "folder": "/tmp/claude-0/-home-user-python-to-exe/0679a7d4-5b85-58b2-850f-8732ea649bc4/scratchpad/fx_silent_onefile/p2e_compare",
+  "engines": [
+    {
+      "engine": "pyinstaller",
+      "built": true,
+      "error": "",
+      "findings": [],
+      "build_seconds": 7.253,
+      "output": "/tmp/claude-0/-home-user-python-to-exe/0679a7d4-5b85-58b2-850f-8732ea649bc4/scratchpad/fx_silent_onefile/p2e_compare/pyinstaller/dist/silentapp",
+      "size_bytes": 7468728,
+      "smoke": {
+        "passed": true,
+        "returncode": null
+      },
+      "startup": {
+        "method": "still_running",
+        "timeout": 3.0,
+        "median_seconds": null,
+        "runs": [
+          {
+            "method": "still_running",
+            "seconds": null
+          },
+          {
+            "method": "still_running",
+            "seconds": null
+          },
+          {
+            "method": "still_running",
+            "seconds": null
+          }
+        ]
+      },
+      "unsupported": []
+    },
+    {
+      "engine": "nuitka",
+      "built": true,
+      "error": "",
+      "findings": [],
+      "build_seconds": 22.555,
+      "output": "/tmp/claude-0/-home-user-python-to-exe/0679a7d4-5b85-58b2-850f-8732ea649bc4/scratchpad/fx_silent_onefile/p2e_compare/nuitka/dist/silentapp",
+      "size_bytes": 4159704,
+      "smoke": {
+        "passed": true,
+        "returncode": null
+      },
+      "startup": {
+        "method": "still_running",
+        "timeout": 3.0,
+        "median_seconds": null,
+        "runs": [
+          {
+            "method": "still_running",
+            "seconds": null
+          },
+          {
+            "method": "still_running",
+            "seconds": null
+          },
+          {
+            "method": "still_running",
+            "seconds": null
+          }
+        ]
+      },
+      "unsupported": []
+    }
+  ],
+  "recommendation": "nuitka",
+  "reasons": [
+    {
+      "code": "startup_not_comparable",
+      "a": "pyinstaller",
+      "b": "nuitka",
+      "method_a": "still_running",
+      "method_b": "still_running"
+    },
+    {
+      "code": "smaller",
+      "engine": "nuitka",
+      "other": "pyinstaller",
+      "small": 4159704,
+      "big": 7468728
+    },
+    {
+      "code": "builds_faster",
+      "engine": "pyinstaller",
+      "other": "nuitka",
+      "fast": 7.253352627999988,
+      "slow": 22.555486511999987
+    }
+  ]
+}
