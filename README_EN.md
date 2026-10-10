@@ -26,7 +26,9 @@ version metadata, build history, and a Windows manifest editor.
 | **Signed self-updater** *(1.5)* | `update.json` signed with **Ed25519** (pure-Python verifier that passes the RFC 8032 test vectors); HTTPS only, redirects to HTTP refused, size and SHA-256 checked before anything is replaced. One-file EXEs swap in place and restart; folder builds launch a verified installer. Key pair and a *Create signed update.json* helper in the app |
 | **Nuitka engine** *(2.0)* | Choose **PyInstaller** or **Nuitka** (`engine` in `p2e.toml`, or `build --engine nuitka`). Nuitka compiles your modules to C: typically fewer antivirus false positives and extraction made **harder, not impossible**; builds are slower because a C compiler runs. What an engine cannot do (Runtime Kit, manifest...) is named before building; fixes are translated to Nuitka's options or marked as having no equivalent — no engine ever gets an option it does not have. The doctor checks the C compiler (MSVC/MinGW on Windows, gcc/clang elsewhere), the Python version and, on Linux, `patchelf`/`readelf`. **No download without your consent**: if Nuitka asks to download a tool, you are asked, for that build only. The size lab reads Nuitka's compilation report |
 | **Project file** *(1.6)* | One `p2e.toml` in your repository describes the whole project — build, Version Info, manifest, installer, signing (never the password), Runtime Kit and release settings. Paths are relative to the file, so a fresh checkout builds the same way. The GUI, presets, history and the command line all use this one model |
-| **Command line** *(1.6)* | `py2exe-gui init / doctor / build / size / env / release`, headless, no PyQt5 needed — for CI and scripts. Build logs stream with stage markers |
+| **Command line** *(1.6)* | `py2exe-gui init / doctor / build / size / compare / env / release / package / ci`, headless, no PyQt5 needed — for CI and scripts. Build logs stream with stage markers |
+| **Linux and macOS packages** *(2.0)* | An **AppImage** (`appimagetool`), a **`.deb`** (`dpkg-deb`, with `control`, a `.desktop` entry and an icon) and a **`.dmg`** (`hdiutil`, an `.app` bundle) from the same build, from the Platforms tab or `py2exe-gui package`; uploaded with the release. `appimagetool` and its runtime file are downloaded **only after you say yes**, and the tool runs with `--runtime-file` so it never goes online during a build |
+| **CI generator** *(2.0)* | `py2exe-gui ci` writes `.github/workflows/p2e-release.yml` into your repository — a Windows/macOS/Linux matrix that installs this command line (no Qt) and runs `release` against `p2e.toml`, pip and build caching, artifact uploads, and a GitHub Release on a `v*` tag — after showing you the whole file. Certificates and passwords are referenced as `${{ secrets.NAME }}` only; a test checks that secret-looking values never reach the file |
 | **One-click release** *(1.6)* | Version bump everywhere at once → notes drafted from `git log` → doctor gate → build → sign → installer → portable ZIP → `SHA256SUMS.txt` → signed `update.json` → git tag → GitHub release → winget manifests. A dry run shows every action first; nothing is tagged or uploaded before you confirm |
 | **Icon Studio** *(1.3)* | Real multi-size `.ico` (16–256px) from an image or from letters, drawn with Qt — no Pillow needed |
 | **Smart Analysis** | AST-based import detection (incl. `__import__` and `importlib`), `requirements.txt` import, hidden-imports auto-suggest |
@@ -142,6 +144,14 @@ repository = "me/image-tool"
 [release.winget]
 enabled = true
 identifier = "Me.ImageTool"
+
+[packaging]                  # new in 2.0: Linux and macOS packages
+appimage = true
+deb = true
+maintainer = "Me <me@example.com>"
+
+[ci]                         # new in 2.0: options for the generated workflow
+python_version = "3.12"
 ```
 
 - **New / Open / Save / Save As** and **Recent projects** are in the
@@ -168,7 +178,9 @@ headless and never imports PyQt5. Every command takes `--project PATH`
 | `py2exe-gui build [--strict] [--yes] [--engine nuitka] [--allow-downloads]` | Run the doctor, then build (in the isolated environment if the project says so). The log streams with `==> [stage] NN%` markers. `--strict` stops on doctor errors. `--engine` picks the engine for this run; `--allow-downloads` lets Nuitka download what it needs (otherwise you are asked) |
 | `py2exe-gui size [--json]` | The size lab on the last build |
 | `py2exe-gui env create\|lock\|delete [--yes]` | The isolated build environment |
-| `py2exe-gui release (--set-version X.Y.Z \| --bump major\|minor\|patch) [--notes FILE] [--dry-run] [--push-tag] [--no-tag] [--no-publish] [--allow-doctor-errors] [--yes]` | The release pipeline (below) |
+| `py2exe-gui release (--set-version X.Y.Z \| --bump major\|minor\|patch) [--notes FILE] [--dry-run] [--push-tag] [--no-tag] [--no-publish] [--allow-doctor-errors] [--allow-downloads] [--yes]` | The release pipeline (below); `--allow-downloads` lets the packages step fetch `appimagetool` |
+| `py2exe-gui package [--format appimage\|deb\|dmg] [--yes] [--allow-downloads] [--json]` | Package the last build: AppImage and `.deb` on Linux, `.dmg` on macOS. Formats default to `[packaging]` in `p2e.toml`; files go to `release/<version>/` |
+| `py2exe-gui ci [--yes] [--print] [--python X.Y] [--tool REQ] [--branch NAME]` | Show the whole `.github/workflows/p2e-release.yml`, then write it with your consent (`--print` only shows it) |
 
 **Consent works as in the window.** A step that reaches the network, installs
 or deletes — and a project file whose settings would run its own code
@@ -194,6 +206,32 @@ pip install git+https://github.com/abosalehg-ui/python_to_exe
 py2exe-gui doctor
 py2exe-gui build --strict --yes
 ```
+
+### CI for every platform (2.0)
+
+`py2exe-gui ci --yes` (or **Preview and write the workflow…** in the Platforms
+tab) writes `.github/workflows/p2e-release.yml` at the root of your repository:
+
+- A `build` job on `windows-latest`, `macos-latest` and `ubuntu-latest`: installs
+  this tool's command line with `pip install --no-deps` (no PyQt5), then
+  PyInstaller (and Nuitka when the project's engine is Nuitka) and your
+  `requirements.txt` if there is one, and runs
+  `py2exe-gui release --yes --no-tag --no-publish --allow-downloads` against
+  `p2e.toml`: the binary, the portable ZIP, the packages and `SHA256SUMS.txt`,
+  uploaded as an artifact.
+- pip caching (`actions/setup-python`) and a cache of the `build/` folder
+  (`actions/cache`).
+- A `release` job on a `v*` tag: downloads the three artifacts, merges the
+  checksum files and creates the GitHub Release with `gh release create`,
+  using the workflow's own token.
+- Windows signing and macOS notarization are optional (`[ci]`) and read the
+  certificates from the secrets `WINDOWS_CERT_BASE64`, `WINDOWS_CERT_PASSWORD`
+  and `MACOS_*` **by name only**. The file never holds a secret, and the
+  install URL is written in it for you to review.
+
+**Not yet run on Windows or macOS:** the `.dmg`, signing and notarization
+steps are written with their standard commands and tested as text only; what
+was exercised for real is the Linux job (AppImage and `.deb`).
 
 ## Release
 
@@ -263,6 +301,13 @@ git*, *From file*), GitHub settings (repository, tag prefix, draft,
 pre-release, which files to upload), the token (stored in the OS keyring, shown
 only as "stored"), winget identifiers, and the step checklist with live status.
 *Dry run* is ticked by default.
+
+### 🌍 Platforms
+Package formats (AppImage, `.deb`, `.dmg`) with the metadata a `.desktop`
+entry, a `control` file and an `Info.plist` need, a banner naming the formats
+this host cannot build, *Build packages from the last build* (asks before
+`appimagetool` is downloaded), and the GitHub Actions options with *Preview
+and write the workflow…*, which shows the whole file before writing it.
 
 ### 🩺 Project Doctor
 Readiness score, every predicted and actual problem in one list, and the fix
@@ -474,6 +519,13 @@ py2exe_gui/
 │   │   ├── nuitka.py     #   Nuitka, mapped from its own --help (4.2.2)
 │   │   ├── nuitka_report.py # size lab from Nuitka's --report XML
 │   │   └── prerequisites.py # C compiler, Python version, patchelf checks
+│   ├── packagers/        # AppImage, .deb, .dmg behind one Packager interface (2.0)
+│   │   ├── base.py       #   spec, result, .desktop layout, icons
+│   │   ├── appimage.py   #   AppDir + appimagetool (downloaded only with consent)
+│   │   ├── deb.py        #   DEBIAN/control + dpkg-deb
+│   │   ├── dmg.py        #   .app bundle + hdiutil (macOS only)
+│   │   └── icons.py      #   PNG from .ico with the standard library
+│   ├── ci_generator.py   # the GitHub Actions workflow for the user's repository (2.0)
 │   ├── builder.py        # command-line helpers (+ compatibility shim)
 │   ├── config.py
 │   ├── dependency_analyzer.py
@@ -542,7 +594,8 @@ See [IDEAS.md](IDEAS.md) for the full roadmap. Currently:
   command line, one-click release (GitHub Releases, checksums, signed
   update manifest, winget manifests)
 - 🚧 **2.0 (in progress):** ✅ engine layer `core/engines/` (milestone 1),
-  ✅ Nuitka engine (milestone 2); next compare mode, CI for all platforms, licensing, projects
+  ✅ Nuitka engine (milestone 2), ✅ compare mode and start-up benchmark (milestone 3),
+  ✅ CI generator and AppImage/.deb/.dmg packagers (milestone 4); next licensing, projects
   workspace, PySide6 — see [PRODUCT_ROADMAP.md](PRODUCT_ROADMAP.md)
 - ⏳ **Next:** venv management, multi-file projects, Linux/macOS installers,
   `.spec` editor, VirusTotal, PySide6 migration —

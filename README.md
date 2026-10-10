@@ -189,8 +189,20 @@
 - ✅ ملف **`p2e.toml`** واحد في مستودعك يصف المشروع كله: البناء، معلومات
   الإصدار، الـ Manifest، المثبّت، التوقيع (بلا كلمة المرور)، مكتبة التشغيل والإصدار
 - ✅ المسارات نسبية إلى الملف، فالنسخة المستنسخة تُبنى بالطريقة نفسها
-- ✅ **سطر أوامر** بلا واجهة: `init` · `doctor` · `build` · `size` · `env` · `release`
-  — يعمل في CI دون PyQt5
+- ✅ **سطر أوامر** بلا واجهة: `init` · `doctor` · `build` · `size` · `compare` · `env` ·
+  `release` · `package` · `ci` — يعمل في CI دون PyQt5
+
+### 🌍 كل المنصات (جديد في 2.0)
+- ✅ **حزم Linux وmacOS** من البناء نفسه: **AppImage** (appimagetool) و**`.deb`**
+  (dpkg-deb مع `control` ومدخل `.desktop` وأيقونة) و**`.dmg`** (hdiutil وحزمة `.app`)،
+  من تبويب «المنصات» أو `py2exe-gui package`، وتُرفع مع الإصدار
+- ✅ **مولّد GitHub Actions**: `py2exe-gui ci` يكتب `p2e-release.yml` في مستودعك —
+  مصفوفة Windows/macOS/Linux، تخزين مؤقت لـ pip والبناء، artifacts، وإصدار GitHub
+  عند دفع وسم `v*` — بعد معاينة الملف كاملاً وموافقتك
+- ✅ **لا سر في أي ملف:** الشهادات وكلمات المرور تُذكر بالاسم `${{ secrets.NAME }}`
+  فقط، واختبار يتحقق أن قيماً تشبه الأسرار لا تصل إلى الملف المولَّد
+- ✅ **لا تنزيل دون موافقتك:** appimagetool وملف runtime يُنزَّلان بعد «نعم» فقط،
+  وتُشغَّل الأداة بـ `--runtime-file` فلا تتصل بالشبكة أثناء البناء
 
 </td>
 <td width="50%">
@@ -331,6 +343,14 @@ cert_path = "certs/me.pfx"   # كلمة المرور تُكتب وقت التو�
 
 [release]
 repository = "me/image-tool"
+
+[packaging]                  # جديد في 2.0: حزم Linux وmacOS
+appimage = true
+deb = true
+maintainer = "Me <me@example.com>"
+
+[ci]                         # جديد في 2.0: خيارات workflow المولَّد
+python_version = "3.12"
 ```
 
 - قائمة **المشروع** فيها: جديد، فتح، حفظ، حفظ باسم، **المشاريع الأخيرة**.
@@ -355,7 +375,9 @@ repository = "me/image-tool"
 | `py2exe-gui build [--strict] [--yes] [--engine nuitka] [--allow-downloads]` | الطبيب ثم البناء (في البيئة المعزولة إن طلبها المشروع)، والسجل يُبث بعلامات المراحل `==> [المرحلة] NN%`. `--engine` يختار المحرك لهذه المرة، و`--allow-downloads` يسمح لـ Nuitka بتنزيل ما يحتاجه (وإلا يُسأل المستخدم) |
 | `py2exe-gui size [--json]` | مختبر الحجم لآخر بناء |
 | `py2exe-gui env create\|lock\|delete` | بيئة البناء المعزولة |
-| `py2exe-gui release --bump patch [--dry-run] [--notes FILE]` | خط الإصدار (أدناه) |
+| `py2exe-gui release --bump patch [--dry-run] [--notes FILE] [--allow-downloads]` | خط الإصدار (أدناه)؛ `--allow-downloads` يسمح بتنزيل appimagetool لخطوة الحزم |
+| `py2exe-gui package [--format appimage\|deb\|dmg] [--yes] [--allow-downloads] [--json]` | تحزيم آخر بناء: AppImage و`.deb` على Linux، `.dmg` على macOS. الصيغ الافتراضية من `[packaging]` في `p2e.toml`، وتُحفظ في `release/<الإصدار>/` |
+| `py2exe-gui ci [--yes] [--print] [--python X.Y] [--tool REQ] [--branch NAME]` | يعرض `.github/workflows/p2e-release.yml` كاملاً ثم يكتبه بعد موافقتك (`--print` يعرضه فقط) |
 
 **الموافقة كما في الواجهة:** أي خطوة تصل إلى الشبكة أو تثبّت أو تحذف — وأي ملف
 مشروع إعداداته تُشغّل كوده (`--runtime-hook`، `--upx-dir`، مفتاح تحديث ليس
@@ -371,6 +393,28 @@ repository = "me/image-tool"
 | 4 | خطوة تحتاج موافقة لم تُعطَ |
 | 5 | أداة أو بيئة مطلوبة غير موجودة |
 | 130 | أُوقف بالمقاطعة |
+
+---
+
+### 🌍 CI لكل المنصات (جديد في 2.0)
+
+`py2exe-gui ci --yes` (أو زر **عاين واكتب ملف workflow…** في تبويب المنصات) يكتب
+`.github/workflows/p2e-release.yml` في جذر مستودعك:
+
+- مهمة `build` على `windows-latest` و`macos-latest` و`ubuntu-latest`: تثبّت سطر أوامر
+  هذه الأداة بـ `pip install --no-deps` (بلا PyQt5) ثم PyInstaller (وNuitka إن كان محرك
+  المشروع)، ومتطلبات مشروعك إن وُجد `requirements.txt`، وتشغّل
+  `py2exe-gui release --yes --no-tag --no-publish --allow-downloads` على `p2e.toml`
+  فتخرج الملف التنفيذي والـ ZIP والحزم و`SHA256SUMS.txt`، وترفع مجلد الإصدار كـ artifact.
+- تخزين مؤقت لـ pip (`actions/setup-python`) ولمجلد `build/` (`actions/cache`).
+- مهمة `release` عند دفع وسم `v*`: تنزّل الـ artifacts الثلاثة، تدمج ملفات البصمات،
+  وتنشئ إصدار GitHub بـ `gh release create` برمز الـ workflow نفسه.
+- التوقيع على Windows والتوثيق على macOS اختياريان من `[ci]`، ويقرآن الشهادات من
+  الأسرار `WINDOWS_CERT_BASE64` و`WINDOWS_CERT_PASSWORD` و`MACOS_*` **بالاسم فقط**.
+  الملف لا يحوي أي سر أبداً، وطريقة التثبيت والرابط مكتوبان فيه ليراجعهما المستخدم.
+
+**لم يُشغَّل بعد على Windows ولا macOS:** خطوات `.dmg` والتوقيع والتوثيق مكتوبة
+بأوامرها القياسية ومختبرة كنصوص فقط؛ ما جُرِّب فعلاً هو مهمة Linux (AppImage و`.deb`).
 
 ---
 
@@ -578,6 +622,13 @@ python_to_exe/
 │   │   │   ├── nuitka.py             #    Nuitka، مأخوذ من --help الخاص به (4.2.2)
 │   │   │   ├── nuitka_report.py      #    مختبر الحجم من تقرير --report
 │   │   │   └── prerequisites.py      #    المترجم، إصدار Python، patchelf
+│   │   ├── packagers/                # 📦 حزم Linux/macOS خلف واجهة Packager واحدة (2.0)
+│   │   │   ├── base.py               #    المواصفة، النتيجة، تخطيط .desktop والأيقونات
+│   │   │   ├── appimage.py           #    AppDir + appimagetool (تنزيل بموافقة فقط)
+│   │   │   ├── deb.py                #    DEBIAN/control + dpkg-deb
+│   │   │   ├── dmg.py                #    حزمة .app + hdiutil (macOS فقط)
+│   │   │   └── icons.py              #    PNG من .ico بالمكتبة القياسية
+│   │   ├── ci_generator.py           # 🤖 ملف GitHub Actions لمستودع المستخدم (2.0)
 │   │   ├── builder.py                # أدوات الأوامر + كشف الأعلام الخطرة (+ واجهة توافق)
 │   │   ├── build_stages.py           # واجهة توافق لمراحل PyInstaller
 │   │   ├── batch_runner.py           # طابور التحويل الدفعي
@@ -656,7 +707,7 @@ python_to_exe/
 
 ```bash
 pip install -r requirements-dev.txt
-pytest tests/ -m "not slow"                # 1519 اختباراً سريعاً
+pytest tests/ -m "not slow"                # 1798 اختباراً سريعاً
 pytest tests/ -m slow                      # بناءات PyInstaller حقيقية (دقائق)
 ruff check py2exe_gui/ p2e_runtime/ tests/ # فحص الكود
 pytest --cov=py2exe_gui.core --cov-report=term
@@ -757,9 +808,9 @@ else:
 - ✅ **الإصدار 1.6:** ملف المشروع `p2e.toml` نموذجاً واحداً للإعدادات، سطر أوامر
   بلا واجهة، إصدار بنقرة (GitHub Releases، بصمات SHA-256، ملف تحديث موقَّع، winget)
 - 🚧 **الإصدار 2.0 (قيد التنفيذ):** ✅ طبقة المحركات `core/engines/` (المرحلة 1)،
-  ✅ محرك Nuitka (المرحلة 2) — ثم وضع المقارنة، مولّد CI لكل
-  المنصات، الترخيص، مساحة المشاريع، الانتقال إلى PySide6 —
-  التفاصيل في [PRODUCT_ROADMAP.md](PRODUCT_ROADMAP.md)
+  ✅ محرك Nuitka (المرحلة 2)، ✅ وضع المقارنة وقياس الإقلاع (المرحلة 3)،
+  ✅ مولّد CI وحزم AppImage/.deb/.dmg (المرحلة 4) — ثم الترخيص، مساحة المشاريع،
+  الانتقال إلى PySide6 — التفاصيل في [PRODUCT_ROADMAP.md](PRODUCT_ROADMAP.md)
 
 ---
 
