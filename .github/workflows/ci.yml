@@ -13,6 +13,9 @@ jobs:
   test:
     name: Test (Python ${{ matrix.python-version }})
     runs-on: ubuntu-latest
+    # The suite takes about a minute; a hung test must not hold a runner for
+    # hours, and faulthandler (below) names it before the job is cut.
+    timeout-minutes: 20
     strategy:
       fail-fast: false
       matrix:
@@ -37,13 +40,14 @@ jobs:
       # here too. The GUI suite runs in the `gui` job below.
       - name: Run core tests
         run: >
-          pytest tests/ -v -m "not slow"
+          pytest tests/ -v -m "not slow" -o faulthandler_timeout=300
           --cov=py2exe_gui.core --cov=p2e_runtime --cov-report=term
           --cov-fail-under=90
 
   gui:
     name: GUI tests (headless)
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
 
@@ -69,7 +73,7 @@ jobs:
         env:
           QT_QPA_PLATFORM: offscreen
         run: >
-          pytest tests/ -v -m "not slow"
+          pytest tests/ -v -m "not slow" -o faulthandler_timeout=300
           --cov=py2exe_gui --cov-report=term
 
   lint:
