@@ -193,6 +193,12 @@ class Packager:
             return PackageResult(self.name, False, error_code="package_failed",
                                  error=f"no output: {os.path.basename(target)}",
                                  commands=commands, findings=findings)
+        # The staging copy is as big as the package; keep it only after a
+        # failure, when it is what there is to look at.
+        shutil.rmtree(staging, ignore_errors=True)
+        parent = os.path.dirname(staging)
+        if os.path.isdir(parent) and not os.listdir(parent):
+            os.rmdir(parent)
         return PackageResult(self.name, True, path=target, size_bytes=os.path.getsize(target),
                              commands=commands, findings=findings)
 

@@ -571,6 +571,10 @@ def test_build_runs_the_tool_and_reports_the_file(tmp_path, onefile, monkeypatch
     assert result.commands[0][0] == "/usr/bin/dpkg-deb"
     assert runner.calls[0][1]["cwd"] == os.path.dirname(result.path)
     assert lines[0].startswith("$ /usr/bin/dpkg-deb --build") and "built" in lines
+    # The staging copy is removed after a success, and left after a failure.
+    assert not os.path.exists(os.path.join(os.path.dirname(result.path), STAGING_DIR))
+    failed = DebPackager().build(spec_for(onefile, tmp_path), runner=FakeRunner(1), env={})
+    assert not failed.ok and os.path.isdir(os.path.join(tmp_path, "release", "1.2.3", STAGING_DIR))
 
 
 def test_build_reports_a_failing_tool(tmp_path, onefile, monkeypatch):
@@ -713,9 +717,10 @@ def test_real_deb_builds_and_runs(tmp_path):
 
 @pytest.mark.slow
 @pytest.mark.skipif(not sys.platform.startswith("linux"), reason="needs Linux")
-def test_real_appimage_builds_and_runs(tmp_path):
+def test_real_appimage_builds_and_runs(tmp_path, monkeypatch):
     tools = os.environ.get("P2E_TEST_TOOLS_DIR", "")
     packager = AppImagePackager(tools_dir=tools or str(tmp_path / "tools"))
+    monkeypatch.setitem(sys.modules["py2exe_gui.core.packagers"]._PACKAGERS, "appimage", packager)
     if not packager.tool_path() and not DOWNLOADS_ALLOWED:
         pytest.skip("appimagetool not present; set P2E_TEST_DOWNLOADS=1 to allow the download")
     built = _real_build(tmp_path)

@@ -575,3 +575,150 @@ def test_dry_run_predicts_the_executable_name_of_the_platform(repo, platform, na
     ctx = context(repo, dry_run=True, publish=False, platform=platform)
     summary = confirmation(run_release(ctx))
     assert os.path.join(ctx.out_dir, name) in summary.created
+
+
+# ── 2.0: the packages step ────────────────────────────────────────────────
+
+
+def packaging_project(tmp_path, **formats):
+    root = tmp_path / "pkgproj"
+    root.mkdir()
+    (root / "app.py").write_text("print('hello')\n")
+    project = ProjectConfig(name="MyApp", version="1.1.0")
+    project.build.source = str(root / "app.py")
+    project.build.output_name = "MyApp"
+    project.packaging.maintainer = "Me <me@example.com>"
+    for name, on in formats.items():
+        setattr(project.packaging, name, on)
+    save_project(project, str(root / "p2e.toml"))
+    return root
+
+
+def packaging_context(root, dry_run, platform="linux", **options):
+    loaded = load_project(str(root / "p2e.toml"))
+    opts = ReleaseOptions(version="1.1.0", platform=platform, dry_run=dry_run, create_tag=False,
+                          publish=False, **options)
+    return ReleaseContext(loaded.project, opts, project_path=loaded.path, build=fake_build,
+                          doctor=doctor_with())
+
+
+def test_packages_step_is_skipped_when_no_format_is_enabled(tmp_path):
+    root = packaging_project(tmp_path)
+    results = {r.key: r for r in plan_release(packaging_context(root, True))}
+    assert results["packages"].status == SKIPPED
+    assert results["packages"].reason == "packages_off"
+
+
+def test_packages_step_is_skipped_on_another_platform(tmp_path):
+    root = packaging_project(tmp_path, dmg=True)
+    results = {r.key: r for r in plan_release(packaging_context(root, True, platform="linux"))}
+    assert results["packages"].status == SKIPPED
+    assert results["packages"].reason == "packages_other_platform"
+    assert results["packages"].params["formats"] == ".dmg"
+    results = {r.key: r for r in plan_release(packaging_context(root, True, platform="win32"))}
+    assert results["packages"].status == SKIPPED
+
+
+def test_packages_step_plans_the_commands_and_the_download(tmp_path, monkeypatch):
+    from py2exe_gui.core import packagers
+    from py2exe_gui.core.packagers import AppImagePackager
+
+    monkeypatch.setattr(shutil, "which",
+                        lambda name: "/usr/bin/dpkg-deb" if name == "dpkg-deb" else None)
+    monkeypatch.setitem(packagers._PACKAGERS, "appimage",
+                        AppImagePackager(tools_dir=str(tmp_path / "tools")))
+    monkeypatch.delenv("APPIMAGETOOL", raising=False)
+    root = packaging_project(tmp_path, appimage=True, deb=True)
+    results = {r.key: r for r in plan_release(packaging_context(root, True))}
+    step = results["packages"]
+    assert step.status == PLANNED and step.reason == "packages_ok"
+    assert step.params == {"count": "2", "formats": "AppImage, .deb"}
+    kinds = [(a.kind, a.target) for a in step.actions]
+    assert kinds[0][0] == pipeline.RUN and kinds[0][1].startswith("download https://github.com/")
+    written = [t for k, t in kinds if k == pipeline.WRITE]
+    assert [os.path.basename(t) for t in written] == ["MyApp-1.1.0-x86_64.AppImage",
+                                                      "myapp_1.1.0_amd64.deb"]
+    assert any("--runtime-file" in t for k, t in kinds if k == pipeline.RUN)
+    assert any("dpkg-deb --build --root-owner-group" in t for k, t in kinds if k == pipeline.RUN)
+    # The planned packages are checksummed and uploaded.
+    assert results["checksums"].params["count"] == "4"
+    summary = confirmation(list(results.values()))
+    assert any(c.startswith("download ") for c in summary.commands)
+    assert any(t.endswith(".deb") for t in summary.created)
+
+
+def test_packages_step_is_blocked_without_the_tool(tmp_path, monkeypatch):
+    monkeypatch.setattr(shutil, "which", lambda _name: None)
+    root = packaging_project(tmp_path, deb=True)
+    results = {r.key: r for r in run_release(packaging_context(root, False))}
+    assert results["packages"].status == FAILED
+    assert results["packages"].reason == "packages_blocked"
+    assert results["packages"].params == {"format": ".deb", "codes": "package_tool_missing"}
+    assert results["checksums"].status == PENDING
+
+
+def test_packages_step_builds_checksums_and_uploads(tmp_path, monkeypatch):
+    from py2exe_gui.core import packagers
+    from py2exe_gui.core.packagers import PackageResult
+
+    monkeypatch.setattr(shutil, "which", lambda _name: "/usr/bin/dpkg-deb")
+    calls = []
+
+    def fake_run_packaging(spec, formats, log=None, runner=None, platform=None, env=None,
+                           download_consent=None, downloader=None):
+        calls.append((list(formats), spec.name, spec.version, download_consent))
+        os.makedirs(spec.out_dir, exist_ok=True)
+        path = os.path.join(spec.out_dir, "myapp_1.1.0_amd64.deb")
+        with open(path, "wb") as f:
+            f.write(b"deb")
+        return [PackageResult("deb", True, path=path, size_bytes=3)]
+
+    monkeypatch.setattr(packagers, "run_packaging", fake_run_packaging)
+    root = packaging_project(tmp_path, deb=True)
+    log = []
+    ctx = packaging_context(root, False)
+    ctx._log = log.append
+    results = {r.key: r for r in run_release(ctx)}
+    assert results["packages"].status == DONE and results["packages"].params["count"] == "1"
+    assert calls[0][:3] == (["deb"], "MyApp", "1.1.0") and calls[0][3] is None
+    assert ctx.files["package_deb"].endswith("myapp_1.1.0_amd64.deb")
+    checksums = open(ctx.files["checksums"], encoding="ascii").read()
+    assert "myapp_1.1.0_amd64.deb" in checksums
+    assert results["checksums"].params["count"] == "3"
+    assert any(p.endswith(".deb") for p in pipeline._upload_files(ctx, results))
+
+
+def test_packages_step_passes_consent_when_downloads_are_allowed(tmp_path, monkeypatch):
+    from py2exe_gui.core import packagers
+    from py2exe_gui.core.packagers import PackageResult
+
+    monkeypatch.setattr(shutil, "which", lambda _name: "/usr/bin/tool")
+    seen = []
+
+    def fake_run_packaging(spec, formats, **kwargs):
+        seen.append(kwargs["download_consent"])
+        return [PackageResult("deb", False, error_code="package_failed", error="dpkg said no")]
+
+    monkeypatch.setattr(packagers, "run_packaging", fake_run_packaging)
+    root = packaging_project(tmp_path, deb=True)
+    results = {r.key: r for r in run_release(packaging_context(root, False, allow_downloads=True))}
+    assert seen[0] is not None and seen[0]("url", "dir") is True
+    assert results["packages"].status == FAILED
+    assert results["packages"].params == {"format": ".deb", "error": "dpkg said no"}
+
+
+def test_macos_sign_identity_reaches_the_spec(tmp_path, monkeypatch):
+    from py2exe_gui.core import packagers
+    from py2exe_gui.core.packagers import PackageResult
+
+    monkeypatch.setattr(shutil, "which", lambda _name: "/usr/bin/hdiutil")
+    specs = []
+
+    def fake_run_packaging(spec, formats, **kwargs):
+        specs.append(spec)
+        return [PackageResult("dmg", True, path=str(tmp_path / "x.dmg"))]
+
+    monkeypatch.setattr(packagers, "run_packaging", fake_run_packaging)
+    root = packaging_project(tmp_path, dmg=True)
+    run_release(packaging_context(root, False, platform="darwin", macos_sign_identity="Dev ID"))
+    assert specs[0].sign_identity == "Dev ID"

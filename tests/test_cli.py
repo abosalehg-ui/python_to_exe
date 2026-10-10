@@ -575,3 +575,92 @@ def test_project_untouched_by_doctor(project):
     before = project.read_text()
     run("doctor")
     assert project.read_text() == before
+
+
+# ── 2.0: package and ci ───────────────────────────────────────────────────
+
+
+def fake_dist(project_path, name="app"):
+    """A 'built' one-file binary where the engine would have put it."""
+    dist = project_path.parent / "dist"
+    dist.mkdir(exist_ok=True)
+    built = dist / name
+    built.write_text("#!/bin/sh\necho built\n")
+    built.chmod(0o755)
+    return built
+
+
+def test_package_without_a_format_is_a_usage_error(project):
+    result = run("package")
+    assert result.code == cli.EXIT_USAGE
+    assert "--format" in result.err
+
+
+@pytest.mark.skipif(not sys.platform.startswith("linux"), reason="Linux packagers")
+def test_package_skips_formats_of_other_platforms(project):
+    result = run("package", "--format", "dmg")
+    assert result.code == cli.EXIT_FAILED
+    assert "macOS" in result.out
+
+
+@pytest.mark.skipif(not sys.platform.startswith("linux"), reason="Linux packagers")
+def test_package_needs_a_build(project):
+    result = run("package", "--format", "deb")
+    assert result.code == cli.EXIT_FAILED
+    assert result.err.strip() == En.CLI_SIZE_NO_BUILD
+
+
+@pytest.mark.skipif(not sys.platform.startswith("linux") or shutil.which("dpkg-deb") is None,
+                    reason="needs Linux and dpkg-deb")
+def test_package_builds_a_real_deb_from_the_project(project, tmp_path):
+    fake_dist(project)
+    edit(project, lambda p: setattr(p.packaging, "deb", True))
+    result = run("package", "--yes")
+    assert result.code == cli.EXIT_OK, result.err
+    version = load_project(str(project)).project.version
+    deb = tmp_path / "release" / version / f"app_{version}_amd64.deb"
+    assert deb.is_file() and str(deb) in result.out
+    assert "package_maintainer_missing" in result.out  # the warning is shown, not fatal
+    listing = subprocess.run(["dpkg-deb", "-c", str(deb)], capture_output=True, text=True)
+    assert "./usr/bin/app" in listing.stdout
+    result = run("package", "--format", "deb", "--json")
+    payload = json.loads(result.out)
+    assert payload[0]["format"] == "deb" and payload[0]["ok"] and payload[0]["path"] == str(deb)
+
+
+@pytest.mark.skipif(not sys.platform.startswith("linux"), reason="Linux packagers")
+def test_package_appimage_asks_before_downloading(project, tmp_path, monkeypatch):
+    from py2exe_gui.core import packagers
+    from py2exe_gui.core.packagers import AppImagePackager
+
+    fake_dist(project)
+    monkeypatch.setitem(packagers._PACKAGERS, "appimage",
+                        AppImagePackager(tools_dir=str(tmp_path / "tools")))
+    monkeypatch.delenv("APPIMAGETOOL", raising=False)
+    monkeypatch.setattr(shutil, "which", lambda _name: None)
+    # Non-interactive, no --yes: refused with the consent exit code, nothing fetched.
+    result = run("package", "--format", "appimage")
+    assert result.code == cli.EXIT_CONSENT
+    assert not (tmp_path / "tools").exists()
+    # Interactive "no": the AppImage is reported as blocked, nothing fetched.
+    result = run("package", "--format", "appimage", interactive=True, answers=["n"])
+    assert result.code == cli.EXIT_FAILED
+    assert "appimagetool_missing" in result.out
+    assert not (tmp_path / "tools").exists()
+
+
+def test_release_and_package_download_flags_parse():
+    parser = cli.build_parser()
+    assert parser.parse_args(["release", "--allow-downloads"]).allow_downloads
+    assert parser.parse_args(["package", "--allow-downloads", "--format", "deb"]).format == ["deb"]
+    assert parser.parse_args(["ci", "--print", "--python", "3.11"]).print_only
+
+
+def test_cli_still_never_imports_pyqt5_for_the_new_commands(tmp_path):
+    code = ("import sys\nsys.modules['PyQt5'] = None\n"
+            "from py2exe_gui import cli\n"
+            "sys.exit(cli.main(['--lang', 'en', 'package', '--help']) or "
+            "cli.main(['--lang', 'en', 'ci', '--help']))")
+    result = subprocess.run([sys.executable, "-c", code], capture_output=True, text=True,
+                            cwd=ROOT, timeout=120)
+    assert result.returncode == 0, result.stderr
