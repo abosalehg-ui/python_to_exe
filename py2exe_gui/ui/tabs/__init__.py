@@ -7,6 +7,7 @@ from py2exe_gui.ui.tabs.batch_tab import BatchTab
 from py2exe_gui.ui.tabs.deploy_tab import DeployTab
 from py2exe_gui.ui.tabs.doctor_tab import DoctorTab
 from py2exe_gui.ui.tabs.history_tab import HistoryTab
+from py2exe_gui.ui.tabs.home_tab import HomeTab
 from py2exe_gui.ui.tabs.installer_tab import InstallerTab
 from py2exe_gui.ui.tabs.main_tab import MainTab
 from py2exe_gui.ui.tabs.platforms_tab import PlatformsTab
@@ -24,6 +25,7 @@ __all__ = [
     "DeployTab",
     "DoctorTab",
     "HistoryTab",
+    "HomeTab",
     "InstallerTab",
     "MainTab",
     "PlatformsTab",
