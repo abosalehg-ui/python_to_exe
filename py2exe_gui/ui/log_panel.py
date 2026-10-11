@@ -109,11 +109,13 @@ class LogPanel(QWidget):
 
         self.clear_btn = QPushButton(S.CLEAR_LOG)
         self.clear_btn.setObjectName("flatBtn")
+        self.clear_btn.setProperty("iconName", "clear")
         self.clear_btn.setAccessibleName(S.CLEAR_LOG)
         self.clear_btn.clicked.connect(self.clear_log)
         row.addWidget(self.clear_btn)
         self.export_btn = QPushButton(S.BTN_EXPORT_LOG)
         self.export_btn.setObjectName("flatBtn")
+        self.export_btn.setProperty("iconName", "export")
         self.export_btn.setAccessibleName(S.BTN_EXPORT_LOG)
         self.export_btn.clicked.connect(self.export_log)
         row.addWidget(self.export_btn)
@@ -143,10 +145,24 @@ class LogPanel(QWidget):
         for widget in (self.log_search, self.log_filter, self.clear_btn, self.export_btn):
             widget.setVisible(checked)
         self.last_label.setVisible(not checked)
+        self._update_arrow()
+        self.toggled.emit(checked)
+
+    def set_chevrons(self, open_icon, closed_icon):
+        """Theme-coloured icons for the toggle instead of the style's arrows."""
+        self._chevrons = (open_icon, closed_icon)
+        self._update_arrow()
+
+    def _update_arrow(self):
+        chevrons = getattr(self, "_chevrons", None)
+        checked = self.toggle_btn.isChecked()
+        if chevrons is not None:
+            self.toggle_btn.setArrowType(Qt.ArrowType.NoArrow)
+            self.toggle_btn.setIcon(chevrons[0] if checked else chevrons[1])
+            return
         self.toggle_btn.setArrowType(
             Qt.ArrowType.DownArrow if checked else Qt.ArrowType.UpArrow
         )
-        self.toggled.emit(checked)
 
     # ── Appending and filtering ────────────────────────────────────────────
 

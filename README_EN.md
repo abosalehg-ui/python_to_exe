@@ -3,7 +3,7 @@
 > Convert Python scripts to Windows executables with a professional bilingual GUI.
 
 A Qt (PySide6) wrapper around PyInstaller and Nuitka that turns one-click .py → .exe into a
-real workflow: a beginner-friendly simple mode, batch conversion, 4 accessible
+real workflow: a side navigation with folded advanced options, batch conversion, 4 accessible
 themes, 11 built-in templates, full Arabic and English UIs, code signing,
 version metadata, build history, and a Windows manifest editor.
 
@@ -36,7 +36,7 @@ version metadata, build history, and a Windows manifest editor.
 | **Deployment** | Splash screen, Windows manifest (DPI, UAC, supported OS), Authenticode code signing, post-build smoke test |
 | **Installer** | Full Inno Setup pipeline: generated `.iss`, stable upgrade-safe AppId, 13 languages, shortcuts, file association, signed `Setup.exe` |
 | **Metadata** | Embed company name, product/file version, description, copyright, etc. in the EXE properties |
-| **UX** | Simple/advanced modes, drag & drop, command preview (dry-run), real-time colored log with search + severity filter + export, icon preview at 4 sizes, 15+ keyboard shortcuts |
+| **UX** *(2.1)* | A side navigation of six sections (Projects, Build, Check, Distribute, Tools, Settings) instead of fifteen tabs; a Build page whose advanced options fold under titled sections with a one-line summary each; a build log panel under every page that opens with the build; one primary action with inline progress; SVG icons (Lucide) coloured by the theme; drag & drop, command preview (dry-run), log search + severity filter + export, icon preview at 4 sizes, 20+ keyboard shortcuts listed under F1 |
 | **Themes** | Dark, Light, Nord, High-contrast, plus `auto` following the OS. Every palette clears WCAG AA 4.5:1, enforced by tests. Font zoom to 200% |
 | **Batch** | Queue many `.py` files and build them all with one configuration, sequentially, with a per-file report |
 | **Presets** | Save the current configuration under a name; export/import to share |
@@ -98,20 +98,38 @@ optional extra: `pip install -e ".[release]"`. Without it, the release reads
 | `Ctrl+N` | New project |
 | `Ctrl+Shift+O` | Open a project |
 | `Ctrl+T` | Toggle theme (dark/light) |
-| `Ctrl+F` | Focus log search |
-| `Ctrl+M` | Toggle simple/advanced mode |
+| `Ctrl+F` | Open the log and focus its search box |
+| `` Ctrl+` `` | Show or fold the build log |
+| `Ctrl+1` … `Ctrl+6` | Go to a section (Projects, Build, Check, Distribute, Tools, Settings) |
+| `Ctrl+,` | Settings |
 | `Ctrl` `+` | Increase font size |
 | `Ctrl` `-` | Decrease font size |
 | `Ctrl+0` | Reset font size |
 | `F5` | Auto-detect imports |
+| `F1` | The shortcuts dialog |
 
-## Simple and Advanced Modes
+Every shortcut is also listed under **Help ▸ Keyboard shortcuts**.
 
-A first run shows eight tabs — Projects, Main, Project Doctor, Size & Environment,
-Runtime Kit, Release, Templates, About — because fifteen tabs of
-PyInstaller options is a lot to meet when all you want is one `.exe`. The mode
-button (or `Ctrl+M`) reveals the rest, and the choice is remembered. Hidden
-tabs keep their contents: switching modes mid-setup loses nothing.
+## The window (2.1)
+
+Pages are grouped into **six sections in a side bar** rather than fifteen tabs
+in one row (which needed 1661px and hid six tabs behind scroll arrows). The
+order top to bottom is the order of the work, and each section holds a few
+sub-tabs that always fit. The simple/advanced modes and the first-run dialog
+are gone: the **Build page** shows the main form and folds the rest — *Extra
+files and libraries*, *File identity (Version Info)*, *Before and after the
+build* — under sections that open in place and summarise what they hold while
+closed (a stored "advanced mode" preference opens them by default). The
+**build log** is a panel under every page: one line (the last message) while
+idle, open during a build, resizable by its top edge. The **action bar** has
+one primary button (Start Build, which becomes Cancel during a build) and an
+inline progress bar that names the stage; the **status bar** shows the build
+state and the interpreter.
+
+<p align="center">
+  <img src="docs/screenshots/2.1/build_en.png" alt="Build page" width="48%">
+  <img src="docs/screenshots/2.1/distribute_en.png" alt="Distribute section" width="48%">
+</p>
 
 ## Project file (`p2e.toml`)
 
@@ -312,7 +330,18 @@ tagged, pushed and uploaded. Each step can be repeated: running the same
 release again reuses the tag, the GitHub release and the assets already
 uploaded.
 
-## Tabs Overview
+## Sections Overview
+
+| Section | Pages |
+|---------|-------|
+| **Projects** | Projects, Build History |
+| **Build** | the Build page: Main Settings + the folded *Extra files and libraries* (Advanced), *File identity* (Version Info) and *Before and after the build* (Deploy) |
+| **Check** | Project Doctor, Size & Environment |
+| **Distribute** | Installer, Platforms, Runtime Kit, Release |
+| **Tools** | Batch, Templates |
+| **Settings** | Preferences (theme, text size, language, update check), About |
+
+The pages themselves are described below under their former tab names.
 
 ### 🏠 Projects (2.0)
 The projects workspace: one card per recent `p2e.toml` (the last 8 opened)
@@ -330,12 +359,12 @@ summaries come from `core/workspace.py` (no Qt); the tab only draws them.
 The sparkline runs in the reading direction: newest on the right in English,
 on the left in Arabic.
 
-### ⚙️ Main Settings
+### ⚙️ Main Settings (the Build page)
 File pickers for source, output directory, icon (with a live preview at
 16/32/48/64px — the sizes Windows requests, where a PNG renamed to `.ico`
 gives itself away). Core PyInstaller flags (`--onefile`, `--windowed`,
-`--clean`, `--noconfirm`, `--strip`), plus the build log with text search and
-a severity filter.
+`--clean`, `--noconfirm`, `--strip`) and the engine. The build log (text
+search, severity filter, export) is the panel under every page since 2.1.
 
 ### ⚖️ Size & Environment
 Choose between the current Python and an **isolated environment** for the
@@ -441,7 +470,7 @@ Notes:
   as `/Sbyparam=`, so `Setup.exe` itself is Authenticode-signed.
 
 ### 📋 Templates
-11 presets including:
+11 presets (the theme and language selectors moved to Settings in 2.1):
 
 | Template | Type | Hidden Imports |
 |----------|------|----------------|
@@ -460,6 +489,10 @@ Notes:
 ### 🕓 History
 Last 20 builds with timestamp, duration, success status. One click
 restores the exact config.
+
+### ⚙️ Preferences (2.1)
+Theme (auto, dark, light, Nord, high contrast), text size, language, and the
+optional update check that used to live in About.
 
 ### ℹ️ About
 Developer info and feature summary.

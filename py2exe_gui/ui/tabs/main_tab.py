@@ -2,6 +2,7 @@
 
 import os
 
+from py2exe_gui import icons
 from py2exe_gui.core.engines import engine_names, get_engine
 from py2exe_gui.qt import (
     QCheckBox,
@@ -19,7 +20,7 @@ from py2exe_gui.qt import (
 )
 from py2exe_gui.strings import S
 from py2exe_gui.ui.log_panel import LogPanel
-from py2exe_gui.ui.tabs.base import BaseTab, browse_button, scrolled_layout
+from py2exe_gui.ui.tabs.base import BaseTab, browse_button, icon_button, scrolled_layout
 
 # The sizes Windows actually pulls out of a multi-resolution .ico. Showing all
 # four is how a PNG renamed to .ico gives itself away: it has only one.
@@ -43,6 +44,8 @@ class MainTab(BaseTab):
         # Readiness badge: the doctor's score at a glance, one click to the
         # details. Hidden until there is a script to examine.
         self.readiness_btn = QPushButton("")
+        self.readiness_btn.setProperty("iconName", "doctor")
+        self.readiness_btn.setIcon(icons.icon("doctor"))
         self.readiness_btn.setToolTip(S.DOCTOR_READINESS_TIP)
         self.readiness_btn.setAccessibleDescription(S.DOCTOR_READINESS_TIP)
         self.readiness_btn.clicked.connect(self.window_action("show_doctor_tab"))
@@ -61,7 +64,7 @@ class MainTab(BaseTab):
         output_layout.addWidget(QLabel(S.OUTPUT_DIR_LABEL), 1, 0)
         self.output_dir = QLineEdit()
         self.output_dir.setPlaceholderText(S.OUTPUT_DIR_PLACEHOLDER)
-        output_dir_btn = browse_button(S.DIALOG_CHOOSE_OUT_DIR, self.browse_output_dir)
+        output_dir_btn = browse_button(S.DIALOG_CHOOSE_OUT_DIR, self.browse_output_dir, folder=True)
         output_layout.addWidget(self.output_dir, 1, 1)
         output_layout.addWidget(output_dir_btn, 1, 2)
 
@@ -69,11 +72,9 @@ class MainTab(BaseTab):
         self.icon_input = QLineEdit()
         self.icon_input.setPlaceholderText(S.ICON_PLACEHOLDER)
         self.icon_input.textChanged.connect(self.refresh_icon_preview)
-        icon_btn = browse_button(S.DIALOG_CHOOSE_ICON, self.browse_icon)
-        studio_btn = QPushButton(S.BTN_ICON_STUDIO)
-        studio_btn.setToolTip(S.ICON_STUDIO_TITLE)
-        studio_btn.setAccessibleName(S.ICON_STUDIO_TITLE)
-        studio_btn.clicked.connect(self.window_action("open_icon_studio"))
+        icon_btn = icon_button("image", S.DIALOG_CHOOSE_ICON, self.browse_icon)
+        studio_btn = icon_button("icon_studio", S.ICON_STUDIO_TITLE,
+                                 self.window_action("open_icon_studio"))
         icon_buttons = QHBoxLayout()
         icon_buttons.addWidget(icon_btn)
         icon_buttons.addWidget(studio_btn)

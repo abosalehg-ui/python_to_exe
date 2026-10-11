@@ -75,7 +75,7 @@ class AdvancedTab(BaseTab):
         extra_layout.addWidget(QLabel(S.UPX_DIR_LABEL), 1, 0)
         self.upx_dir = QLineEdit()
         self.upx_dir.setPlaceholderText(S.UPX_DIR_PLACEHOLDER)
-        upx_dir_btn = browse_button(S.UPX_DIR_LABEL, self.browse_upx_dir)
+        upx_dir_btn = browse_button(S.UPX_DIR_LABEL, self.browse_upx_dir, folder=True)
         extra_layout.addWidget(self.upx_dir, 1, 1)
         extra_layout.addWidget(upx_dir_btn, 1, 2)
 

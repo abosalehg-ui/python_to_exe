@@ -154,6 +154,25 @@ def test_every_icon_only_button_has_an_accessible_name(window):
     assert not bare, f"icon-only buttons without accessible name/tooltip: {bare}"
 
 
+def test_every_text_less_button_has_an_icon_a_tooltip_and_a_name(window):
+    """2.1: the '📂' buttons became icon buttons; each must still speak."""
+    from py2exe_gui.qt import QPushButton
+
+    icon_buttons = [b for b in window.findChildren(QPushButton)
+                    if not b.text().strip() and b.property("iconName")]
+    assert len(icon_buttons) >= 10, "expected the browse / icon-studio buttons"
+    for btn in icon_buttons:
+        if btn is window.main_tab.readiness_btn:
+            continue  # text is set once there is a score; it is hidden before
+        assert not btn.icon().isNull(), btn.property("iconName")
+        assert btn.toolTip() and btn.accessibleName(), btn.property("iconName")
+        assert btn.width() >= 32 and btn.height() >= 32, btn.property("iconName")
+    # And no text-less button that is shown lacks an icon altogether.
+    bare = [b for b in window.findChildren(QPushButton)
+            if not b.text().strip() and b.isVisibleTo(window) and b.icon().isNull()]
+    assert not bare
+
+
 def test_stylesheet_defines_a_focus_indicator_for_buttons(window):
     assert "QPushButton:focus" in window.styleSheet()
 

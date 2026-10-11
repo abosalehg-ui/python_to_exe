@@ -12,19 +12,19 @@ class Ar:
 
     # Window & tabs
     WINDOW_TITLE_FMT = "{name} v{version}"
-    TAB_MAIN = "⚙️ الإعدادات الرئيسية"
-    TAB_ADVANCED = "🔧 إعدادات متقدمة"
-    TAB_TEMPLATES = "📋 القوالب"
-    TAB_ABOUT = "ℹ️ حول البرنامج"
+    TAB_MAIN = "الإعدادات الرئيسية"
+    TAB_ADVANCED = "إعدادات متقدمة"
+    TAB_TEMPLATES = "القوالب"
+    TAB_ABOUT = "حول البرنامج"
 
     # Header
-    HEADER_TITLE = "🐍 Python to EXE Converter"
+    HEADER_TITLE = "Python to EXE Converter"
     HEADER_SUBTITLE = "تحويل تطبيقات بايثون إلى ملفات تنفيذية بسهولة"
 
     # Main tab
-    GROUP_SOURCE = "📄 ملف المصدر"
+    GROUP_SOURCE = "ملف المصدر"
     SOURCE_PLACEHOLDER = "اختر ملف .py للتحويل..."
-    GROUP_OUTPUT = "📤 إعدادات الإخراج"
+    GROUP_OUTPUT = "إعدادات الإخراج"
     OUTPUT_NAME_LABEL = "اسم الملف الناتج:"
     OUTPUT_NAME_PLACEHOLDER = "اسم الملف بدون .exe"
     OUTPUT_DIR_LABEL = "مجلد الإخراج:"
@@ -32,7 +32,7 @@ class Ar:
     ICON_LABEL = "أيقونة البرنامج:"
     ICON_PLACEHOLDER = "اختياري - ملف .ico"
 
-    GROUP_OPTIONS = "⚙️ خيارات التحويل"
+    GROUP_OPTIONS = "خيارات التحويل"
     OPT_ONEFILE = "ملف واحد (--onefile)"
     OPT_ONEFILE_TIP = "دمج كل الملفات في ملف EXE واحد"
     OPT_WINDOWED = "بدون Console (--windowed)"
@@ -47,8 +47,8 @@ class Ar:
     OPT_STRIP_TIP = "إزالة معلومات التنقيح (أصغر حجماً)"
 
     # Logs
-    GROUP_LOG = "📋 سجل العملية"
-    CLEAR_LOG = "🗑️ مسح السجل"
+    GROUP_LOG = "سجل العملية"
+    CLEAR_LOG = "مسح السجل"
     LOG_CHECKING_DEPS = "🔍 جاري التحقق من المتطلبات..."
     LOG_PYTHON_FOUND = "✅ Python: {version}"
     LOG_PYTHON_MISSING = "❌ Python غير موجود!"
@@ -75,14 +75,14 @@ class Ar:
     CONV_FAILED_MSG = "فشل التحويل - راجع السجل للتفاصيل"
 
     # Advanced tab
-    GROUP_EXTRA_FILES = "📁 الملفات الإضافية (--add-data)"
-    BTN_ADD_FILE = "➕ إضافة ملف"
-    BTN_ADD_FOLDER = "📂 إضافة مجلد"
-    BTN_REMOVE_SELECTED = "🗑️ حذف المحدد"
-    GROUP_HIDDEN_IMPORTS = "📦 المكتبات المخفية (--hidden-import)"
-    BTN_ADD_IMPORT = "➕ إضافة مكتبة"
-    BTN_AUTO_DETECT = "🔍 كشف تلقائي"
-    GROUP_EXTRA_OPTS = "🔧 خيارات إضافية"
+    GROUP_EXTRA_FILES = "الملفات الإضافية (--add-data)"
+    BTN_ADD_FILE = "إضافة ملف"
+    BTN_ADD_FOLDER = "إضافة مجلد"
+    BTN_REMOVE_SELECTED = "حذف المحدد"
+    GROUP_HIDDEN_IMPORTS = "المكتبات المخفية (--hidden-import)"
+    BTN_ADD_IMPORT = "إضافة مكتبة"
+    BTN_AUTO_DETECT = "كشف تلقائي"
+    GROUP_EXTRA_OPTS = "خيارات إضافية"
     OPT_LEVEL_LABEL = "مستوى التحسين:"
     OPT_LEVELS = ["0 - بدون تحسين", "1 - تحسين أساسي", "2 - تحسين كامل"]
     UPX_DIR_LABEL = "مجلد UPX:"
@@ -91,17 +91,17 @@ class Ar:
     UPX_LEVEL_TIP = "0 = بدون ضغط، 9 = أقصى ضغط"
     UPX_USE = "استخدام UPX للضغط"
     UPX_USE_TIP = "يتطلب تثبيت UPX"
-    GROUP_EXTRA_ARGS = "💻 أوامر PyInstaller إضافية"
+    GROUP_EXTRA_ARGS = "أوامر PyInstaller إضافية"
     EXTRA_ARGS_PLACEHOLDER = "أضف أي أوامر إضافية هنا..."
 
     # Templates tab
-    GROUP_TEMPLATES = "📋 القوالب الجاهزة"
+    GROUP_TEMPLATES = "القوالب الجاهزة"
     TEMPLATES_HINT = "اختر قالباً لتطبيق الإعدادات المناسبة تلقائياً:"
-    BTN_APPLY_TEMPLATE = "✅ تطبيق القالب"
-    GROUP_SAVE_LOAD = "💾 حفظ وتحميل الإعدادات"
+    BTN_APPLY_TEMPLATE = "تطبيق القالب"
+    GROUP_SAVE_LOAD = "حفظ وتحميل الإعدادات"
     SAVE_LOAD_HINT = "يمكنك حفظ إعداداتك الحالية لاستخدامها لاحقاً:"
-    BTN_SAVE_SETTINGS = "💾 حفظ الإعدادات"
-    BTN_LOAD_SETTINGS = "📂 تحميل إعدادات"
+    BTN_SAVE_SETTINGS = "حفظ الإعدادات"
+    BTN_LOAD_SETTINGS = "تحميل إعدادات"
 
     # Dialog
     DIALOG_ADD_IMPORT_TITLE = "إضافة مكتبة مخفية"
@@ -122,8 +122,8 @@ class Ar:
     DIALOG_FILTER_JSON = "JSON Files (*.json)"
 
     # Log enhancements (Phase 2)
-    LOG_SEARCH_PLACEHOLDER = "🔍 ابحث في السجل..."
-    BTN_EXPORT_LOG = "💾 تصدير السجل"
+    LOG_SEARCH_PLACEHOLDER = "ابحث في السجل..."
+    BTN_EXPORT_LOG = "تصدير السجل"
     DIALOG_EXPORT_LOG = "تصدير السجل"
     DIALOG_FILTER_LOG = "Log Files (*.log *.txt);;All Files (*.*)"
     LOG_EXPORT_OK = "✅ تم تصدير السجل: {path}"
@@ -133,10 +133,10 @@ class Ar:
     LOG_DROPPED_EXTRA = "➕ تم سحب ملف إضافي: {path}"
 
     # Dry-run preview (Phase 2)
-    BTN_PREVIEW_CMD = "👁️ معاينة الأمر"
+    BTN_PREVIEW_CMD = "معاينة الأمر"
     DIALOG_PREVIEW_TITLE = "معاينة أمر PyInstaller"
     DIALOG_PREVIEW_HINT = "هذا هو الأمر الذي سيُنفَّذ عند الضغط على \"بدء التحويل\":"
-    BTN_COPY_CMD = "📋 نسخ"
+    BTN_COPY_CMD = "نسخ"
     BTN_CLOSE = "إغلاق"
     MSG_COPIED = "تم نسخ الأمر إلى الحافظة"
 
@@ -151,9 +151,9 @@ class Ar:
     PROGRESS_FAILED = "❌ فشل التحويل"
 
     # Buttons
-    BTN_CONVERT = "🚀 بدء التحويل"
-    BTN_CANCEL = "❌ إلغاء"
-    BTN_OPEN_FOLDER = "📂 فتح مجلد الإخراج"
+    BTN_CONVERT = "بدء التحويل"
+    BTN_CANCEL = "إلغاء"
+    BTN_OPEN_FOLDER = "فتح مجلد الإخراج"
 
     # Messages
     MSG_WARNING = "تنبيه"
@@ -226,8 +226,8 @@ class Ar:
         "أداة احترافية لتحويل تطبيقات بايثون إلى ملفات تنفيذية EXE "
         "باستخدام PyInstaller مع واجهة رسومية سهلة الاستخدام"
     )
-    ABOUT_DEVELOPER_LABEL = "👨‍💻 المطور"
-    ABOUT_FEATURES_LABEL = "✨ الميزات"
+    ABOUT_DEVELOPER_LABEL = "المطور"
+    ABOUT_FEATURES_LABEL = "الميزات"
     ABOUT_FEATURES = [
         "تحويل أي ملف بايثون إلى EXE",
         "إضافة أيقونة مخصصة",
@@ -245,13 +245,13 @@ class Ar:
     ]
 
     # Language selector (Phase 3)
-    LANGUAGE_LABEL = "🌐 اللغة:"
+    LANGUAGE_LABEL = "اللغة:"
     LANGUAGE_NATIVE = "العربية"
     MSG_RESTART_REQUIRED = "يجب إعادة تشغيل التطبيق لتطبيق اللغة الجديدة."
 
     # Phase 4: Version info editor
-    TAB_VERSION_INFO = "📝 معلومات الإصدار"
-    GROUP_VERSION_INFO = "📝 بيانات ملف EXE (Windows)"
+    TAB_VERSION_INFO = "معلومات الإصدار"
+    GROUP_VERSION_INFO = "بيانات ملف EXE (Windows)"
     VERSION_INFO_HINT = "اترك الحقول فارغة لتجاهلها. تُضمَّن في خصائص الـ EXE الناتج."
     VI_COMPANY_NAME = "اسم الشركة:"
     VI_FILE_DESCRIPTION = "وصف الملف:"
@@ -264,7 +264,7 @@ class Ar:
     VI_PLACEHOLDER_VERSION = "مثل: 1.0.0.0"
 
     # Phase 4: requirements.txt import
-    BTN_IMPORT_REQUIREMENTS = "📥 استيراد من requirements.txt"
+    BTN_IMPORT_REQUIREMENTS = "استيراد من requirements.txt"
     DIALOG_CHOOSE_REQS = "اختر ملف requirements.txt"
     DIALOG_FILTER_REQS = "Requirements (*.txt);;All Files (*.*)"
     LOG_REQS_IMPORTED = "✅ تم استيراد {total} حزمة من requirements.txt، أُضيفت {added} جديدة"
@@ -275,26 +275,26 @@ class Ar:
     LOG_REQS_ERROR = "❌ خطأ في قراءة requirements.txt: {error}"
 
     # Phase 4: Build history
-    TAB_HISTORY = "🕓 سجل البناءات"
-    GROUP_HISTORY = "🕓 آخر البناءات"
+    TAB_HISTORY = "سجل البناءات"
+    GROUP_HISTORY = "آخر البناءات"
     HISTORY_EMPTY = "لا توجد بناءات سابقة."
-    BTN_RESTORE_BUILD = "♻️ استعادة الإعدادات"
-    BTN_CLEAR_HISTORY = "🗑️ مسح السجل"
+    BTN_RESTORE_BUILD = "استعادة الإعدادات"
+    BTN_CLEAR_HISTORY = "مسح السجل"
     HISTORY_CLEARED = "✅ تم مسح سجل البناءات"
     LOG_RESTORED = "✅ تمت استعادة إعدادات البناء من {time}"
 
     # Phase 5: Deployment tab
-    TAB_DEPLOY = "🚀 النشر"
+    TAB_DEPLOY = "النشر"
 
     # Splash
-    GROUP_SPLASH = "🖼️ شاشة البداية (Splash)"
+    GROUP_SPLASH = "شاشة البداية (Splash)"
     SPLASH_LABEL = "صورة شاشة البداية:"
     SPLASH_PLACEHOLDER = "اختياري - PNG / JPG"
     DIALOG_CHOOSE_SPLASH = "اختر صورة شاشة البداية"
     DIALOG_FILTER_IMAGE = "Images (*.png *.jpg *.jpeg *.bmp);;All Files (*.*)"
 
     # Manifest
-    GROUP_MANIFEST = "📜 Windows Manifest"
+    GROUP_MANIFEST = "Windows Manifest"
     MANIFEST_HINT = "يُولَّد ملف XML ويُمرَّر عبر --manifest عند البناء."
     MANIFEST_ENABLE = "تفعيل توليد Manifest"
     MANIFEST_DPI = "DPI Aware (PerMonitorV2)"
@@ -302,7 +302,7 @@ class Ar:
     MANIFEST_OS_LABEL = "أنظمة Windows المدعومة:"
 
     # Signing
-    GROUP_SIGNING = "🔐 التوقيع الرقمي"
+    GROUP_SIGNING = "التوقيع الرقمي"
     SIGNING_HINT = "بعد إكمال البناء، يُوقَّع الـ EXE باستخدام signtool.exe (Windows)."
     SIGNING_ENABLE = "تفعيل التوقيع الرقمي"
     SIGNING_CERT_LABEL = "ملف الشهادة (.pfx):"
@@ -320,7 +320,7 @@ class Ar:
     LOG_SIGNING_SKIPPED = "⏭️ تم تخطي التوقيع: {reason}"
 
     # Smoke test
-    GROUP_SMOKE = "🧪 اختبار ما بعد البناء"
+    GROUP_SMOKE = "اختبار ما بعد البناء"
     SMOKE_ENABLE = "تشغيل الـ EXE الناتج تلقائياً للتحقق"
     SMOKE_TIMEOUT_LABEL = "مدة الانتظار (ثواني):"
     LOG_SMOKE_START = "🧪 جاري اختبار الـ EXE الناتج..."
@@ -361,15 +361,15 @@ class Ar:
     TPL_CUSTOM_DESC = "تخصيص جميع الإعدادات يدوياً"
 
     # ── Phase 7: مثبّت Inno Setup ──────────────────────────────────────
-    TAB_INSTALLER = "📦 المثبِّت"
-    GROUP_INSTALLER = "📦 إنشاء مثبّت (Inno Setup)"
+    TAB_INSTALLER = "المثبِّت"
+    GROUP_INSTALLER = "إنشاء مثبّت (Inno Setup)"
     INSTALLER_HINT = (
         "أنشئ ملف Setup.exe احترافياً بعد البناء مباشرةً. "
         "يتطلب تثبيت Inno Setup 6 على الجهاز."
     )
     INSTALLER_ENABLE = "إنشاء المثبّت تلقائياً بعد نجاح البناء"
 
-    GROUP_INSTALLER_IDENTITY = "🪪 هوية التطبيق"
+    GROUP_INSTALLER_IDENTITY = "هوية التطبيق"
     INST_APP_NAME_LABEL = "اسم التطبيق:"
     INST_APP_NAME_PLACEHOLDER = "الاسم الظاهر في قائمة ابدأ ولوحة التحكم"
     INST_VERSION_LABEL = "الإصدار:"
@@ -384,7 +384,7 @@ class Ar:
         "معرّف ثابت يجعل الإصدارات الجديدة تُحدّث التثبيت السابق بدل تكراره"
     )
 
-    GROUP_INSTALLER_OUTPUT = "📤 مخرجات المثبّت"
+    GROUP_INSTALLER_OUTPUT = "مخرجات المثبّت"
     INST_OUT_DIR_LABEL = "مجلد الإخراج:"
     INST_OUT_DIR_PLACEHOLDER = "الافتراضي: بجانب ملف EXE الناتج"
     INST_OUT_NAME_LABEL = "اسم ملف Setup:"
@@ -396,7 +396,7 @@ class Ar:
     INST_SETUP_ICON_LABEL = "أيقونة المثبّت:"
     INST_SETUP_ICON_PLACEHOLDER = "اختياري - ملف .ico لواجهة Setup.exe"
 
-    GROUP_INSTALLER_OPTIONS = "⚙️ خيارات التثبيت"
+    GROUP_INSTALLER_OPTIONS = "خيارات التثبيت"
     INST_PRIVILEGES_LABEL = "صلاحيات التثبيت:"
     INST_PRIV_ADMIN = "لكل المستخدمين (يتطلب مدير)"
     INST_PRIV_LOWEST = "للمستخدم الحالي فقط (بدون مدير)"
@@ -421,12 +421,12 @@ class Ar:
     INST_ASSOC_LABEL = "ربط امتداد ملفات:"
     INST_ASSOC_PLACEHOLDER = "اختياري - مثال: .myapp"
 
-    GROUP_INSTALLER_TOOLCHAIN = "🔧 مترجم Inno Setup"
+    GROUP_INSTALLER_TOOLCHAIN = "مترجم Inno Setup"
     INST_ISCC_LABEL = "مسار ISCC.exe:"
     INST_ISCC_PLACEHOLDER = "الافتراضي: البحث التلقائي في PATH ومجلدات التثبيت"
-    BTN_DETECT_ISCC = "🔍 كشف تلقائي"
-    BTN_GENERATE_ISS = "📝 توليد ملف .iss فقط"
-    BTN_BUILD_INSTALLER = "📦 بناء المثبّت الآن"
+    BTN_DETECT_ISCC = "كشف تلقائي"
+    BTN_GENERATE_ISS = "توليد ملف .iss فقط"
+    BTN_BUILD_INSTALLER = "بناء المثبّت الآن"
 
     # رسائل المثبّت
     LOG_ISCC_FOUND = "✅ تم العثور على Inno Setup: {path}"
@@ -468,11 +468,11 @@ class Ar:
 
     # ── Phase 9: themes ──
     THEME_SELECT_LABEL = "السمة:"
-    THEME_LABEL_AUTO = "🖥️ تلقائي (حسب النظام)"
-    THEME_LABEL_DARK = "🌙 داكنة"
-    THEME_LABEL_LIGHT = "☀️ نهارية"
-    THEME_LABEL_NORD = "❄️ Nord"
-    THEME_LABEL_HIGH_CONTRAST = "🔲 تباين عالٍ"
+    THEME_LABEL_AUTO = "تلقائي (حسب النظام)"
+    THEME_LABEL_DARK = "داكنة"
+    THEME_LABEL_LIGHT = "نهارية"
+    THEME_LABEL_NORD = "Nord"
+    THEME_LABEL_HIGH_CONTRAST = "تباين عالٍ"
     LOG_THEME_CHANGED = "🎨 تم تغيير السمة: {theme}"
 
     # ── Phase 9: font zoom ──
@@ -516,18 +516,18 @@ class Ar:
     LOG_FILTER_EMPTY = "لا توجد أسطر مطابقة لهذه التصفية."
 
     # ── Phase 10: batch conversion ──
-    TAB_BATCH = "📚 تحويل دفعي"
-    GROUP_BATCH_FILES = "📚 قائمة الملفات"
+    TAB_BATCH = "تحويل دفعي"
+    GROUP_BATCH_FILES = "قائمة الملفات"
     BATCH_HINT = (
         "حوّل عدة ملفات بنفس الإعدادات. تُنفَّذ واحداً تلو الآخر — "
         "لأن PyInstaller يكتب في نفس مجلدي build/ و dist/."
     )
-    BTN_BATCH_ADD = "➕ إضافة ملفات"
-    BTN_BATCH_REMOVE = "🗑️ حذف المحدد"
-    BTN_BATCH_CLEAR = "🧹 تفريغ القائمة"
-    BTN_BATCH_START = "🚀 بدء التحويل الدفعي"
-    BTN_BATCH_CANCEL = "⏹️ إلغاء"
-    GROUP_BATCH_RESULT = "📊 النتيجة"
+    BTN_BATCH_ADD = "إضافة ملفات"
+    BTN_BATCH_REMOVE = "حذف المحدد"
+    BTN_BATCH_CLEAR = "تفريغ القائمة"
+    BTN_BATCH_START = "بدء التحويل الدفعي"
+    BTN_BATCH_CANCEL = "إلغاء"
+    GROUP_BATCH_RESULT = "النتيجة"
     BATCH_EMPTY = "القائمة فارغة — أضف ملفات .py للبدء."
     BATCH_SUMMARY_FMT = (
         "الإجمالي: {total} | ✅ نجح: {succeeded} | ❌ فشل: {failed} | "
@@ -546,7 +546,7 @@ class Ar:
     DIALOG_CHOOSE_BATCH_FILES = "اختر ملفات .py للتحويل الدفعي"
 
     # ── Phase 10: update check ──
-    BTN_CHECK_UPDATES = "🔄 التحقق من التحديثات"
+    BTN_CHECK_UPDATES = "التحقق من التحديثات"
     UPDATE_CHECK_ON_START = "التحقق من التحديثات عند بدء التشغيل"
     UPDATE_AVAILABLE_FMT = (
         "يتوفر إصدار جديد: {version} (الحالي {current}).\n\n"
@@ -560,17 +560,17 @@ class Ar:
     LOG_UPDATE_FAILED = "⚠️ تعذّر التحقق من التحديثات (تحقق من الاتصال)"
 
     # ── Phase 10: presets ──
-    GROUP_PRESETS = "⭐ الإعدادات المحفوظة (Presets)"
+    GROUP_PRESETS = "الإعدادات المحفوظة (Presets)"
     PRESETS_HINT = (
         "احفظ الإعدادات الحالية باسم لاستعادتها لاحقاً بنقرة واحدة، "
         "بدل البحث عن ملف JSON في كل مرة."
     )
     PRESET_NONE = "— لا توجد إعدادات محفوظة —"
-    BTN_PRESET_SAVE = "💾 حفظ باسم"
-    BTN_PRESET_APPLY = "📥 تطبيق"
-    BTN_PRESET_DELETE = "🗑️ حذف"
-    BTN_PRESET_EXPORT = "📤 تصدير الكل"
-    BTN_PRESET_IMPORT = "📥 استيراد"
+    BTN_PRESET_SAVE = "حفظ باسم"
+    BTN_PRESET_APPLY = "تطبيق"
+    BTN_PRESET_DELETE = "حذف"
+    BTN_PRESET_EXPORT = "تصدير الكل"
+    BTN_PRESET_IMPORT = "استيراد"
     PRESET_NAME_PROMPT = "اسم الإعداد:"
     PRESET_SAVED_FMT = "⭐ تم حفظ الإعداد: {name}"
     PRESET_APPLIED_FMT = "📥 تم تطبيق الإعداد: {name}"
@@ -585,7 +585,7 @@ class Ar:
     DIALOG_IMPORT_PRESETS = "استيراد إعدادات محفوظة"
 
     # ── 1.3: project doctor and diagnostics ──
-    TAB_DOCTOR = "🩺 طبيب المشروع"
+    TAB_DOCTOR = "طبيب المشروع"
     DOCTOR_SCORE_FMT = "درجة الجاهزية: {score}/100"
     DOCTOR_SCORE_NONE = "درجة الجاهزية: —"
     DOCTOR_SUMMARY_FMT = "{errors} خطأ · {warnings} تحذير · {infos} ملاحظة"
@@ -596,23 +596,23 @@ class Ar:
     )
     DOCTOR_NO_SOURCE = "اختر ملف المصدر في التبويب الرئيسي ليبدأ الفحص."
     DOCTOR_ALL_CLEAR = "✅ لا مشاكل معروفة — مشروعك جاهز للبناء"
-    BTN_DOCTOR_EXAMINE = "🔍 افحص الآن"
-    BTN_DOCTOR_APPLY = "✅ طبّق الإصلاحات المحددة"
-    BTN_DOCTOR_APPLY_REBUILD = "🔁 طبّق وأعد البناء"
-    BTN_DOCTOR_DIAGNOSE = "🧪 تشغيل تشخيصي"
+    BTN_DOCTOR_EXAMINE = "افحص الآن"
+    BTN_DOCTOR_APPLY = "طبّق الإصلاحات المحددة"
+    BTN_DOCTOR_APPLY_REBUILD = "طبّق وأعد البناء"
+    BTN_DOCTOR_DIAGNOSE = "تشغيل تشخيصي"
     BTN_DOCTOR_DIAGNOSE_TIP = (
         "التطبيق بلا Console يُخفي رسالة الخطأ عند انهياره. هذا الزر يبني نسخة "
         "تشخيصية مع Console في مجلد جانبي، يشغّلها، ويقرأ الخطأ الحقيقي."
     )
-    BTN_DOCTOR_COPY = "📋 نسخ الكود"
-    BTN_DOCTOR_COPY_PIP = "📋 نسخ أمر التثبيت"
+    BTN_DOCTOR_COPY = "نسخ الكود"
+    BTN_DOCTOR_COPY_PIP = "نسخ أمر التثبيت"
     DOCTOR_COPIED = "📋 تم النسخ إلى الحافظة"
     DOCTOR_FIXES_HEADER = "الإصلاح التلقائي:"
     DOCTOR_MANUAL_HEADER = "يتطلب تعديلاً منك — انسخ الكود التالي:"
     DOCTOR_PIP_HEADER = "ثبّت المكتبة في بايثون الذي يبني التطبيق:"
     DOCTOR_NOTE_HEADER = "ملاحظة:"
     DOCTOR_NOTHING_SELECTED = "لم تحدد أي إصلاح قابل للتطبيق"
-    DOCTOR_READINESS_BTN_FMT = "🩺 {score}/100"
+    DOCTOR_READINESS_BTN_FMT = "{score}/100"
     DOCTOR_READINESS_TIP = "درجة جاهزية المشروع للتحويل — اضغط لعرض التفاصيل"
     LOG_DOCTOR_FIX_APPLIED = "🩺 تم تطبيق: {fix}"
     LOG_DOCTOR_PREBUILD = (
@@ -783,24 +783,24 @@ class Ar:
     )
 
     # ── 1.3: icon studio ──
-    BTN_ICON_STUDIO = "🎨"
-    ICON_STUDIO_TITLE = "🎨 استوديو الأيقونات"
+    BTN_ICON_STUDIO = ""
+    ICON_STUDIO_TITLE = "استوديو الأيقونات"
     ICON_STUDIO_HINT = (
         "أنشئ ملف .ico حقيقياً بكل الأحجام التي يطلبها Windows "
         "(16 إلى 256) من صورة، أو من حروف اسم برنامجك."
     )
     ICON_STUDIO_FROM_IMAGE = "من صورة"
     ICON_STUDIO_FROM_TEXT = "من حروف"
-    ICON_STUDIO_CHOOSE_IMAGE = "📂 اختر صورة"
+    ICON_STUDIO_CHOOSE_IMAGE = "اختر صورة"
     ICON_STUDIO_IMAGE_FILTER = "Images (*.png *.jpg *.jpeg *.bmp *.gif *.svg *.webp);;All Files (*.*)"
     ICON_STUDIO_TEXT_LABEL = "النص (حرف أو حرفان):"
-    ICON_STUDIO_COLOR = "🎨 لون الخلفية"
+    ICON_STUDIO_COLOR = "لون الخلفية"
     ICON_STUDIO_SHAPE_LABEL = "الشكل:"
     ICON_STUDIO_SHAPE_ROUNDED = "مربع بزوايا دائرية"
     ICON_STUDIO_SHAPE_CIRCLE = "دائرة"
     ICON_STUDIO_SHAPE_SQUARE = "مربع"
     ICON_STUDIO_PREVIEW = "معاينة:"
-    ICON_STUDIO_SAVE = "💾 حفظ واستخدام الأيقونة"
+    ICON_STUDIO_SAVE = "حفظ واستخدام الأيقونة"
     ICON_STUDIO_SAVE_DIALOG = "حفظ الأيقونة"
     ICON_STUDIO_ICO_FILTER = "Icon Files (*.ico)"
     ICON_STUDIO_NOTHING = "اختر صورة أو اكتب نصاً أولاً"
@@ -809,8 +809,8 @@ class Ar:
     LOG_ICON_STUDIO_SAVED = "🎨 تم إنشاء الأيقونة ({sizes}): {path}"
 
     # ── 1.4: build environment, size lab, build report, sandbox ──
-    TAB_SIZE = "⚖️ الحجم والبيئة"
-    GROUP_BUILD_ENV = "🧪 بيئة البناء"
+    TAB_SIZE = "الحجم والبيئة"
+    GROUP_BUILD_ENV = "بيئة البناء"
     ENV_HINT = (
         "PyInstaller يضمّن كل ما يجده مثبتاً، فالبناء من بايثون مليء بالمكتبات "
         "يضخّم الـ EXE. البيئة المعزولة تحوي فقط ما يستورده مشروعك."
@@ -829,14 +829,14 @@ class Ar:
     ENV_REQ_FROM_FILE = "ملف {file}"
     ENV_REQ_NONE = "لا مكتبات خارجية — PyInstaller فقط"
     ENV_UV_NOTE = "⚡ سيُستخدم uv لتسريع إنشاء البيئة"
-    BTN_ENV_CREATE = "🔧 إنشاء / تحديث البيئة"
-    BTN_ENV_RECREATE = "♻️ إعادة الإنشاء من الصفر"
-    BTN_ENV_LOCK = "🔒 حفظ ملف القفل"
+    BTN_ENV_CREATE = "إنشاء / تحديث البيئة"
+    BTN_ENV_RECREATE = "إعادة الإنشاء من الصفر"
+    BTN_ENV_LOCK = "حفظ ملف القفل"
     BTN_ENV_LOCK_TIP = (
         "يحفظ الإصدارات الدقيقة للمكتبات في p2e-build.lock بجوار مشروعك، فتُعاد "
         "البيئة نفسها تماماً على أي جهاز."
     )
-    BTN_ENV_DELETE = "🗑️ حذف البيئة"
+    BTN_ENV_DELETE = "حذف البيئة"
     MSG_ENV_CONFIRM = (
         "سيتم تنفيذ الأوامر التالية (تحتاج اتصالاً بالإنترنت لتنزيل الحزم):\n\n"
         "{commands}\n\nمتابعة؟"
@@ -862,7 +862,7 @@ class Ar:
     LOG_ENV_PYTHON = "🐍 البناء باستخدام: {python}"
     ERR_ENV_PYTHON_MISSING = "مفسّر بايثون غير موجود: {path}"
 
-    GROUP_SIZE = "📏 مختبر الحجم — آخر بناء"
+    GROUP_SIZE = "مختبر الحجم — آخر بناء"
     SIZE_NONE = "ابنِ مشروعك ليظهر هنا ما بداخل الـ EXE وحجم كل مكتبة."
     SIZE_SUMMARY_FMT = "الحجم على القرص: {disk} · المحتوى قبل الضغط: {content}"
     SIZE_COMPARE_FMT = "مقارنة بالبناء السابق ({previous}): {change}"
@@ -881,20 +881,20 @@ class Ar:
         "🐢 ملف واحد بحجم {size} يفك نفسه عند كل تشغيل فيبطؤ إقلاعه. وضع المجلد مع "
         "مثبّت يقلع فوراً."
     )
-    GROUP_SIZE_SUGGESTIONS = "✂️ مقترحات التنحيف"
+    GROUP_SIZE_SUGGESTIONS = "مقترحات التنحيف"
     SIZE_SUGGESTIONS_NONE = "لا مقترحات — لا توجد في الـ EXE مكتبات معروفة يمكن استبعادها."
     SIZE_SUGGESTIONS_HINT = (
         "مكتبات داخل الـ EXE لا يستوردها كودك. استبعادها آمن غالباً، وأي خطأ بعد "
         "إعادة البناء سيلتقطه طبيب المشروع."
     )
-    BTN_SIZE_APPLY = "✅ استبعد المحدد"
-    BTN_SIZE_APPLY_REBUILD = "🔁 استبعد وأعد البناء"
-    BTN_SIZE_REFRESH = "🔄 حلّل آخر بناء"
+    BTN_SIZE_APPLY = "استبعد المحدد"
+    BTN_SIZE_APPLY_REBUILD = "استبعد وأعد البناء"
+    BTN_SIZE_REFRESH = "حلّل آخر بناء"
     LOG_SIZE_SUMMARY = "📏 الحجم: {disk} — التفاصيل في تبويب «الحجم والبيئة»"
 
-    GROUP_REPORT = "📄 تقرير البناء"
+    GROUP_REPORT = "تقرير البناء"
     REPORT_AUTO = "إنشاء تقرير HTML بعد كل بناء ناجح"
-    BTN_REPORT_OPEN = "📄 فتح آخر تقرير"
+    BTN_REPORT_OPEN = "فتح آخر تقرير"
     LOG_REPORT_SAVED = "📄 تقرير البناء: {path}"
     LOG_REPORT_FAILED = "❌ تعذّر كتابة التقرير: {error}"
     REPORT_TITLE = "تقرير البناء"
@@ -930,7 +930,7 @@ class Ar:
     REPORT_NONE = "لا شيء"
     REPORT_GENERATOR_FMT = "أُنشئ بواسطة {app} {version}"
 
-    BTN_SANDBOX = "🧊 اختبار في Windows Sandbox"
+    BTN_SANDBOX = "اختبار في Windows Sandbox"
     BTN_SANDBOX_TIP = (
         "يشغّل الـ EXE على نسخة Windows نظيفة تماماً (بلا بايثون ولا مكتباتك) "
         "لكشف مشاكل «يعمل عندي فقط»."
@@ -955,18 +955,18 @@ class Ar:
     )
 
     # ── 1.5: Runtime Kit ──
-    TAB_RUNTIME = "🧰 مكتبة التشغيل"
+    TAB_RUNTIME = "مكتبة التشغيل"
     KIT_HINT = (
         "خدمات تُضمَّن داخل البرنامج الناتج نفسه، وكل خدمة تُفعَّل وحدها. لا شيء مفعّل "
         "افتراضياً، ولا قياس استخدام من أي نوع، ولا اتصال بالشبكة إلا إن ضبطت رابط تحديث "
         "بنفسك. لا يُعدَّل كودك: ما يحتاج سطراً منك يظهر ككود جاهز للنسخ."
     )
-    GROUP_KIT_SERVICES = "🧩 الخدمات"
-    KIT_NAME_RESOURCE_PATH = "📁 مسارات الملفات المضمّنة"
-    KIT_NAME_LOG_REDIRECT = "📝 ملف سجل للتطبيق بلا نافذة أوامر"
-    KIT_NAME_CRASH_REPORTER = "🧯 مُبلِّغ الانهيار"
-    KIT_NAME_SINGLE_INSTANCE = "🔒 نسخة واحدة فقط"
-    KIT_NAME_UPDATER = "🔄 محدِّث ذاتي موقَّع"
+    GROUP_KIT_SERVICES = "الخدمات"
+    KIT_NAME_RESOURCE_PATH = "مسارات الملفات المضمّنة"
+    KIT_NAME_LOG_REDIRECT = "ملف سجل للتطبيق بلا نافذة أوامر"
+    KIT_NAME_CRASH_REPORTER = "مُبلِّغ الانهيار"
+    KIT_NAME_SINGLE_INSTANCE = "نسخة واحدة فقط"
+    KIT_NAME_UPDATER = "محدِّث ذاتي موقَّع"
     KIT_DESC_RESOURCE_PATH = (
         "الدالة resource_path() تجد الملفات المضمّنة في التطوير وبعد التحويل: "
         "from p2e_runtime import resource_path"
@@ -989,7 +989,7 @@ class Ar:
     KIT_INSTANCE_MESSAGE_LABEL = "رسالة النسخة الثانية:"
     KIT_INSTANCE_MESSAGE_PLACEHOLDER = "اتركها فارغة لرسالة «{app} يعمل بالفعل»"
 
-    GROUP_KIT_UPDATER = "🔄 المحدِّث الموقَّع"
+    GROUP_KIT_UPDATER = "المحدِّث الموقَّع"
     KIT_UPDATE_URL_LABEL = "رابط update.json:"
     KIT_UPDATE_URL_PLACEHOLDER = "https://example.com/myapp/update.json"
     KIT_APP_VERSION_LABEL = "إصدار هذا البناء:"
@@ -1011,12 +1011,12 @@ class Ar:
     )
     KIT_PUBLIC_KEY_LABEL = "المفتاح العام المضمَّن:"
     KIT_PUBLIC_KEY_PLACEHOLDER = "64 خانة ست عشرية — يُملأ من مفتاحك"
-    BTN_KIT_USE_MY_KEY = "🔑 استخدم مفتاحي"
+    BTN_KIT_USE_MY_KEY = "استخدم مفتاحي"
     KIT_KEY_STATUS_NONE = "لا يوجد مفتاح توقيع بعد. أنشئ زوج مفاتيح لتتمكن من نشر التحديثات."
     KIT_KEY_STATUS_FMT = "مفتاحك: {fingerprint}… — المفتاح الخاص محفوظ في:\n{path}"
-    BTN_KIT_KEY_GENERATE = "🔐 إنشاء زوج مفاتيح"
-    BTN_KIT_KEY_EXPORT = "💾 نسخة احتياطية"
-    BTN_KIT_KEY_IMPORT = "📥 استيراد مفتاح"
+    BTN_KIT_KEY_GENERATE = "إنشاء زوج مفاتيح"
+    BTN_KIT_KEY_EXPORT = "نسخة احتياطية"
+    BTN_KIT_KEY_IMPORT = "استيراد مفتاح"
     MSG_KIT_KEY_REPLACE_CONFIRM = (
         "⚠️ يوجد مفتاح توقيع بالفعل ({fingerprint}…).\n\n"
         "البرامج التي وزّعتها بالمفتاح الحالي لن تقبل أي تحديث موقَّع بمفتاح جديد — "
@@ -1045,7 +1045,7 @@ class Ar:
     ERR_KIT_KEY_WRITE = "تعذّر حفظ المفتاح: {error}"
     ERR_KIT_NO_KEY = "لا يوجد مفتاح توقيع. أنشئ زوج مفاتيح أو استورده أولاً."
 
-    GROUP_KIT_PUBLISH = "📦 نشر تحديث"
+    GROUP_KIT_PUBLISH = "نشر تحديث"
     KIT_PUBLISH_HINT = (
         "يُنشئ update.json وupdate.json.sig بجوار الملف. لا يُرفع شيء: ضع الملفين مع "
         "البناء الجديد على خادمك (النشر على GitHub Releases في الإصدار 1.6)."
@@ -1060,7 +1060,7 @@ class Ar:
     KIT_PUBLISH_MIN_VERSION_LABEL = "أقدم إصدار يُحدَّث مباشرة:"
     KIT_PUBLISH_MIN_VERSION_PLACEHOLDER = "اختياري"
     KIT_PUBLISH_NOTES_LABEL = "ملاحظات الإصدار:"
-    BTN_KIT_PUBLISH = "✍️ إنشاء update.json موقَّع"
+    BTN_KIT_PUBLISH = "إنشاء update.json موقَّع"
     LOG_KIT_PUBLISHED = "✍️ ملفات التحديث: {manifest} و {signature}"
     MSG_KIT_PUBLISHED_FMT = (
         "أُنشئ ووُقِّع:\n{manifest}\n{signature}\n\nارفعهما مع الملف الجديد بحيث يكون "
@@ -1068,7 +1068,7 @@ class Ar:
     )
     ERR_KIT_PUBLISH_FMT = "تعذّر إنشاء ملفات التحديث: {error}"
 
-    GROUP_KIT_PREVIEW = "👁️ ما سيُضمَّن في الـ EXE"
+    GROUP_KIT_PREVIEW = "ما سيُضمَّن في الـ EXE"
     KIT_PREVIEW_HOOK = "Runtime hook"
     KIT_PREVIEW_CONFIG = "p2e_runtime.json"
     KIT_PREVIEW_NONE = "لا خدمة مفعّلة — لن يُضمَّن شيء في الـ EXE."
@@ -1095,7 +1095,7 @@ class Ar:
 
     FIX_LABEL_RUNTIME = "التفعيل في مكتبة التشغيل: {value}"
     DOCTOR_ALT_HEADER = "أو بدلاً من ذلك:"
-    BTN_DOCTOR_ALT_FMT = "🔀 بدلاً من ذلك: {fix}"
+    BTN_DOCTOR_ALT_FMT = "بدلاً من ذلك: {fix}"
     REPORT_RUNTIME_KIT = "مكتبة التشغيل المدمجة"
 
     FINDING_KIT_IMPORTED_NOT_ENABLED_TITLE = "الكود يستورد p2e_runtime ومكتبة التشغيل معطّلة"
@@ -1136,15 +1136,15 @@ class Ar:
 
     # ── 1.6: ملف المشروع وسطر الأوامر والإصدار ─────────────────────────
     WINDOW_TITLE_PROJECT_FMT = "{project}[*] — {app}"
-    TAB_RELEASE = "🚀 الإصدار"
+    TAB_RELEASE = "الإصدار"
     MENU_PROJECT = "المشروع"
-    MENU_NEW_PROJECT = "📄 مشروع جديد"
-    MENU_OPEN_PROJECT = "📂 فتح مشروع…"
-    MENU_RECENT_PROJECTS = "🕓 المشاريع الأخيرة"
+    MENU_NEW_PROJECT = "مشروع جديد"
+    MENU_OPEN_PROJECT = "فتح مشروع…"
+    MENU_RECENT_PROJECTS = "المشاريع الأخيرة"
     MENU_RECENT_EMPTY = "لا توجد مشاريع حديثة"
-    MENU_SAVE_PROJECT = "💾 حفظ المشروع"
-    MENU_SAVE_PROJECT_AS = "💾 حفظ المشروع باسم…"
-    MENU_INIT_PROJECT = "🧩 إنشاء مشروع من هذا السكربت"
+    MENU_SAVE_PROJECT = "حفظ المشروع"
+    MENU_SAVE_PROJECT_AS = "حفظ المشروع باسم…"
+    MENU_INIT_PROJECT = "إنشاء مشروع من هذا السكربت"
     DIALOG_OPEN_PROJECT = "فتح ملف مشروع"
     DIALOG_SAVE_PROJECT = "حفظ ملف المشروع"
     DIALOG_FILTER_PROJECT = "Project (p2e.toml *.toml);;All Files (*.*)"
@@ -1173,24 +1173,24 @@ class Ar:
 
     # Release tab
     RELEASE_HINT = "من رفع الإصدار إلى نشره على GitHub في خطوة واحدة. «تجربة دون تنفيذ» تعرض كل ما سيحدث دون أن تغيّر شيئاً، ولا يُنشأ وسم ولا يُرفع ملف قبل تأكيدك."
-    GROUP_RELEASE_VERSION = "🔢 الإصدار"
+    GROUP_RELEASE_VERSION = "الإصدار"
     RELEASE_VERSION_LABEL = "رقم الإصدار:"
     RELEASE_VERSION_PLACEHOLDER = "مثل 1.2.3"
     BTN_BUMP_PATCH = "+ تصحيح (patch)"
     BTN_BUMP_MINOR = "+ ثانوي (minor)"
     BTN_BUMP_MAJOR = "+ رئيسي (major)"
-    BTN_APPLY_VERSION = "✅ طبّق على كل التبويبات"
+    BTN_APPLY_VERSION = "طبّق على كل التبويبات"
     BTN_APPLY_VERSION_TIP = "يكتب الرقم في معلومات الإصدار والمثبّت ومكتبة التشغيل معاً"
     RELEASE_MISMATCH_FMT = "⚠️ أرقام الإصدار غير متطابقة:\n{rows}"
     RELEASE_MISMATCH_ROW = "• {field}: {value} (المتوقع {expected})"
-    GROUP_RELEASE_NOTES = "📝 ملاحظات الإصدار"
+    GROUP_RELEASE_NOTES = "ملاحظات الإصدار"
     RELEASE_NOTES_HINT = "تُكتب مسودة من رسائل git منذ آخر وسم، مجمّعة حسب البادئة (feat، fix…). عدّلها قبل النشر."
     RELEASE_NOTES_PLACEHOLDER = "اتركها فارغة لتُكتب المسودة تلقائياً عند التجربة"
-    BTN_DRAFT_NOTES = "✍️ مسودة من git"
-    BTN_LOAD_NOTES = "📂 من ملف…"
-    GROUP_RELEASE_GITHUB = "🐙 GitHub Releases"
+    BTN_DRAFT_NOTES = "مسودة من git"
+    BTN_LOAD_NOTES = "من ملف…"
+    GROUP_RELEASE_GITHUB = "GitHub Releases"
     RELEASE_REPOSITORY_LABEL = "المستودع:"
-    BTN_DETECT_REPOSITORY = "🔍 من git"
+    BTN_DETECT_REPOSITORY = "من git"
     RELEASE_TAG_PREFIX_LABEL = "بادئة الوسم:"
     RELEASE_DRAFT = "مسودة (Draft)"
     RELEASE_PRERELEASE = "إصدار تجريبي (Pre-release)"
@@ -1205,12 +1205,12 @@ class Ar:
     RELEASE_TOKEN_FROM_KEYRING = "✅ محفوظ في مخزن كلمات المرور لنظام التشغيل"
     RELEASE_TOKEN_FROM_ENV = "✅ من متغير البيئة GITHUB_TOKEN"
     RELEASE_TOKEN_NONE = "لا يوجد رمز. احفظه هنا، ويتطلب ذلك الحزمة keyring، أو عيّن المتغير GITHUB_TOKEN. لا يُكتب الرمز في الإعدادات ولا في المشروع ولا في السجل."
-    BTN_SAVE_TOKEN = "🔐 حفظ في مخزن النظام"
-    BTN_FORGET_TOKEN = "🗑️ حذف"
+    BTN_SAVE_TOKEN = "حفظ في مخزن النظام"
+    BTN_FORGET_TOKEN = "حذف"
     ERR_TOKEN_STORE = "تعذّر حفظ الرمز في مخزن كلمات المرور:\n{error}"
     LOG_TOKEN_SAVED = "🔐 حُفظ رمز GitHub في مخزن كلمات المرور"
     LOG_TOKEN_FORGOTTEN = "🗑️ حُذف رمز GitHub من مخزن كلمات المرور"
-    GROUP_RELEASE_WINGET = "📦 winget"
+    GROUP_RELEASE_WINGET = "winget"
     RELEASE_WINGET_HINT = "تُولَّد ملفات manifest الثلاثة لـ winget (المخطط 1.28.0) برابط المثبّت وبصمته الحقيقيين. لا يُرسل شيء: قدّمها أنت إلى winget-pkgs."
     RELEASE_WINGET_ENABLE = "توليد manifest لـ winget"
     RELEASE_WINGET_IDENTIFIER = "المعرّف:"
@@ -1218,15 +1218,15 @@ class Ar:
     RELEASE_WINGET_LICENSE = "الرخصة:"
     RELEASE_WINGET_DESCRIPTION = "وصف قصير:"
     RELEASE_WINGET_LOCALE = "اللغة:"
-    GROUP_RELEASE_STEPS = "✅ الخطوات"
+    GROUP_RELEASE_STEPS = "الخطوات"
     RELEASE_DRY_RUN = "تجربة دون تنفيذ"
     RELEASE_DRY_RUN_TIP = "يعرض كل خطوة وما ستُنشئه وترفعه، دون أي تغيير"
     RELEASE_CREATE_TAG = "إنشاء وسم git"
     RELEASE_PUSH_TAG = "دفع الوسم إلى المستودع البعيد"
     RELEASE_PUBLISH = "النشر على GitHub"
     RELEASE_ALLOW_DOCTOR_ERRORS = "المتابعة رغم أخطاء الطبيب"
-    BTN_START_RELEASE = "🚀 ابدأ"
-    BTN_OPEN_RELEASE_FOLDER = "📂 مجلد الإصدار"
+    BTN_START_RELEASE = "ابدأ"
+    BTN_OPEN_RELEASE_FOLDER = "مجلد الإصدار"
     ERR_RELEASE_VERSION = "رقم الإصدار «{version}» ليس بصيغة MAJOR.MINOR.PATCH (مثل 1.2.3)."
     ERR_RELEASE_ENV = "البناء في بيئة معزولة لم تُنشأ بعد. أنشئها من تبويب الحجم والبيئة أولاً."
     LOG_RELEASE_PLANNING = "📋 تخطيط الإصدار {version}…"
@@ -1243,14 +1243,14 @@ class Ar:
     RELEASE_CONFIRM_HEADING = "سيُنفَّذ الإصدار {version} كما يلي بالضبط:"
     RELEASE_CONFIRM_NOTE = "لا يحدث أي شيء مما سبق قبل الضغط على «أصدِر». الرمز وكلمة مرور الشهادة لا يظهران في أي سجل."
     RELEASE_CONFIRM_NOTHING = "لا شيء سيُنشأ أو يُرفع."
-    RELEASE_CONFIRM_CREATED = "📁 ملفات ستُكتب:"
-    RELEASE_CONFIRM_COMMANDS = "⚙️ أوامر ستُنفَّذ:"
-    RELEASE_CONFIRM_COMMITS = "📝 إيداع رقم الإصدار الجديد في git للملف:"
-    RELEASE_CONFIRM_TAGS = "🏷️ وسم git سيُنشأ:"
-    RELEASE_CONFIRM_PUSHES = "⬆️ وسم سيُدفع إلى المستودع البعيد:"
-    RELEASE_CONFIRM_RELEASES = "🐙 إصدار GitHub سيُنشأ (أو يُستكمل):"
-    RELEASE_CONFIRM_UPLOADS = "⬆️ ملفات ستُرفع:"
-    BTN_CONFIRM_RELEASE = "🚀 أصدِر"
+    RELEASE_CONFIRM_CREATED = "ملفات ستُكتب:"
+    RELEASE_CONFIRM_COMMANDS = "أوامر ستُنفَّذ:"
+    RELEASE_CONFIRM_COMMITS = "إيداع رقم الإصدار الجديد في git للملف:"
+    RELEASE_CONFIRM_TAGS = "وسم git سيُنشأ:"
+    RELEASE_CONFIRM_PUSHES = "وسم سيُدفع إلى المستودع البعيد:"
+    RELEASE_CONFIRM_RELEASES = "إصدار GitHub سيُنشأ (أو يُستكمل):"
+    RELEASE_CONFIRM_UPLOADS = "ملفات ستُرفع:"
+    BTN_CONFIRM_RELEASE = "أصدِر"
     BTN_CANCEL_RELEASE = "إلغاء"
     RELEASE_STEP_VERSION = "رفع الإصدار"
     RELEASE_STEP_NOTES = "ملاحظات الإصدار"
@@ -1516,7 +1516,7 @@ class Ar:
         "مكتبة التشغيل تُضمَّن عبر --runtime-hook الخاص بـ PyInstaller، ولا مقابل له في "
         "{engine}. أطفئ خدمات مكتبة التشغيل أو ابنِ بـ PyInstaller."
     )
-    BTN_ALLOW_DOWNLOAD_REBUILD = "📥 اسمح بالتنزيل وأعد البناء"
+    BTN_ALLOW_DOWNLOAD_REBUILD = "اسمح بالتنزيل وأعد البناء"
     CLI_DOWNLOAD_CONFIRM = "Nuitka يطلب تنزيل {tool} (لهذا البناء فقط، --assume-yes-for-downloads)."
     CLI_ENGINE_MISSING = "❌ {engine} غير مثبّت في {python}. ثبّته: {cmd}"
 
@@ -1528,14 +1528,14 @@ class Ar:
 
 
     # ── 2.0: وضع المقارنة وقياس الإقلاع ─────────────────────────────────
-    COMPARE_GROUP = "🏁 مقارنة المحركات"
+    COMPARE_GROUP = "مقارنة المحركات"
     COMPARE_INTRO = (
         "يبني المشروع بكل محرك في مجلد منفصل ({folder}) دون أن يمس البناء الأصلي، ثم يقيس "
         "الحجم وزمن البناء وزمن الإقلاع (وسيط عدة تشغيلات، مع طريقة القياس) واختبار التشغيل."
     )
     COMPARE_RUNS_LABEL = "مرات القياس:"
     COMPARE_TIMEOUT_LABEL = "مهلة كل تشغيل (ثانية):"
-    BTN_COMPARE = "🏁 ابنِ بالمحركين وقارن"
+    BTN_COMPARE = "ابنِ بالمحركين وقارن"
     COMPARE_ENGINE_HEADER = "المحرك"
     COMPARE_ROW_STATUS = "البناء"
     COMPARE_ROW_SIZE = "الحجم على القرص"
@@ -1593,9 +1593,9 @@ class Ar:
     FEATURE_DEB = "حزمة .deb"
     FEATURE_DMG = "صورة .dmg"
 
-    TAB_PLATFORMS = "🌍 المنصات"
+    TAB_PLATFORMS = "المنصات"
     PLATFORMS_HINT = "حزم Linux وmacOS من البناء نفسه، وملف GitHub Actions يبني مشروعك على Windows وmacOS وLinux معاً وينشر إصداراً عند دفع وسم."
-    GROUP_PACKAGES = "📦 حزم Linux && macOS"
+    GROUP_PACKAGES = "حزم Linux && macOS"
     PACKAGES_HINT = "AppImage (ملف واحد يعمل على معظم التوزيعات) و.deb (Debian/Ubuntu) يُبنيان على Linux بأداتي appimagetool وdpkg-deb، و.dmg يُبنى على macOS بـ hdiutil. تُحفظ الحزم مع ملفات الإصدار في release/<الإصدار>/، وتُرفع مع الإصدار على GitHub."
     PACKAGE_APPIMAGE = "AppImage (Linux)"
     PACKAGE_DEB = ".deb (Debian/Ubuntu)"
@@ -1611,8 +1611,8 @@ class Ar:
     PACKAGE_CATEGORIES_PLACEHOLDER = "Utility;Development"
     PACKAGE_IDENTIFIER_PLACEHOLDER = "com.example.app"
     PACKAGE_DESCRIPTION_PLACEHOLDER = "سطر قصير يظهر في مدير الحزم وفي القائمة"
-    BTN_BUILD_PACKAGES = "📦 ابنِ الحزم من آخر بناء"
-    BTN_OPEN_PACKAGES_FOLDER = "📂 افتح مجلد الحزم"
+    BTN_BUILD_PACKAGES = "ابنِ الحزم من آخر بناء"
+    BTN_OPEN_PACKAGES_FOLDER = "افتح مجلد الحزم"
     MSG_PACKAGES_NO_BUILD = "لا يوجد بناء لهذا المشروع. ابنِ البرنامج أولاً ثم ابنِ الحزم."
     MSG_PACKAGES_NONE_SELECTED = "لم تختر أي صيغة حزمة."
     MSG_PACKAGES_NONE_HERE = "لا شيء من الصيغ المختارة يُبنى على {platform}. يبنيها workflow الـ CI على المشغّل المناسب."
@@ -1629,7 +1629,7 @@ class Ar:
     PACKAGES_RESULT_FAILED = "فشلت حزمة واحدة على الأقل، راجع السجل."
     PACKAGES_RESULT_NONE = ""
 
-    GROUP_CI = "🤖 GitHub Actions"
+    GROUP_CI = "GitHub Actions"
     CI_HINT = "يولّد .github/workflows/p2e-release.yml في مستودعك: مصفوفة Windows وmacOS وLinux تثبّت سطر أوامر هذه الأداة وتشغّل release على p2e.toml، مع تخزين مؤقت لـ pip والبناء، ورفع الملفات كـ artifacts، ومهمة تنشئ إصدار GitHub عند دفع وسم v*. الأسرار تُذكر بالاسم فقط ولا تُكتب أبداً في الملف."
     CI_PYTHON_LABEL = "إصدار Python على المشغّل:"
     CI_SIGN_WINDOWS = "توقيع Windows من سر (WINDOWS_CERT_BASE64 وWINDOWS_CERT_PASSWORD)"
@@ -1637,16 +1637,16 @@ class Ar:
     CI_ALLOW_DOCTOR_ERRORS = "لا تُوقف البناء عند أخطاء الطبيب (--allow-doctor-errors)"
     CI_TOOL_LABEL = "تثبيت الأداة من:"
     CI_SECRETS_NOTE = "الأسرار تُضاف في Settings → Secrets and variables → Actions، ويشير إليها الملف بـ ${{ secrets.NAME }} فقط."
-    BTN_GENERATE_CI = "🤖 عاين واكتب ملف workflow…"
+    BTN_GENERATE_CI = "عاين واكتب ملف workflow…"
     CI_DIALOG_TITLE = "ملف GitHub Actions"
     CI_DIALOG_HEADING = "سيُكتب هذا الملف إلى:\n{path}"
     CI_DIALOG_OVERWRITE_NOTE = "⚠️ الملف موجود وسيُستبدل."
     CI_DIALOG_SECRETS = "الأسرار المذكورة بالاسم فقط: {names}"
     CI_DIALOG_NO_SECRETS = "لا يشير الملف إلى أي سر (التوقيع والتوثيق معطّلان)."
     CI_DIALOG_NOTE = "لا يُكتب شيء قبل أن تضغط «اكتب الملف». راجع الملف كاملاً: يثبّت الأداة من الرابط المذكور ويشغّلها على مشروعك."
-    BTN_WRITE_WORKFLOW = "✅ اكتب الملف"
+    BTN_WRITE_WORKFLOW = "اكتب الملف"
     BTN_CANCEL_WORKFLOW = "إلغاء"
-    BTN_COPY_WORKFLOW = "📋 نسخ"
+    BTN_COPY_WORKFLOW = "نسخ"
     MSG_CI_NEEDS_PROJECT = "احفظ المشروع كملف p2e.toml داخل مستودعك أولاً؛ يُكتب workflow بجواره."
     MSG_CI_BLOCKED = "لا يمكن توليد workflow لهذا المشروع:\n{problems}"
     LOG_CI_WRITTEN = "✅ كُتب ملف workflow: {path}"
@@ -1709,12 +1709,12 @@ class Ar:
     CLI_CI_WRITTEN = "✅ كُتب {path}"
 
     # ── 2.0 milestone 5: offline licensing ──
-    KIT_NAME_LICENSING = "🔑 ترخيص دون إنترنت"
+    KIT_NAME_LICENSING = "ترخيص دون إنترنت"
     KIT_DESC_LICENSING = (
         "مفاتيح ترخيص موقَّعة بـ Ed25519 يتحقق منها برنامجك بالمفتاح العام المضمّن دون أي اتصال: "
         "p2e_runtime.license.check(key). يردع النسخ العَرَضي فقط؛ لا يمنع من يعدّل البرنامج نفسه."
     )
-    GROUP_KIT_LICENSE = "🔑 الترخيص دون إنترنت"
+    GROUP_KIT_LICENSE = "الترخيص دون إنترنت"
     KIT_LICENSE_HONESTY = (
         "⚠️ بصراحة: التحقق يجري داخل البرنامج الموزَّع نفسه. هذا يردع النسخ العَرَضي ويمنع تزوير "
         "المفاتيح دون مفتاحك الخاص، لكن من يملك البرنامج يستطيع إزالة التحقق بتعديل ملفه، وتاريخ "
@@ -1724,16 +1724,16 @@ class Ar:
     KIT_LICENSE_PRODUCT_PLACEHOLDER = "اتركه فارغاً ليُستخدم اسم البرنامج"
     KIT_LICENSE_PUBLIC_KEY_LABEL = "المفتاح العام للترخيص:"
     KIT_LICENSE_PUBLIC_KEY_PLACEHOLDER = "64 خانة ست عشرية — يُملأ من مفتاح الترخيص"
-    BTN_KIT_LICENSE_USE_MY_KEY = "🔑 استخدم مفتاح الترخيص"
+    BTN_KIT_LICENSE_USE_MY_KEY = "استخدم مفتاح الترخيص"
     KIT_LICENSE_KEY_STATUS_NONE = (
         "لا يوجد مفتاح ترخيص بعد. يُنشأ بالزر أدناه (مفتاح مستقل عن مفتاح التحديثات، بنفس "
         "المجلد والصلاحيات)."
     )
     KIT_LICENSE_KEY_STATUS_FMT = "مفتاح الترخيص: {fingerprint}… — المفتاح الخاص محفوظ في:\n{path}"
-    BTN_KIT_LICENSE_KEY_CREATE = "🔐 إنشاء مفتاح الترخيص"
-    BTN_KIT_LICENSE_KEY_EXPORT = "💾 نسخة احتياطية"
-    BTN_KIT_LICENSE_KEY_IMPORT = "📥 استيراد مفتاح"
-    BTN_KIT_LICENSE_ISSUE = "🎫 إصدار مفتاح ترخيص…"
+    BTN_KIT_LICENSE_KEY_CREATE = "إنشاء مفتاح الترخيص"
+    BTN_KIT_LICENSE_KEY_EXPORT = "نسخة احتياطية"
+    BTN_KIT_LICENSE_KEY_IMPORT = "استيراد مفتاح"
+    BTN_KIT_LICENSE_ISSUE = "إصدار مفتاح ترخيص…"
     KIT_LICENSE_API_HINT = (
         "من برنامجك: from p2e_runtime import license ثم info = license.check(key) — تعود None "
         "لمفتاح مزوَّر أو منتهٍ أو لمنتج آخر، وinfo.has_feature('pro') للميزات، "
@@ -1760,7 +1760,7 @@ class Ar:
     ERR_KIT_LICENSE_NO_KEY = "لا يوجد مفتاح ترخيص. أنشئه أو استورده أولاً من تبويب مكتبة التشغيل."
     KIT_LICENSE_NO_EXPIRY = "بلا انتهاء"
 
-    LICENSE_DIALOG_TITLE = "🎫 إصدار مفتاح ترخيص"
+    LICENSE_DIALOG_TITLE = "إصدار مفتاح ترخيص"
     LICENSE_DIALOG_HEADING = (
         "يُوقَّع المفتاح بمفتاحك الخاص على هذا الجهاز الآن ولا يُرسل شيء. برنامجك يتحقق منه "
         "بالمفتاح العام المضمّن في البناء."
@@ -1774,8 +1774,8 @@ class Ar:
     LICENSE_FEATURES_PLACEHOLDER = "مثال: pro, export"
     LICENSE_KEY_LABEL = "مفتاح الترخيص — انسخه وأرسله للعميل:"
     LICENSE_RESULT_FMT = "{name} — {product} — {expiry} — {count} ميزة — {length} حرفاً"
-    BTN_LICENSE_ISSUE = "🎫 إصدار المفتاح"
-    BTN_LICENSE_COPY = "📋 نسخ المفتاح"
+    BTN_LICENSE_ISSUE = "إصدار المفتاح"
+    BTN_LICENSE_COPY = "نسخ المفتاح"
     BTN_LICENSE_CLOSE = "إغلاق"
     MSG_LICENSE_COPIED = "تم نسخ المفتاح إلى الحافظة"
     LICENSE_ERR_NAME_MISSING = "اكتب اسم العميل."
@@ -1825,15 +1825,15 @@ class Ar:
     CLI_LICENSE_NO_FEATURES = "لا شيء"
 
     # ── 2.0: the projects workspace (home view) ──────────────────────────
-    TAB_HOME = "🏠 المشاريع"
+    TAB_HOME = "المشاريع"
     HOME_HINT = "مشاريعك الأخيرة (ملفات p2e.toml) في مكان واحد: آخر بناء ونتيجته، مسار الحجم عبر البناءات الناجحة، وآخر إصدار. «ابنِ» و«أصدر» هنا هما نفس المساران في تبويبي الإعدادات والإصدار، لا نسخة ثانية منهما."
     HOME_EMPTY = "لا مشاريع حديثة بعد. افتح ملف p2e.toml، أو احفظ إعداداتك الحالية كمشروع من قائمة «مشروع»، وسيظهر هنا."
-    BTN_HOME_OPEN_OTHER = "📂 افتح مشروعاً آخر…"
-    BTN_HOME_REFRESH = "🔄 تحديث"
-    BTN_HOME_OPEN = "📂 افتح"
-    BTN_HOME_BUILD = "🔨 ابنِ"
-    BTN_HOME_RELEASE = "🚀 أصدر"
-    BTN_HOME_FORGET = "🗑️ أزل من القائمة"
+    BTN_HOME_OPEN_OTHER = "افتح مشروعاً آخر…"
+    BTN_HOME_REFRESH = "تحديث"
+    BTN_HOME_OPEN = "افتح"
+    BTN_HOME_BUILD = "ابنِ"
+    BTN_HOME_RELEASE = "أصدر"
+    BTN_HOME_FORGET = "أزل من القائمة"
     HOME_VERSION_FMT = "الإصدار {version}"
     HOME_NO_VERSION = "بلا رقم إصدار"
     HOME_ENGINE_FMT = "المحرك: {engine}"
@@ -1950,19 +1950,19 @@ class En:
 
     # Window & tabs
     WINDOW_TITLE_FMT = "{name} v{version}"
-    TAB_MAIN = "⚙️ Main Settings"
-    TAB_ADVANCED = "🔧 Advanced"
-    TAB_TEMPLATES = "📋 Templates"
-    TAB_ABOUT = "ℹ️ About"
+    TAB_MAIN = "Main Settings"
+    TAB_ADVANCED = "Advanced"
+    TAB_TEMPLATES = "Templates"
+    TAB_ABOUT = "About"
 
     # Header
-    HEADER_TITLE = "🐍 Python to EXE Converter"
+    HEADER_TITLE = "Python to EXE Converter"
     HEADER_SUBTITLE = "Convert Python apps to executables with ease"
 
     # Main tab
-    GROUP_SOURCE = "📄 Source File"
+    GROUP_SOURCE = "Source File"
     SOURCE_PLACEHOLDER = "Choose a .py file to convert..."
-    GROUP_OUTPUT = "📤 Output Settings"
+    GROUP_OUTPUT = "Output Settings"
     OUTPUT_NAME_LABEL = "Output file name:"
     OUTPUT_NAME_PLACEHOLDER = "File name without .exe"
     OUTPUT_DIR_LABEL = "Output directory:"
@@ -1970,7 +1970,7 @@ class En:
     ICON_LABEL = "Program icon:"
     ICON_PLACEHOLDER = "Optional - .ico file"
 
-    GROUP_OPTIONS = "⚙️ Build Options"
+    GROUP_OPTIONS = "Build Options"
     OPT_ONEFILE = "Single file (--onefile)"
     OPT_ONEFILE_TIP = "Bundle everything into one EXE"
     OPT_WINDOWED = "No console (--windowed)"
@@ -1985,8 +1985,8 @@ class En:
     OPT_STRIP_TIP = "Strip debug info (smaller output)"
 
     # Logs
-    GROUP_LOG = "📋 Build Log"
-    CLEAR_LOG = "🗑️ Clear Log"
+    GROUP_LOG = "Build Log"
+    CLEAR_LOG = "Clear Log"
     LOG_CHECKING_DEPS = "🔍 Checking dependencies..."
     LOG_PYTHON_FOUND = "✅ Python: {version}"
     LOG_PYTHON_MISSING = "❌ Python not found!"
@@ -2013,14 +2013,14 @@ class En:
     CONV_FAILED_MSG = "Build failed - see log for details"
 
     # Advanced tab
-    GROUP_EXTRA_FILES = "📁 Extra files (--add-data)"
-    BTN_ADD_FILE = "➕ Add file"
-    BTN_ADD_FOLDER = "📂 Add folder"
-    BTN_REMOVE_SELECTED = "🗑️ Remove selected"
-    GROUP_HIDDEN_IMPORTS = "📦 Hidden imports (--hidden-import)"
-    BTN_ADD_IMPORT = "➕ Add module"
-    BTN_AUTO_DETECT = "🔍 Auto-detect"
-    GROUP_EXTRA_OPTS = "🔧 Extra options"
+    GROUP_EXTRA_FILES = "Extra files (--add-data)"
+    BTN_ADD_FILE = "Add file"
+    BTN_ADD_FOLDER = "Add folder"
+    BTN_REMOVE_SELECTED = "Remove selected"
+    GROUP_HIDDEN_IMPORTS = "Hidden imports (--hidden-import)"
+    BTN_ADD_IMPORT = "Add module"
+    BTN_AUTO_DETECT = "Auto-detect"
+    GROUP_EXTRA_OPTS = "Extra options"
     OPT_LEVEL_LABEL = "Optimization level:"
     OPT_LEVELS = ["0 - None", "1 - Basic", "2 - Full"]
     UPX_DIR_LABEL = "UPX directory:"
@@ -2029,17 +2029,17 @@ class En:
     UPX_LEVEL_TIP = "0 = no compression, 9 = maximum"
     UPX_USE = "Use UPX compression"
     UPX_USE_TIP = "Requires UPX installed"
-    GROUP_EXTRA_ARGS = "💻 Extra PyInstaller arguments"
+    GROUP_EXTRA_ARGS = "Extra PyInstaller arguments"
     EXTRA_ARGS_PLACEHOLDER = "Add any additional arguments here..."
 
     # Templates tab
-    GROUP_TEMPLATES = "📋 Available Templates"
+    GROUP_TEMPLATES = "Available Templates"
     TEMPLATES_HINT = "Choose a template to auto-apply suitable settings:"
-    BTN_APPLY_TEMPLATE = "✅ Apply Template"
-    GROUP_SAVE_LOAD = "💾 Save & Load Settings"
+    BTN_APPLY_TEMPLATE = "Apply Template"
+    GROUP_SAVE_LOAD = "Save & Load Settings"
     SAVE_LOAD_HINT = "Save your current settings for later use:"
-    BTN_SAVE_SETTINGS = "💾 Save Settings"
-    BTN_LOAD_SETTINGS = "📂 Load Settings"
+    BTN_SAVE_SETTINGS = "Save Settings"
+    BTN_LOAD_SETTINGS = "Load Settings"
 
     # Dialog
     DIALOG_ADD_IMPORT_TITLE = "Add Hidden Import"
@@ -2060,8 +2060,8 @@ class En:
     DIALOG_FILTER_JSON = "JSON Files (*.json)"
 
     # Log enhancements
-    LOG_SEARCH_PLACEHOLDER = "🔍 Search log..."
-    BTN_EXPORT_LOG = "💾 Export Log"
+    LOG_SEARCH_PLACEHOLDER = "Search log..."
+    BTN_EXPORT_LOG = "Export Log"
     DIALOG_EXPORT_LOG = "Export Log"
     DIALOG_FILTER_LOG = "Log Files (*.log *.txt);;All Files (*.*)"
     LOG_EXPORT_OK = "✅ Log exported: {path}"
@@ -2071,10 +2071,10 @@ class En:
     LOG_DROPPED_EXTRA = "➕ Dropped extra: {path}"
 
     # Dry-run preview
-    BTN_PREVIEW_CMD = "👁️ Preview Command"
+    BTN_PREVIEW_CMD = "Preview Command"
     DIALOG_PREVIEW_TITLE = "PyInstaller Command Preview"
     DIALOG_PREVIEW_HINT = 'This is the command that will run when you click "Start build":'
-    BTN_COPY_CMD = "📋 Copy"
+    BTN_COPY_CMD = "Copy"
     BTN_CLOSE = "Close"
     MSG_COPIED = "Command copied to clipboard"
 
@@ -2089,9 +2089,9 @@ class En:
     PROGRESS_FAILED = "❌ Build failed"
 
     # Buttons
-    BTN_CONVERT = "🚀 Start Build"
-    BTN_CANCEL = "❌ Cancel"
-    BTN_OPEN_FOLDER = "📂 Open Output Folder"
+    BTN_CONVERT = "Start Build"
+    BTN_CANCEL = "Cancel"
+    BTN_OPEN_FOLDER = "Open Output Folder"
 
     # Messages
     MSG_WARNING = "Warning"
@@ -2164,8 +2164,8 @@ class En:
         "A professional tool for converting Python applications into EXE files "
         "using PyInstaller, with an easy-to-use graphical interface"
     )
-    ABOUT_DEVELOPER_LABEL = "👨‍💻 Developer"
-    ABOUT_FEATURES_LABEL = "✨ Features"
+    ABOUT_DEVELOPER_LABEL = "Developer"
+    ABOUT_FEATURES_LABEL = "Features"
     ABOUT_FEATURES = [
         "Convert any Python file to EXE",
         "Add a custom icon",
@@ -2183,13 +2183,13 @@ class En:
     ]
 
     # Language selector
-    LANGUAGE_LABEL = "🌐 Language:"
+    LANGUAGE_LABEL = "Language:"
     LANGUAGE_NATIVE = "English"
     MSG_RESTART_REQUIRED = "Please restart the app to apply the new language."
 
     # Phase 4: Version info editor
-    TAB_VERSION_INFO = "📝 Version Info"
-    GROUP_VERSION_INFO = "📝 EXE Metadata (Windows)"
+    TAB_VERSION_INFO = "Version Info"
+    GROUP_VERSION_INFO = "EXE Metadata (Windows)"
     VERSION_INFO_HINT = "Leave fields blank to skip. Embedded into the resulting EXE's properties."
     VI_COMPANY_NAME = "Company name:"
     VI_FILE_DESCRIPTION = "File description:"
@@ -2202,7 +2202,7 @@ class En:
     VI_PLACEHOLDER_VERSION = "e.g.: 1.0.0.0"
 
     # Phase 4: requirements.txt import
-    BTN_IMPORT_REQUIREMENTS = "📥 Import from requirements.txt"
+    BTN_IMPORT_REQUIREMENTS = "Import from requirements.txt"
     DIALOG_CHOOSE_REQS = "Choose requirements.txt"
     DIALOG_FILTER_REQS = "Requirements (*.txt);;All Files (*.*)"
     LOG_REQS_IMPORTED = "✅ Imported {total} packages from requirements.txt, added {added} new"
@@ -2213,31 +2213,31 @@ class En:
     LOG_REQS_ERROR = "❌ Failed to read requirements.txt: {error}"
 
     # Phase 4: Build history
-    TAB_HISTORY = "🕓 Build History"
-    GROUP_HISTORY = "🕓 Recent Builds"
+    TAB_HISTORY = "Build History"
+    GROUP_HISTORY = "Recent Builds"
     HISTORY_EMPTY = "No previous builds yet."
-    BTN_RESTORE_BUILD = "♻️ Restore Settings"
-    BTN_CLEAR_HISTORY = "🗑️ Clear History"
+    BTN_RESTORE_BUILD = "Restore Settings"
+    BTN_CLEAR_HISTORY = "Clear History"
     HISTORY_CLEARED = "✅ Build history cleared"
     LOG_RESTORED = "✅ Build settings restored from {time}"
 
     # Phase 5: Deployment tab
-    TAB_DEPLOY = "🚀 Deploy"
+    TAB_DEPLOY = "Deploy"
 
-    GROUP_SPLASH = "🖼️ Splash Screen"
+    GROUP_SPLASH = "Splash Screen"
     SPLASH_LABEL = "Splash image:"
     SPLASH_PLACEHOLDER = "Optional - PNG / JPG"
     DIALOG_CHOOSE_SPLASH = "Choose splash image"
     DIALOG_FILTER_IMAGE = "Images (*.png *.jpg *.jpeg *.bmp);;All Files (*.*)"
 
-    GROUP_MANIFEST = "📜 Windows Manifest"
+    GROUP_MANIFEST = "Windows Manifest"
     MANIFEST_HINT = "Generates an XML manifest passed via --manifest at build time."
     MANIFEST_ENABLE = "Generate manifest"
     MANIFEST_DPI = "DPI Aware (PerMonitorV2)"
     MANIFEST_ADMIN = "Require administrator (requireAdministrator)"
     MANIFEST_OS_LABEL = "Supported Windows versions:"
 
-    GROUP_SIGNING = "🔐 Code Signing"
+    GROUP_SIGNING = "Code Signing"
     SIGNING_HINT = "After build, signs the EXE using signtool.exe (Windows-only)."
     SIGNING_ENABLE = "Enable code signing"
     SIGNING_CERT_LABEL = "Certificate file (.pfx):"
@@ -2254,7 +2254,7 @@ class En:
     LOG_SIGNING_FAIL = "❌ Code signing failed: {error}"
     LOG_SIGNING_SKIPPED = "⏭️ Signing skipped: {reason}"
 
-    GROUP_SMOKE = "🧪 Post-build Smoke Test"
+    GROUP_SMOKE = "Post-build Smoke Test"
     SMOKE_ENABLE = "Run built EXE automatically to verify it starts"
     SMOKE_TIMEOUT_LABEL = "Timeout (seconds):"
     LOG_SMOKE_START = "🧪 Testing built executable..."
@@ -2294,15 +2294,15 @@ class En:
     TPL_CUSTOM_DESC = "Fully manual configuration"
 
     # ── Phase 7: Inno Setup installer ──────────────────────────────────
-    TAB_INSTALLER = "📦 Installer"
-    GROUP_INSTALLER = "📦 Build an installer (Inno Setup)"
+    TAB_INSTALLER = "Installer"
+    GROUP_INSTALLER = "Build an installer (Inno Setup)"
     INSTALLER_HINT = (
         "Produce a professional Setup.exe right after the build. "
         "Requires Inno Setup 6 to be installed on this machine."
     )
     INSTALLER_ENABLE = "Build the installer automatically after a successful build"
 
-    GROUP_INSTALLER_IDENTITY = "🪪 Application identity"
+    GROUP_INSTALLER_IDENTITY = "Application identity"
     INST_APP_NAME_LABEL = "Application name:"
     INST_APP_NAME_PLACEHOLDER = "Shown in the Start menu and Apps & features"
     INST_VERSION_LABEL = "Version:"
@@ -2318,7 +2318,7 @@ class En:
         "instead of installing side by side"
     )
 
-    GROUP_INSTALLER_OUTPUT = "📤 Installer output"
+    GROUP_INSTALLER_OUTPUT = "Installer output"
     INST_OUT_DIR_LABEL = "Output directory:"
     INST_OUT_DIR_PLACEHOLDER = "Default: next to the produced EXE"
     INST_OUT_NAME_LABEL = "Setup file name:"
@@ -2330,7 +2330,7 @@ class En:
     INST_SETUP_ICON_LABEL = "Setup icon:"
     INST_SETUP_ICON_PLACEHOLDER = "Optional - .ico for Setup.exe itself"
 
-    GROUP_INSTALLER_OPTIONS = "⚙️ Installation options"
+    GROUP_INSTALLER_OPTIONS = "Installation options"
     INST_PRIVILEGES_LABEL = "Install privileges:"
     INST_PRIV_ADMIN = "All users (requires admin)"
     INST_PRIV_LOWEST = "Current user only (no admin)"
@@ -2355,12 +2355,12 @@ class En:
     INST_ASSOC_LABEL = "Associate file extension:"
     INST_ASSOC_PLACEHOLDER = "Optional - e.g. .myapp"
 
-    GROUP_INSTALLER_TOOLCHAIN = "🔧 Inno Setup compiler"
+    GROUP_INSTALLER_TOOLCHAIN = "Inno Setup compiler"
     INST_ISCC_LABEL = "ISCC.exe path:"
     INST_ISCC_PLACEHOLDER = "Default: auto-detect on PATH and standard install dirs"
-    BTN_DETECT_ISCC = "🔍 Auto-detect"
-    BTN_GENERATE_ISS = "📝 Generate .iss only"
-    BTN_BUILD_INSTALLER = "📦 Build installer now"
+    BTN_DETECT_ISCC = "Auto-detect"
+    BTN_GENERATE_ISS = "Generate .iss only"
+    BTN_BUILD_INSTALLER = "Build installer now"
 
     # Installer messages
     LOG_ISCC_FOUND = "✅ Inno Setup found: {path}"
@@ -2401,11 +2401,11 @@ class En:
 
     # ── Phase 9: themes ──
     THEME_SELECT_LABEL = "Theme:"
-    THEME_LABEL_AUTO = "🖥️ Automatic (follow system)"
-    THEME_LABEL_DARK = "🌙 Dark"
-    THEME_LABEL_LIGHT = "☀️ Light"
-    THEME_LABEL_NORD = "❄️ Nord"
-    THEME_LABEL_HIGH_CONTRAST = "🔲 High contrast"
+    THEME_LABEL_AUTO = "Automatic (follow system)"
+    THEME_LABEL_DARK = "Dark"
+    THEME_LABEL_LIGHT = "Light"
+    THEME_LABEL_NORD = "Nord"
+    THEME_LABEL_HIGH_CONTRAST = "High contrast"
     LOG_THEME_CHANGED = "🎨 Theme changed: {theme}"
 
     # ── Phase 9: font zoom ──
@@ -2449,18 +2449,18 @@ class En:
     LOG_FILTER_EMPTY = "No lines match this filter."
 
     # ── Phase 10: batch conversion ──
-    TAB_BATCH = "📚 Batch"
-    GROUP_BATCH_FILES = "📚 File queue"
+    TAB_BATCH = "Batch"
+    GROUP_BATCH_FILES = "File queue"
     BATCH_HINT = (
         "Convert several files with the same settings. They run one after "
         "another — PyInstaller writes into the same build/ and dist/ folders."
     )
-    BTN_BATCH_ADD = "➕ Add files"
-    BTN_BATCH_REMOVE = "🗑️ Remove selected"
-    BTN_BATCH_CLEAR = "🧹 Clear queue"
-    BTN_BATCH_START = "🚀 Start batch"
-    BTN_BATCH_CANCEL = "⏹️ Cancel"
-    GROUP_BATCH_RESULT = "📊 Result"
+    BTN_BATCH_ADD = "Add files"
+    BTN_BATCH_REMOVE = "Remove selected"
+    BTN_BATCH_CLEAR = "Clear queue"
+    BTN_BATCH_START = "Start batch"
+    BTN_BATCH_CANCEL = "Cancel"
+    GROUP_BATCH_RESULT = "Result"
     BATCH_EMPTY = "The queue is empty — add .py files to begin."
     BATCH_SUMMARY_FMT = (
         "Total: {total} | ✅ ok: {succeeded} | ❌ failed: {failed} | "
@@ -2479,7 +2479,7 @@ class En:
     DIALOG_CHOOSE_BATCH_FILES = "Choose .py files for batch conversion"
 
     # ── Phase 10: update check ──
-    BTN_CHECK_UPDATES = "🔄 Check for updates"
+    BTN_CHECK_UPDATES = "Check for updates"
     UPDATE_CHECK_ON_START = "Check for updates on startup"
     UPDATE_AVAILABLE_FMT = (
         "A new version is available: {version} (you have {current}).\n\n"
@@ -2494,17 +2494,17 @@ class En:
     LOG_UPDATE_FAILED = "⚠️ Could not check for updates (check your connection)"
 
     # ── Phase 10: presets ──
-    GROUP_PRESETS = "⭐ Saved presets"
+    GROUP_PRESETS = "Saved presets"
     PRESETS_HINT = (
         "Save the current settings under a name and restore them later with "
         "one click, instead of hunting for a JSON file each time."
     )
     PRESET_NONE = "— no saved presets —"
-    BTN_PRESET_SAVE = "💾 Save as"
-    BTN_PRESET_APPLY = "📥 Apply"
-    BTN_PRESET_DELETE = "🗑️ Delete"
-    BTN_PRESET_EXPORT = "📤 Export all"
-    BTN_PRESET_IMPORT = "📥 Import"
+    BTN_PRESET_SAVE = "Save as"
+    BTN_PRESET_APPLY = "Apply"
+    BTN_PRESET_DELETE = "Delete"
+    BTN_PRESET_EXPORT = "Export all"
+    BTN_PRESET_IMPORT = "Import"
     PRESET_NAME_PROMPT = "Preset name:"
     PRESET_SAVED_FMT = "⭐ Preset saved: {name}"
     PRESET_APPLIED_FMT = "📥 Preset applied: {name}"
@@ -2519,7 +2519,7 @@ class En:
     DIALOG_IMPORT_PRESETS = "Import saved presets"
 
     # ── 1.3: project doctor and diagnostics ──
-    TAB_DOCTOR = "🩺 Project Doctor"
+    TAB_DOCTOR = "Project Doctor"
     DOCTOR_SCORE_FMT = "Readiness: {score}/100"
     DOCTOR_SCORE_NONE = "Readiness: —"
     DOCTOR_SUMMARY_FMT = "{errors} error(s) · {warnings} warning(s) · {infos} note(s)"
@@ -2531,24 +2531,24 @@ class En:
     )
     DOCTOR_NO_SOURCE = "Choose a source file on the Main tab to start the checkup."
     DOCTOR_ALL_CLEAR = "✅ No known problems — your project is ready to build"
-    BTN_DOCTOR_EXAMINE = "🔍 Check now"
-    BTN_DOCTOR_APPLY = "✅ Apply selected fixes"
-    BTN_DOCTOR_APPLY_REBUILD = "🔁 Apply and rebuild"
-    BTN_DOCTOR_DIAGNOSE = "🧪 Diagnostic run"
+    BTN_DOCTOR_EXAMINE = "Check now"
+    BTN_DOCTOR_APPLY = "Apply selected fixes"
+    BTN_DOCTOR_APPLY_REBUILD = "Apply and rebuild"
+    BTN_DOCTOR_DIAGNOSE = "Diagnostic run"
     BTN_DOCTOR_DIAGNOSE_TIP = (
         "A windowed app hides its error message when it crashes. This builds a "
         "diagnostic copy with a console into a side folder, runs it, and reads "
         "the real error."
     )
-    BTN_DOCTOR_COPY = "📋 Copy code"
-    BTN_DOCTOR_COPY_PIP = "📋 Copy install command"
+    BTN_DOCTOR_COPY = "Copy code"
+    BTN_DOCTOR_COPY_PIP = "Copy install command"
     DOCTOR_COPIED = "📋 Copied to clipboard"
     DOCTOR_FIXES_HEADER = "Automatic fix:"
     DOCTOR_MANUAL_HEADER = "Needs a change from you — copy this code:"
     DOCTOR_PIP_HEADER = "Install it into the Python that builds the app:"
     DOCTOR_NOTE_HEADER = "Note:"
     DOCTOR_NOTHING_SELECTED = "No applicable fix is selected"
-    DOCTOR_READINESS_BTN_FMT = "🩺 {score}/100"
+    DOCTOR_READINESS_BTN_FMT = "{score}/100"
     DOCTOR_READINESS_TIP = "How ready the project is to build — click for details"
     LOG_DOCTOR_FIX_APPLIED = "🩺 Applied: {fix}"
     LOG_DOCTOR_PREBUILD = (
@@ -2734,24 +2734,24 @@ class En:
     )
 
     # ── 1.3: icon studio ──
-    BTN_ICON_STUDIO = "🎨"
-    ICON_STUDIO_TITLE = "🎨 Icon Studio"
+    BTN_ICON_STUDIO = ""
+    ICON_STUDIO_TITLE = "Icon Studio"
     ICON_STUDIO_HINT = (
         "Create a real .ico with every size Windows asks for (16 to 256) from an "
         "image, or from your program's initials."
     )
     ICON_STUDIO_FROM_IMAGE = "From image"
     ICON_STUDIO_FROM_TEXT = "From letters"
-    ICON_STUDIO_CHOOSE_IMAGE = "📂 Choose image"
+    ICON_STUDIO_CHOOSE_IMAGE = "Choose image"
     ICON_STUDIO_IMAGE_FILTER = "Images (*.png *.jpg *.jpeg *.bmp *.gif *.svg *.webp);;All Files (*.*)"
     ICON_STUDIO_TEXT_LABEL = "Text (one or two letters):"
-    ICON_STUDIO_COLOR = "🎨 Background colour"
+    ICON_STUDIO_COLOR = "Background colour"
     ICON_STUDIO_SHAPE_LABEL = "Shape:"
     ICON_STUDIO_SHAPE_ROUNDED = "Rounded square"
     ICON_STUDIO_SHAPE_CIRCLE = "Circle"
     ICON_STUDIO_SHAPE_SQUARE = "Square"
     ICON_STUDIO_PREVIEW = "Preview:"
-    ICON_STUDIO_SAVE = "💾 Save and use icon"
+    ICON_STUDIO_SAVE = "Save and use icon"
     ICON_STUDIO_SAVE_DIALOG = "Save icon"
     ICON_STUDIO_ICO_FILTER = "Icon Files (*.ico)"
     ICON_STUDIO_NOTHING = "Choose an image or type some text first"
@@ -2761,8 +2761,8 @@ class En:
 
     # ── 1.4: build environment, size lab, build report, sandbox ──
     # "&&": a single "&" in a tab title is a keyboard-mnemonic marker.
-    TAB_SIZE = "⚖️ Size && Environment"
-    GROUP_BUILD_ENV = "🧪 Build environment"
+    TAB_SIZE = "Size && Environment"
+    GROUP_BUILD_ENV = "Build environment"
     ENV_HINT = (
         "PyInstaller bundles whatever it finds installed, so building from a "
         "Python full of libraries bloats the EXE. An isolated environment holds "
@@ -2782,14 +2782,14 @@ class En:
     ENV_REQ_FROM_FILE = "{file}"
     ENV_REQ_NONE = "no third-party packages — PyInstaller only"
     ENV_UV_NOTE = "⚡ uv will be used to create the environment faster"
-    BTN_ENV_CREATE = "🔧 Create / update environment"
-    BTN_ENV_RECREATE = "♻️ Recreate from scratch"
-    BTN_ENV_LOCK = "🔒 Save lock file"
+    BTN_ENV_CREATE = "Create / update environment"
+    BTN_ENV_RECREATE = "Recreate from scratch"
+    BTN_ENV_LOCK = "Save lock file"
     BTN_ENV_LOCK_TIP = (
         "Saves the exact package versions to p2e-build.lock next to your project, "
         "so the very same environment can be rebuilt on any machine."
     )
-    BTN_ENV_DELETE = "🗑️ Delete environment"
+    BTN_ENV_DELETE = "Delete environment"
     MSG_ENV_CONFIRM = (
         "These commands will run (packages are downloaded, so this needs an "
         "internet connection):\n\n{commands}\n\nContinue?"
@@ -2815,7 +2815,7 @@ class En:
     LOG_ENV_PYTHON = "🐍 Building with: {python}"
     ERR_ENV_PYTHON_MISSING = "Python interpreter not found: {path}"
 
-    GROUP_SIZE = "📏 Size lab — last build"
+    GROUP_SIZE = "Size lab — last build"
     SIZE_NONE = "Build your project to see what is inside the EXE and how big each library is."
     SIZE_SUMMARY_FMT = "On disk: {disk} · contents before compression: {content}"
     SIZE_COMPARE_FMT = "Compared with the previous build ({previous}): {change}"
@@ -2835,20 +2835,20 @@ class En:
         "🐢 A {size} one-file EXE unpacks itself on every launch, so it starts "
         "slowly. Folder mode with an installer starts instantly."
     )
-    GROUP_SIZE_SUGGESTIONS = "✂️ Slimming suggestions"
+    GROUP_SIZE_SUGGESTIONS = "Slimming suggestions"
     SIZE_SUGGESTIONS_NONE = "No suggestions — no known removable libraries are in the EXE."
     SIZE_SUGGESTIONS_HINT = (
         "Libraries inside the EXE that your code doesn't import. Excluding them is "
         "usually safe, and the Project Doctor catches any error after the rebuild."
     )
-    BTN_SIZE_APPLY = "✅ Exclude selected"
-    BTN_SIZE_APPLY_REBUILD = "🔁 Exclude and rebuild"
-    BTN_SIZE_REFRESH = "🔄 Analyze last build"
+    BTN_SIZE_APPLY = "Exclude selected"
+    BTN_SIZE_APPLY_REBUILD = "Exclude and rebuild"
+    BTN_SIZE_REFRESH = "Analyze last build"
     LOG_SIZE_SUMMARY = "📏 Size: {disk} — details on the Size & Environment tab"
 
-    GROUP_REPORT = "📄 Build report"
+    GROUP_REPORT = "Build report"
     REPORT_AUTO = "Write an HTML report after every successful build"
-    BTN_REPORT_OPEN = "📄 Open last report"
+    BTN_REPORT_OPEN = "Open last report"
     LOG_REPORT_SAVED = "📄 Build report: {path}"
     LOG_REPORT_FAILED = "❌ Could not write the report: {error}"
     REPORT_TITLE = "Build report"
@@ -2884,7 +2884,7 @@ class En:
     REPORT_NONE = "None"
     REPORT_GENERATOR_FMT = "Generated by {app} {version}"
 
-    BTN_SANDBOX = "🧊 Test in Windows Sandbox"
+    BTN_SANDBOX = "Test in Windows Sandbox"
     BTN_SANDBOX_TIP = (
         "Runs the EXE on a completely clean Windows (no Python, none of your "
         "libraries) to catch “works on my machine” problems."
@@ -2910,19 +2910,19 @@ class En:
     )
 
     # ── 1.5: Runtime Kit ──
-    TAB_RUNTIME = "🧰 Runtime Kit"
+    TAB_RUNTIME = "Runtime Kit"
     KIT_HINT = (
         "Services built into the program you ship, each turned on on its own. Nothing is "
         "on by default, there is no telemetry of any kind, and nothing touches the network "
         "unless you set an update URL yourself. Your code is never edited: anything that "
         "needs a line from you comes as a snippet to copy."
     )
-    GROUP_KIT_SERVICES = "🧩 Services"
-    KIT_NAME_RESOURCE_PATH = "📁 resource_path() helper"
-    KIT_NAME_LOG_REDIRECT = "📝 Log file for windowed apps"
-    KIT_NAME_CRASH_REPORTER = "🧯 Crash reporter"
-    KIT_NAME_SINGLE_INSTANCE = "🔒 Single instance"
-    KIT_NAME_UPDATER = "🔄 Signed self-updater"
+    GROUP_KIT_SERVICES = "Services"
+    KIT_NAME_RESOURCE_PATH = "resource_path() helper"
+    KIT_NAME_LOG_REDIRECT = "Log file for windowed apps"
+    KIT_NAME_CRASH_REPORTER = "Crash reporter"
+    KIT_NAME_SINGLE_INSTANCE = "Single instance"
+    KIT_NAME_UPDATER = "Signed self-updater"
     KIT_DESC_RESOURCE_PATH = (
         "Finds bundled files in development and once frozen: from p2e_runtime import resource_path"
     )
@@ -2944,7 +2944,7 @@ class En:
     KIT_INSTANCE_MESSAGE_LABEL = "Second-copy message:"
     KIT_INSTANCE_MESSAGE_PLACEHOLDER = "Leave empty for “{app} is already running.”"
 
-    GROUP_KIT_UPDATER = "🔄 Signed updater"
+    GROUP_KIT_UPDATER = "Signed updater"
     KIT_UPDATE_URL_LABEL = "update.json URL:"
     KIT_UPDATE_URL_PLACEHOLDER = "https://example.com/myapp/update.json"
     KIT_APP_VERSION_LABEL = "This build's version:"
@@ -2966,12 +2966,12 @@ class En:
     )
     KIT_PUBLIC_KEY_LABEL = "Embedded public key:"
     KIT_PUBLIC_KEY_PLACEHOLDER = "64 hex characters — filled from your key"
-    BTN_KIT_USE_MY_KEY = "🔑 Use my key"
+    BTN_KIT_USE_MY_KEY = "Use my key"
     KIT_KEY_STATUS_NONE = "No signing key yet. Generate a key pair to be able to publish updates."
     KIT_KEY_STATUS_FMT = "Your key: {fingerprint}… — the private key is stored in:\n{path}"
-    BTN_KIT_KEY_GENERATE = "🔐 Generate key pair"
-    BTN_KIT_KEY_EXPORT = "💾 Back up"
-    BTN_KIT_KEY_IMPORT = "📥 Import key"
+    BTN_KIT_KEY_GENERATE = "Generate key pair"
+    BTN_KIT_KEY_EXPORT = "Back up"
+    BTN_KIT_KEY_IMPORT = "Import key"
     MSG_KIT_KEY_REPLACE_CONFIRM = (
         "⚠️ A signing key already exists ({fingerprint}…).\n\n"
         "Programs you shipped with the current key will refuse any update signed with a new "
@@ -3002,7 +3002,7 @@ class En:
     ERR_KIT_KEY_WRITE = "Could not save the key: {error}"
     ERR_KIT_NO_KEY = "No signing key. Generate or import a key pair first."
 
-    GROUP_KIT_PUBLISH = "📦 Publish an update"
+    GROUP_KIT_PUBLISH = "Publish an update"
     KIT_PUBLISH_HINT = (
         "Writes update.json and update.json.sig next to the file. Nothing is uploaded: put "
         "both on your server with the new build (GitHub Releases publishing comes in 1.6)."
@@ -3017,7 +3017,7 @@ class En:
     KIT_PUBLISH_MIN_VERSION_LABEL = "Oldest version that may update directly:"
     KIT_PUBLISH_MIN_VERSION_PLACEHOLDER = "optional"
     KIT_PUBLISH_NOTES_LABEL = "Release notes:"
-    BTN_KIT_PUBLISH = "✍️ Create signed update.json"
+    BTN_KIT_PUBLISH = "Create signed update.json"
     LOG_KIT_PUBLISHED = "✍️ Update files: {manifest} and {signature}"
     MSG_KIT_PUBLISHED_FMT = (
         "Created and signed:\n{manifest}\n{signature}\n\nUpload both with the new file so "
@@ -3025,7 +3025,7 @@ class En:
     )
     ERR_KIT_PUBLISH_FMT = "Could not create the update files: {error}"
 
-    GROUP_KIT_PREVIEW = "👁️ What goes into the EXE"
+    GROUP_KIT_PREVIEW = "What goes into the EXE"
     KIT_PREVIEW_HOOK = "Runtime hook"
     KIT_PREVIEW_CONFIG = "p2e_runtime.json"
     KIT_PREVIEW_NONE = "No service is on — nothing is added to the EXE."
@@ -3052,7 +3052,7 @@ class En:
 
     FIX_LABEL_RUNTIME = "Turn on in the Runtime Kit: {value}"
     DOCTOR_ALT_HEADER = "Or instead:"
-    BTN_DOCTOR_ALT_FMT = "🔀 Instead: {fix}"
+    BTN_DOCTOR_ALT_FMT = "Instead: {fix}"
     REPORT_RUNTIME_KIT = "Runtime Kit"
 
     FINDING_KIT_IMPORTED_NOT_ENABLED_TITLE = "The code imports p2e_runtime but the Runtime Kit is off"
@@ -3099,15 +3099,15 @@ class En:
 
     # ── 1.6: project file, command line, release ───────────────────────
     WINDOW_TITLE_PROJECT_FMT = "{project}[*] — {app}"
-    TAB_RELEASE = "🚀 Release"
+    TAB_RELEASE = "Release"
     MENU_PROJECT = "Project"
-    MENU_NEW_PROJECT = "📄 New project"
-    MENU_OPEN_PROJECT = "📂 Open project…"
-    MENU_RECENT_PROJECTS = "🕓 Recent projects"
+    MENU_NEW_PROJECT = "New project"
+    MENU_OPEN_PROJECT = "Open project…"
+    MENU_RECENT_PROJECTS = "Recent projects"
     MENU_RECENT_EMPTY = "No recent projects"
-    MENU_SAVE_PROJECT = "💾 Save project"
-    MENU_SAVE_PROJECT_AS = "💾 Save project as…"
-    MENU_INIT_PROJECT = "🧩 Init project from this script"
+    MENU_SAVE_PROJECT = "Save project"
+    MENU_SAVE_PROJECT_AS = "Save project as…"
+    MENU_INIT_PROJECT = "Init project from this script"
     DIALOG_OPEN_PROJECT = "Open a project file"
     DIALOG_SAVE_PROJECT = "Save the project file"
     DIALOG_FILTER_PROJECT = "Project (p2e.toml *.toml);;All Files (*.*)"
@@ -3136,24 +3136,24 @@ class En:
 
     # Release tab
     RELEASE_HINT = "From version bump to a published GitHub release in one go. “Dry run” shows everything that would happen without changing anything, and nothing is tagged or uploaded before you confirm."
-    GROUP_RELEASE_VERSION = "🔢 Version"
+    GROUP_RELEASE_VERSION = "Version"
     RELEASE_VERSION_LABEL = "Version:"
     RELEASE_VERSION_PLACEHOLDER = "e.g. 1.2.3"
     BTN_BUMP_PATCH = "+ patch"
     BTN_BUMP_MINOR = "+ minor"
     BTN_BUMP_MAJOR = "+ major"
-    BTN_APPLY_VERSION = "✅ Apply to every tab"
+    BTN_APPLY_VERSION = "Apply to every tab"
     BTN_APPLY_VERSION_TIP = "Writes the number into Version Info, the installer and the Runtime Kit together"
     RELEASE_MISMATCH_FMT = "⚠️ Version numbers disagree:\n{rows}"
     RELEASE_MISMATCH_ROW = "• {field}: {value} (expected {expected})"
-    GROUP_RELEASE_NOTES = "📝 Release notes"
+    GROUP_RELEASE_NOTES = "Release notes"
     RELEASE_NOTES_HINT = "Drafted from the git commits since the last tag, grouped by prefix (feat, fix…). Edit before publishing."
     RELEASE_NOTES_PLACEHOLDER = "Leave empty to draft them automatically on the dry run"
-    BTN_DRAFT_NOTES = "✍️ Draft from git"
-    BTN_LOAD_NOTES = "📂 From file…"
-    GROUP_RELEASE_GITHUB = "🐙 GitHub Releases"
+    BTN_DRAFT_NOTES = "Draft from git"
+    BTN_LOAD_NOTES = "From file…"
+    GROUP_RELEASE_GITHUB = "GitHub Releases"
     RELEASE_REPOSITORY_LABEL = "Repository:"
-    BTN_DETECT_REPOSITORY = "🔍 From git"
+    BTN_DETECT_REPOSITORY = "From git"
     RELEASE_TAG_PREFIX_LABEL = "Tag prefix:"
     RELEASE_DRAFT = "Draft"
     RELEASE_PRERELEASE = "Pre-release"
@@ -3168,12 +3168,12 @@ class En:
     RELEASE_TOKEN_FROM_KEYRING = "✅ Stored in the operating system's keyring"
     RELEASE_TOKEN_FROM_ENV = "✅ From the GITHUB_TOKEN environment variable"
     RELEASE_TOKEN_NONE = "No token. Store one here (needs the keyring package) or set GITHUB_TOKEN. It is never written to the settings, the project or the log."
-    BTN_SAVE_TOKEN = "🔐 Store in keyring"
-    BTN_FORGET_TOKEN = "🗑️ Remove"
+    BTN_SAVE_TOKEN = "Store in keyring"
+    BTN_FORGET_TOKEN = "Remove"
     ERR_TOKEN_STORE = "Could not store the token in the keyring:\n{error}"
     LOG_TOKEN_SAVED = "🔐 GitHub token stored in the keyring"
     LOG_TOKEN_FORGOTTEN = "🗑️ GitHub token removed from the keyring"
-    GROUP_RELEASE_WINGET = "📦 winget"
+    GROUP_RELEASE_WINGET = "winget"
     RELEASE_WINGET_HINT = "Generates the three winget manifest files (schema 1.28.0) with the installer's real URL and hash. Nothing is submitted: you send them to winget-pkgs."
     RELEASE_WINGET_ENABLE = "Generate a winget manifest"
     RELEASE_WINGET_IDENTIFIER = "Identifier:"
@@ -3181,15 +3181,15 @@ class En:
     RELEASE_WINGET_LICENSE = "License:"
     RELEASE_WINGET_DESCRIPTION = "Short description:"
     RELEASE_WINGET_LOCALE = "Locale:"
-    GROUP_RELEASE_STEPS = "✅ Steps"
+    GROUP_RELEASE_STEPS = "Steps"
     RELEASE_DRY_RUN = "Dry run"
     RELEASE_DRY_RUN_TIP = "Shows every step and what it would create and upload, changing nothing"
     RELEASE_CREATE_TAG = "Create a git tag"
     RELEASE_PUSH_TAG = "Push the tag to the remote"
     RELEASE_PUBLISH = "Publish on GitHub"
     RELEASE_ALLOW_DOCTOR_ERRORS = "Continue despite doctor errors"
-    BTN_START_RELEASE = "🚀 Start"
-    BTN_OPEN_RELEASE_FOLDER = "📂 Release folder"
+    BTN_START_RELEASE = "Start"
+    BTN_OPEN_RELEASE_FOLDER = "Release folder"
     ERR_RELEASE_VERSION = "The version “{version}” is not MAJOR.MINOR.PATCH (e.g. 1.2.3)."
     ERR_RELEASE_ENV = "The project builds in an isolated environment that does not exist yet. Create it on the Size & Environment tab first."
     LOG_RELEASE_PLANNING = "📋 Planning release {version}…"
@@ -3206,14 +3206,14 @@ class En:
     RELEASE_CONFIRM_HEADING = "Release {version} will do exactly this:"
     RELEASE_CONFIRM_NOTE = "None of it happens before you press “Release”. The token and the certificate password appear in no log."
     RELEASE_CONFIRM_NOTHING = "Nothing will be created or uploaded."
-    RELEASE_CONFIRM_CREATED = "📁 Files written:"
-    RELEASE_CONFIRM_COMMANDS = "⚙️ Commands run:"
-    RELEASE_CONFIRM_COMMITS = "📝 Version bump committed in:"
-    RELEASE_CONFIRM_TAGS = "🏷️ git tag created:"
-    RELEASE_CONFIRM_PUSHES = "⬆️ Tag pushed to the remote:"
-    RELEASE_CONFIRM_RELEASES = "🐙 GitHub release created (or completed):"
-    RELEASE_CONFIRM_UPLOADS = "⬆️ Files uploaded:"
-    BTN_CONFIRM_RELEASE = "🚀 Release"
+    RELEASE_CONFIRM_CREATED = "Files written:"
+    RELEASE_CONFIRM_COMMANDS = "Commands run:"
+    RELEASE_CONFIRM_COMMITS = "Version bump committed in:"
+    RELEASE_CONFIRM_TAGS = "git tag created:"
+    RELEASE_CONFIRM_PUSHES = "Tag pushed to the remote:"
+    RELEASE_CONFIRM_RELEASES = "GitHub release created (or completed):"
+    RELEASE_CONFIRM_UPLOADS = "Files uploaded:"
+    BTN_CONFIRM_RELEASE = "Release"
     BTN_CANCEL_RELEASE = "Cancel"
     RELEASE_STEP_VERSION = "Version bump"
     RELEASE_STEP_NOTES = "Release notes"
@@ -3479,7 +3479,7 @@ class En:
         "The Runtime Kit is embedded through PyInstaller's --runtime-hook, which {engine} has "
         "no equivalent for. Turn the Runtime Kit services off or build with PyInstaller."
     )
-    BTN_ALLOW_DOWNLOAD_REBUILD = "📥 Allow download and rebuild"
+    BTN_ALLOW_DOWNLOAD_REBUILD = "Allow download and rebuild"
     CLI_DOWNLOAD_CONFIRM = "Nuitka asks to download {tool} (this build only, --assume-yes-for-downloads)."
     CLI_ENGINE_MISSING = "❌ {engine} is not installed in {python}. Install it: {cmd}"
 
@@ -3491,7 +3491,7 @@ class En:
 
 
     # ── 2.0: compare mode and start-up benchmark ──────────────────────────
-    COMPARE_GROUP = "🏁 Compare engines"
+    COMPARE_GROUP = "Compare engines"
     COMPARE_INTRO = (
         "Builds the project with each engine into its own folder ({folder}), leaving the real "
         "build alone, then measures size, build time, start-up time (the median of several "
@@ -3499,7 +3499,7 @@ class En:
     )
     COMPARE_RUNS_LABEL = "Runs:"
     COMPARE_TIMEOUT_LABEL = "Timeout per run (s):"
-    BTN_COMPARE = "🏁 Build with both and compare"
+    BTN_COMPARE = "Build with both and compare"
     COMPARE_ENGINE_HEADER = "Engine"
     COMPARE_ROW_STATUS = "Build"
     COMPARE_ROW_SIZE = "Size on disk"
@@ -3557,9 +3557,9 @@ class En:
     FEATURE_DEB = ".deb package"
     FEATURE_DMG = ".dmg image"
 
-    TAB_PLATFORMS = "🌍 Platforms"
+    TAB_PLATFORMS = "Platforms"
     PLATFORMS_HINT = "Linux and macOS packages from the same build, and a GitHub Actions workflow that builds your project on Windows, macOS and Linux and publishes a release when a tag is pushed."
-    GROUP_PACKAGES = "📦 Linux && macOS packages"
+    GROUP_PACKAGES = "Linux && macOS packages"
     PACKAGES_HINT = "AppImage (one file that runs on most distributions) and .deb (Debian/Ubuntu) are built on Linux with appimagetool and dpkg-deb; .dmg is built on macOS with hdiutil. Packages go with the release files in release/<version>/ and are uploaded with the GitHub release."
     PACKAGE_APPIMAGE = "AppImage (Linux)"
     PACKAGE_DEB = ".deb (Debian/Ubuntu)"
@@ -3575,8 +3575,8 @@ class En:
     PACKAGE_CATEGORIES_PLACEHOLDER = "Utility;Development"
     PACKAGE_IDENTIFIER_PLACEHOLDER = "com.example.app"
     PACKAGE_DESCRIPTION_PLACEHOLDER = "One short line, shown by the package manager and in the menu"
-    BTN_BUILD_PACKAGES = "📦 Build packages from the last build"
-    BTN_OPEN_PACKAGES_FOLDER = "📂 Open the packages folder"
+    BTN_BUILD_PACKAGES = "Build packages from the last build"
+    BTN_OPEN_PACKAGES_FOLDER = "Open the packages folder"
     MSG_PACKAGES_NO_BUILD = "There is no build for this project. Build the program first, then the packages."
     MSG_PACKAGES_NONE_SELECTED = "No package format is selected."
     MSG_PACKAGES_NONE_HERE = "None of the selected formats is built on {platform}. The CI workflow builds them on the right runner."
@@ -3593,7 +3593,7 @@ class En:
     PACKAGES_RESULT_FAILED = "At least one package failed; see the log."
     PACKAGES_RESULT_NONE = ""
 
-    GROUP_CI = "🤖 GitHub Actions"
+    GROUP_CI = "GitHub Actions"
     CI_HINT = "Generates .github/workflows/p2e-release.yml in your repository: a Windows, macOS and Linux matrix that installs this tool's command line and runs release against p2e.toml, with pip and build caching, artifact uploads, and a job that creates the GitHub Release when a v* tag is pushed. Secrets are named only, never written into the file."
     CI_PYTHON_LABEL = "Python version on the runners:"
     CI_SIGN_WINDOWS = "Sign on Windows from a secret (WINDOWS_CERT_BASE64 and WINDOWS_CERT_PASSWORD)"
@@ -3601,16 +3601,16 @@ class En:
     CI_ALLOW_DOCTOR_ERRORS = "Do not stop the build on doctor errors (--allow-doctor-errors)"
     CI_TOOL_LABEL = "Install the tool from:"
     CI_SECRETS_NOTE = "Secrets are added under Settings → Secrets and variables → Actions; the file refers to them as ${{ secrets.NAME }} only."
-    BTN_GENERATE_CI = "🤖 Preview and write the workflow…"
+    BTN_GENERATE_CI = "Preview and write the workflow…"
     CI_DIALOG_TITLE = "GitHub Actions workflow"
     CI_DIALOG_HEADING = "This file will be written to:\n{path}"
     CI_DIALOG_OVERWRITE_NOTE = "⚠️ The file exists and will be replaced."
     CI_DIALOG_SECRETS = "Secrets referenced by name only: {names}"
     CI_DIALOG_NO_SECRETS = "The file refers to no secret (signing and notarization are off)."
     CI_DIALOG_NOTE = "Nothing is written until you press “Write the file”. Read it in full: it installs the tool from the URL shown and runs it on your project."
-    BTN_WRITE_WORKFLOW = "✅ Write the file"
+    BTN_WRITE_WORKFLOW = "Write the file"
     BTN_CANCEL_WORKFLOW = "Cancel"
-    BTN_COPY_WORKFLOW = "📋 Copy"
+    BTN_COPY_WORKFLOW = "Copy"
     MSG_CI_NEEDS_PROJECT = "Save the project as a p2e.toml inside your repository first; the workflow is written next to it."
     MSG_CI_BLOCKED = "A workflow cannot be generated for this project:\n{problems}"
     LOG_CI_WRITTEN = "✅ Workflow written: {path}"
@@ -3673,13 +3673,13 @@ class En:
     CLI_CI_WRITTEN = "✅ Wrote {path}"
 
     # ── 2.0 milestone 5: offline licensing ──
-    KIT_NAME_LICENSING = "🔑 Offline licence keys"
+    KIT_NAME_LICENSING = "Offline licence keys"
     KIT_DESC_LICENSING = (
         "Ed25519-signed licence keys your app checks with the embedded public key, with no "
         "connection at all: p2e_runtime.license.check(key). Deters casual copying only; it "
         "does not stop someone who edits the program itself."
     )
-    GROUP_KIT_LICENSE = "🔑 Offline licensing"
+    GROUP_KIT_LICENSE = "Offline licensing"
     KIT_LICENSE_HONESTY = (
         "⚠️ Plainly: the check runs inside the distributed program itself. That deters casual "
         "copying and makes keys impossible to forge without your private key, but whoever holds "
@@ -3690,16 +3690,16 @@ class En:
     KIT_LICENSE_PRODUCT_PLACEHOLDER = "Leave empty to use the app's name"
     KIT_LICENSE_PUBLIC_KEY_LABEL = "Licence public key:"
     KIT_LICENSE_PUBLIC_KEY_PLACEHOLDER = "64 hex characters — filled from your licence key"
-    BTN_KIT_LICENSE_USE_MY_KEY = "🔑 Use my licence key"
+    BTN_KIT_LICENSE_USE_MY_KEY = "Use my licence key"
     KIT_LICENSE_KEY_STATUS_NONE = (
         "No licence key yet. Create one with the button below (a key of its own, separate from "
         "the update key, in the same folder with the same permissions)."
     )
     KIT_LICENSE_KEY_STATUS_FMT = "Licence key: {fingerprint}… — the private key is stored in:\n{path}"
-    BTN_KIT_LICENSE_KEY_CREATE = "🔐 Create licence key"
-    BTN_KIT_LICENSE_KEY_EXPORT = "💾 Back up"
-    BTN_KIT_LICENSE_KEY_IMPORT = "📥 Import key"
-    BTN_KIT_LICENSE_ISSUE = "🎫 Issue a licence key…"
+    BTN_KIT_LICENSE_KEY_CREATE = "Create licence key"
+    BTN_KIT_LICENSE_KEY_EXPORT = "Back up"
+    BTN_KIT_LICENSE_KEY_IMPORT = "Import key"
+    BTN_KIT_LICENSE_ISSUE = "Issue a licence key…"
     KIT_LICENSE_API_HINT = (
         "From your app: from p2e_runtime import license then info = license.check(key) — None "
         "for a forged, expired or other product's key, info.has_feature('pro') for features, "
@@ -3728,7 +3728,7 @@ class En:
     ERR_KIT_LICENSE_NO_KEY = "No licence key. Create or import one first, in the Runtime Kit tab."
     KIT_LICENSE_NO_EXPIRY = "never expires"
 
-    LICENSE_DIALOG_TITLE = "🎫 Issue a licence key"
+    LICENSE_DIALOG_TITLE = "Issue a licence key"
     LICENSE_DIALOG_HEADING = (
         "The key is signed with your private key on this machine, now; nothing is sent. Your "
         "app checks it with the public key embedded in the build."
@@ -3742,8 +3742,8 @@ class En:
     LICENSE_FEATURES_PLACEHOLDER = "e.g. pro, export"
     LICENSE_KEY_LABEL = "Licence key — copy it and send it to the customer:"
     LICENSE_RESULT_FMT = "{name} — {product} — {expiry} — {count} feature(s) — {length} characters"
-    BTN_LICENSE_ISSUE = "🎫 Issue the key"
-    BTN_LICENSE_COPY = "📋 Copy the key"
+    BTN_LICENSE_ISSUE = "Issue the key"
+    BTN_LICENSE_COPY = "Copy the key"
     BTN_LICENSE_CLOSE = "Close"
     MSG_LICENSE_COPIED = "Key copied to clipboard"
     LICENSE_ERR_NAME_MISSING = "Enter the customer's name."
@@ -3794,15 +3794,15 @@ class En:
     CLI_LICENSE_NO_FEATURES = "none"
 
     # ── 2.0: the projects workspace (home view) ──────────────────────────
-    TAB_HOME = "🏠 Projects"
+    TAB_HOME = "Projects"
     HOME_HINT = "Your recent projects (p2e.toml files) in one place: the last build and its result, the size across successful builds, and the last release. “Build” and “Release” here are the same paths as the Main and Release tabs, not a second copy of them."
     HOME_EMPTY = "No recent projects yet. Open a p2e.toml file, or save your current settings as a project from the Project menu, and it shows up here."
-    BTN_HOME_OPEN_OTHER = "📂 Open another project…"
-    BTN_HOME_REFRESH = "🔄 Refresh"
-    BTN_HOME_OPEN = "📂 Open"
-    BTN_HOME_BUILD = "🔨 Build"
-    BTN_HOME_RELEASE = "🚀 Release"
-    BTN_HOME_FORGET = "🗑️ Remove from list"
+    BTN_HOME_OPEN_OTHER = "Open another project…"
+    BTN_HOME_REFRESH = "Refresh"
+    BTN_HOME_OPEN = "Open"
+    BTN_HOME_BUILD = "Build"
+    BTN_HOME_RELEASE = "Release"
+    BTN_HOME_FORGET = "Remove from list"
     HOME_VERSION_FMT = "version {version}"
     HOME_NO_VERSION = "no version"
     HOME_ENGINE_FMT = "engine: {engine}"

@@ -84,7 +84,7 @@ def test_clean_script_shows_all_clear(window, tmp_path):
     window.main_tab.source_input.setText(make_source(tmp_path, "print(1)\n"))
     window.run_doctor()
     assert window.doctor_tab.findings_list.item(0).text() == En.DOCTOR_ALL_CLEAR
-    assert window.main_tab.readiness_btn.text() == "🩺 100/100"
+    assert window.main_tab.readiness_btn.text() == "100/100"
 
 
 def test_badge_opens_the_doctor_tab(window, tmp_path):

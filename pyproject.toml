@@ -75,7 +75,8 @@ exclude = ["tests*"]
 
 [tool.setuptools.package-data]
 # The doctor's knowledge base is data, not code; it must ship in the wheel.
-py2exe_gui = ["knowledge/*.json"]
+# The icons (Lucide, ISC; icons/LICENSE) are rendered at runtime from SVG.
+py2exe_gui = ["knowledge/*.json", "icons/*.svg", "icons/LICENSE"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

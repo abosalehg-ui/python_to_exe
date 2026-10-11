@@ -5,6 +5,71 @@ follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### 2.1.0 — The window, redesigned
+
+The UX plan in [UX_REDESIGN_PLAN.md](UX_REDESIGN_PLAN.md), applied in four
+steps. Measured on the 2.0 window at the default 1080x800 size: the content's
+minimum height was 1195px (fields collapsed to two pixels), the fifteen tabs
+needed 1661px of tab bar, 338px of chrome never changed, and 78 distinct emoji
+served as the icon set.
+
+**Changed**
+- **Six sections in a side bar** replace the fifteen tabs: Projects, Build,
+  Check, Distribute, Tools, Settings, each with a few sub-tabs that always
+  fit. `Ctrl+1`…`Ctrl+6` jump between them. `window.tabs` keeps the
+  `QTabWidget` subset the code and tests use (`py2exe_gui/ui/navigation.py`).
+- **The Build page** (`py2exe_gui/ui/build_page.py`) shows the main form and
+  folds the former Advanced, Version Info and Deploy tabs under titled
+  sections (`py2exe_gui/ui/widgets/collapsible.py`) with a one-line summary
+  each. The **simple/advanced modes, the mode button and the first-run
+  dialog are removed**; a stored `simple_mode: false` opens the sections by
+  default, and *View ▸ Open the advanced build sections* toggles them all.
+- **The build log is a panel under every page** (`py2exe_gui/ui/log_panel.py`):
+  one line (the last message) while idle, opened when a build starts, in a
+  splitter with the pages. `Ctrl+\`` toggles it; `Ctrl+F` opens it and
+  focuses the search box.
+- **One action bar**: a primary *Start Build* that becomes *Cancel* during a
+  build, *Preview command* and *Open output folder* as quiet buttons, and an
+  inline progress bar that names the stage. The header banner, the
+  always-visible progress box and the theme/mode buttons are gone.
+- **View, Tools and Help menus**: theme and language (checkable), text size,
+  the log, the advanced sections, the section bar, every tool, a
+  **keyboard-shortcuts dialog** (`F1`) built from the same table the window
+  binds, and About.
+- **Settings page** (`py2exe_gui/ui/tabs/settings_tab.py`): theme, text size,
+  language and the update check, moved from the Templates and About tabs.
+- **The status bar shows the build state** (ready, the stage, finished in
+  N s, failed) and the Python/PyInstaller versions; the copyright is in About.
+- **Icons are SVGs** (`py2exe_gui/icons/`, ~85 Lucide icons, ISC) rendered
+  from the theme palette by `py2exe_gui/icons.py`, with disabled and
+  selected states and mirroring of directional icons under RTL. Emoji are
+  gone from tabs, sections, group titles, buttons and menus (a test keeps
+  them out) and stay in log lines, where ✅/❌/⚠️ mean something. The
+  `📂` buttons are 32px `icon_button`s with a tooltip and an accessible name.
+- **Stylesheet** (`styles.py`): 1px borders, three button tiers (filled
+  primary/success/danger, outlined default, flat), tinted notice tiers
+  (info/warning/danger), slim scrollbars, group titles above the frame on
+  the side the layout direction puts them. New palette keys `warning` and
+  `on_warning` in all four themes.
+
+**Fixed**
+- **Every page scrolls**: eight tabs laid their groups straight onto the
+  widget and were squeezed at the default and the declared minimum window
+  size (`tests/test_ui_layout.py` holds the content inside 900x600).
+- **Command-line flags in Arabic strings** rendered reversed
+  ("(onefile--)"): every `--flag` in a right-to-left locale is wrapped in a
+  left-to-right isolate at import (`strings.isolate_flags`,
+  `tests/test_strings_bidi.py`).
+- Group-box titles no longer sit on the frame line and follow the layout
+  direction (they were pinned to the right in the English UI).
+- The platform banner ("does nothing on this OS") uses the warning tier,
+  not the danger colour.
+- The Cancel button is shown only while a build runs, in Build's place.
+
+**Documentation**
+- `docs/screenshots/2.1/` (taken at the default 1080x800 window, both
+  languages), the sections table in both READMEs, the shortcuts tables.
+
 ### 2.0.0 — Every platform, every engine
 
 The 2.0 release of [PRODUCT_ROADMAP.md](PRODUCT_ROADMAP.md), built as seven

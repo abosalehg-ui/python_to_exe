@@ -6,6 +6,7 @@ that owns its own controls and the browse handlers that belong to it; the
 window keeps orchestration (threads, the build pipeline, shortcuts).
 """
 
+from py2exe_gui import icons
 from py2exe_gui.core.platform_support import (
     LINUX,
     MACOS,
@@ -19,6 +20,8 @@ from py2exe_gui.qt import (
     QLabel,
     QPushButton,
     QScrollArea,
+    QSize,
+    Qt,
     QVBoxLayout,
     QWidget,
 )
@@ -43,19 +46,35 @@ _NOTICE_FORMATS = {
 }
 
 
-def browse_button(label: str, handler) -> QPushButton:
-    """A '📂' button that screen readers and tooltips can actually describe.
+ICON_BUTTON_SIZE = 32
+ICON_SIZE = 18
 
-    Emoji-only buttons expose no accessible name of their own, so several
-    identical '📂' buttons were indistinguishable to assistive technology and
-    to anyone navigating by keyboard.
+
+def icon_button(icon_name: str, label: str, handler, size: int = ICON_BUTTON_SIZE) -> QPushButton:
+    """A square button that shows an icon and *says* ``label``.
+
+    The icon is drawn in the default colour here and recoloured by the window
+    for the active theme (``MainWindow._apply_icons`` reads ``iconName``).
+    The tooltip and the accessible name are not optional: an icon alone is
+    indistinguishable to assistive technology and to anyone new to the app.
     """
-    button = QPushButton("📂")
+    button = QPushButton()
+    button.setObjectName("iconBtn")
+    button.setProperty("iconName", icon_name)
+    button.setFixedSize(size, size)
+    button.setIconSize(QSize(ICON_SIZE, ICON_SIZE))
+    button.setIcon(icons.icon(icon_name))
     button.setToolTip(label)
     button.setAccessibleName(label)
     button.setAccessibleDescription(label)
+    button.setCursor(Qt.CursorShape.PointingHandCursor)
     button.clicked.connect(handler)
     return button
+
+
+def browse_button(label: str, handler, folder: bool = False) -> QPushButton:
+    """The "choose a file/folder" button next to a path field."""
+    return icon_button("browse_folder" if folder else "browse_file", label, handler)
 
 
 class BaseTab(QWidget):

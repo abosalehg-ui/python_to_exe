@@ -112,11 +112,25 @@ _MODULES = (QtWidgets, QtGui, QtCore)
 
 
 def __getattr__(name: str):
-    """Resolve any Qt class from the three modules the application uses."""
+    """Resolve any Qt class from the three modules the application uses.
+
+    ``QtSvg`` (the icon renderer, 2.1) is looked up last and imported on
+    first use: it is a separate module in both bindings, and a binding
+    installed without it must still open the window (icons fall back to
+    the image plugin, then to no icon).
+    """
     if name.startswith("_"):
         raise AttributeError(name)
     for module in _MODULES:
         value = getattr(module, name, None)
+        if value is not None:
+            return value
+    if name.startswith("QSvg"):
+        try:
+            svg = importlib.import_module(API + ".QtSvg")
+        except ImportError as e:
+            raise AttributeError(f"{API}.QtSvg is not installed: {e}") from e
+        value = getattr(svg, name, None)
         if value is not None:
             return value
     raise AttributeError(f"module 'py2exe_gui.qt' ({API}) has no attribute {name!r}")

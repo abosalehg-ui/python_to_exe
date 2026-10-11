@@ -99,8 +99,18 @@ class CollapsibleSection(QWidget):
         self._update_arrow()
         self.toggled.emit(checked)
 
+    def set_chevrons(self, open_icon, closed_icon):
+        """Use these icons (theme-coloured SVGs) instead of the style's arrows."""
+        self._chevrons = (open_icon, closed_icon)
+        self._update_arrow()
+
     def _update_arrow(self):
         """Down when open; when closed, pointing into the reading direction."""
+        chevrons = getattr(self, "_chevrons", None)
+        if chevrons is not None:
+            self.header.setArrowType(Qt.ArrowType.NoArrow)
+            self.header.setIcon(chevrons[0] if self.header.isChecked() else chevrons[1])
+            return
         if self.header.isChecked():
             arrow = Qt.ArrowType.DownArrow
         elif self.layoutDirection() == Qt.LayoutDirection.RightToLeft:

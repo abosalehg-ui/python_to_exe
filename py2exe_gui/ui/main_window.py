@@ -150,6 +150,7 @@ from py2exe_gui.core.venv_manager import (
     write_metadata,
 )
 from py2exe_gui.core.workspace import summarize_projects
+from py2exe_gui.icons import themed_icon
 from py2exe_gui.paths import envs_dir, license_key_path, signing_key_path
 from py2exe_gui.qt import (
     QAction,
@@ -370,6 +371,55 @@ class MainWindow(QMainWindow):
         self.setStyleSheet(
             themed_stylesheet(self.current_theme, current_locale(), self.font_scale)
         )
+        self._apply_icons()
+
+    # ── Icons ──────────────────────────────────────────────────────────────
+
+    #: Former tab key → icon shown on its sub-tab.
+    PAGE_ICONS = {
+        "home": "home", "history": "history", "doctor": "doctor", "size": "size",
+        "installer": "installer", "platforms": "platforms", "runtime": "runtime",
+        "release": "release", "batch": "batch", "templates": "templates",
+        "settings": "preferences", "about": "about",
+    }
+
+    def _icon(self, name: str, role: str = "text"):
+        palette = PALETTES.get(self.current_theme) or PALETTES["dark"]
+        rtl = LOCALE_LAYOUT.get(current_locale(), "rtl") == "rtl"
+        return themed_icon(name, palette, role, rtl)
+
+    def _apply_icons(self):
+        """Colour every icon for the active theme (and mirror for RTL).
+
+        Called after the stylesheet: icons are SVGs rendered in the palette's
+        colours, so a theme change re-renders them like it recolours the CSS.
+        """
+        if not hasattr(self, "tabs"):
+            return
+        from py2exe_gui.qt import QTabWidget
+
+        nav = self.tabs.nav
+        for row, key in enumerate(self.tabs.sections()):
+            nav.item(row).setIcon(self._icon(f"section_{key}"))
+        for key, widget, _title in self._all_tabs:
+            page = self.tabs.page_of(self._tab_sections[key])
+            if isinstance(page, QTabWidget) and key in self.PAGE_ICONS:
+                page.setTabIcon(page.indexOf(widget), self._icon(self.PAGE_ICONS[key]))
+        self.convert_btn.setIcon(self._icon("start", "on_accent"))
+        self.cancel_btn.setIcon(self._icon("stop", "on_accent"))
+        self.preview_btn.setIcon(self._icon("preview"))
+        self.open_folder_btn.setIcon(self._icon("open_folder"))
+        for button in self.findChildren(QPushButton):
+            name = button.property("iconName")
+            if name:
+                button.setIcon(self._icon(name, button.property("iconRole") or "text"))
+        self.log_panel.set_chevrons(self._icon("chevron_down"), self._icon("chevron_up"))
+        side = "chevron_left" if self.layoutDirection() == Qt.LayoutDirection.RightToLeft \
+            else "chevron_right"
+        for section in self.build_page.sections.values():
+            section.set_chevrons(self._icon("chevron_down"), self._icon(side))
+        for action, name in getattr(self, "_menu_icons", []):
+            action.setIcon(self._icon(name))
 
     def _apply_layout_direction(self):
         self.setLayoutDirection(
@@ -2860,10 +2910,14 @@ class MainWindow(QMainWindow):
         # it with the bar). A reference is harmless on every binding.
         self._menu_actions = []
 
-        def item(menu, text, handler, keys="", checkable=False, checked=False):
+        self._menu_icons = []
+
+        def item(menu, text, handler, keys="", checkable=False, checked=False, icon=""):
             # The shortcut is shown in the menu but bound once, as a
             # QShortcut: binding it here too would make it ambiguous.
             action = QAction(f"{text}\t{keys}" if keys else text, self)
+            if icon:
+                self._menu_icons.append((action, icon))
             if checkable:
                 action.setCheckable(True)
                 action.setChecked(bool(checked))
@@ -2876,14 +2930,16 @@ class MainWindow(QMainWindow):
 
         # ── Project ──
         self.project_menu = menu = bar.addMenu(S.MENU_PROJECT)
-        self.new_project_action = item(menu, S.MENU_NEW_PROJECT, self.new_project, "Ctrl+N")
+        self.new_project_action = item(menu, S.MENU_NEW_PROJECT, self.new_project, "Ctrl+N",
+                                       icon="file_text")
         self.open_project_action = item(menu, S.MENU_OPEN_PROJECT, self.open_project_dialog,
-                                        "Ctrl+Shift+O")
+                                        "Ctrl+Shift+O", icon="open_folder")
         self.recent_menu = menu.addMenu(S.MENU_RECENT_PROJECTS)
         menu.addSeparator()
-        self.save_project_action = item(menu, S.MENU_SAVE_PROJECT, self.save_project, "Ctrl+S")
+        self.save_project_action = item(menu, S.MENU_SAVE_PROJECT, self.save_project, "Ctrl+S",
+                                        icon="save")
         self.save_as_action = item(menu, S.MENU_SAVE_PROJECT_AS, self.save_project_as,
-                                   "Ctrl+Shift+S")
+                                   "Ctrl+Shift+S", icon="save")
         menu.addSeparator()
         self.init_project_action = item(menu, S.MENU_INIT_PROJECT, self.init_project_from_script)
         self._refresh_recent_menu()
@@ -2920,13 +2976,13 @@ class MainWindow(QMainWindow):
             self.language_actions[code] = action
         self._menu_actions.append(language_group)
         view.addSeparator()
-        item(view, S.MENU_ZOOM_IN, self.zoom_in, "Ctrl++")
-        item(view, S.MENU_ZOOM_OUT, self.zoom_out, "Ctrl+-")
+        item(view, S.MENU_ZOOM_IN, self.zoom_in, "Ctrl++", icon="zoom_in")
+        item(view, S.MENU_ZOOM_OUT, self.zoom_out, "Ctrl+-", icon="zoom_out")
         item(view, S.MENU_ZOOM_RESET, self.zoom_reset, "Ctrl+0")
         view.addSeparator()
         self.show_log_action = item(
             view, S.MENU_SHOW_LOG, self.log_panel.set_expanded, "Ctrl+`",
-            checkable=True, checked=self.log_panel.is_expanded())
+            checkable=True, checked=self.log_panel.is_expanded(), icon="log")
         self.advanced_sections_action = item(
             view, S.MENU_ADVANCED_SECTIONS, self.set_advanced_sections_open,
             checkable=True, checked=self.build_page.any_expanded())
@@ -2935,24 +2991,28 @@ class MainWindow(QMainWindow):
             checkable=True, checked=self.tabs.nav.is_collapsed())
         view.addSeparator()
         item(view, S.MENU_SETTINGS,
-             lambda: self.tabs.setCurrentWidget(self.settings_tab), "Ctrl+,")
+             lambda: self.tabs.setCurrentWidget(self.settings_tab), "Ctrl+,",
+             icon="section_settings")
 
         # ── Tools ──
         self.tools_menu = tools = bar.addMenu(S.MENU_TOOLS)
-        item(tools, S.MENU_DETECT_IMPORTS, self.detect_imports_action, "F5")
-        item(tools, S.MENU_IMPORT_REQUIREMENTS, self.import_requirements_file)
+        item(tools, S.MENU_DETECT_IMPORTS, self.detect_imports_action, "F5", icon="detect")
+        item(tools, S.MENU_IMPORT_REQUIREMENTS, self.import_requirements_file, icon="import")
         tools.addSeparator()
-        item(tools, S.MENU_PREVIEW_COMMAND, self.preview_command, "Ctrl+P")
-        item(tools, S.MENU_OPEN_OUTPUT, self.open_output_folder)
-        item(tools, S.MENU_ICON_STUDIO, self.open_icon_studio)
+        item(tools, S.MENU_PREVIEW_COMMAND, self.preview_command, "Ctrl+P", icon="preview")
+        item(tools, S.MENU_OPEN_OUTPUT, self.open_output_folder, icon="open_folder")
+        item(tools, S.MENU_ICON_STUDIO, self.open_icon_studio, icon="icon_studio")
         tools.addSeparator()
-        item(tools, S.MENU_BATCH, lambda: self.tabs.setCurrentWidget(self.batch_tab))
-        item(tools, S.MENU_CHECK_UPDATES, self.check_for_updates)
+        item(tools, S.MENU_BATCH, lambda: self.tabs.setCurrentWidget(self.batch_tab),
+             icon="batch")
+        item(tools, S.MENU_CHECK_UPDATES, self.check_for_updates, icon="update")
 
         # ── Help ──
         self.help_menu = help_menu = bar.addMenu(S.MENU_HELP)
-        item(help_menu, S.MENU_SHORTCUTS, self.show_shortcuts, "F1")
-        item(help_menu, S.MENU_ABOUT, lambda: self.tabs.setCurrentWidget(self.about_tab))
+        item(help_menu, S.MENU_SHORTCUTS, self.show_shortcuts, "F1", icon="keyboard")
+        item(help_menu, S.MENU_ABOUT, lambda: self.tabs.setCurrentWidget(self.about_tab),
+             icon="about")
+        self._apply_icons()
 
     def _set_nav_collapsed(self, collapsed: bool):
         self.tabs.set_collapsed(bool(collapsed))
