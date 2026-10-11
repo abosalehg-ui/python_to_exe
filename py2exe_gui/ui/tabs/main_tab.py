@@ -17,6 +17,7 @@ from py2exe_gui.qt import (
     QSize,
     Qt,
     QVBoxLayout,
+    QWidget,
 )
 from py2exe_gui.strings import S
 from py2exe_gui.ui.log_panel import LogPanel
@@ -38,9 +39,9 @@ class MainTab(BaseTab):
         self.source_input = QLineEdit()
         self.source_input.setPlaceholderText(S.SOURCE_PLACEHOLDER)
         self.source_input.textChanged.connect(self.on_source_changed)
-        source_btn = browse_button(S.DIALOG_CHOOSE_PY, self.browse_source)
-        source_layout.addWidget(self.source_input, stretch=4)
-        source_layout.addWidget(source_btn, stretch=1)
+        self.source_btn = browse_button(S.DIALOG_CHOOSE_PY, self.browse_source)
+        source_layout.addWidget(self.source_input, stretch=1)
+        source_layout.addWidget(self.source_btn)
         # Readiness badge: the doctor's score at a glance, one click to the
         # details. Hidden until there is a script to examine.
         self.readiness_btn = QPushButton("")
@@ -64,20 +65,21 @@ class MainTab(BaseTab):
         output_layout.addWidget(QLabel(S.OUTPUT_DIR_LABEL), 1, 0)
         self.output_dir = QLineEdit()
         self.output_dir.setPlaceholderText(S.OUTPUT_DIR_PLACEHOLDER)
-        output_dir_btn = browse_button(S.DIALOG_CHOOSE_OUT_DIR, self.browse_output_dir, folder=True)
+        self.output_dir_btn = browse_button(S.DIALOG_CHOOSE_OUT_DIR, self.browse_output_dir,
+                                            folder=True)
         output_layout.addWidget(self.output_dir, 1, 1)
-        output_layout.addWidget(output_dir_btn, 1, 2)
+        output_layout.addWidget(self.output_dir_btn, 1, 2)
 
         output_layout.addWidget(QLabel(S.ICON_LABEL), 2, 0)
         self.icon_input = QLineEdit()
         self.icon_input.setPlaceholderText(S.ICON_PLACEHOLDER)
         self.icon_input.textChanged.connect(self.refresh_icon_preview)
-        icon_btn = icon_button("image", S.DIALOG_CHOOSE_ICON, self.browse_icon)
-        studio_btn = icon_button("icon_studio", S.ICON_STUDIO_TITLE,
-                                 self.window_action("open_icon_studio"))
+        self.icon_btn = icon_button("image", S.DIALOG_CHOOSE_ICON, self.browse_icon)
+        self.studio_btn = icon_button("icon_studio", S.ICON_STUDIO_TITLE,
+                                      self.window_action("open_icon_studio"))
         icon_buttons = QHBoxLayout()
-        icon_buttons.addWidget(icon_btn)
-        icon_buttons.addWidget(studio_btn)
+        icon_buttons.addWidget(self.icon_btn)
+        icon_buttons.addWidget(self.studio_btn)
         output_layout.addWidget(self.icon_input, 2, 1)
         output_layout.addLayout(icon_buttons, 2, 2)
 
@@ -162,6 +164,18 @@ class MainTab(BaseTab):
         # the window moves it into the bottom of the window.
         self.log_panel = LogPanel(self)
         self.log_panel.setVisible(False)
+
+        # Tab order follows the reading order of the form, not creation
+        # order (which put the readiness badge between the path and its
+        # browse button).
+        order = [
+            self.source_input, self.source_btn, self.readiness_btn, self.output_name,
+            self.output_dir, self.output_dir_btn, self.icon_input, self.icon_btn,
+            self.studio_btn, self.engine_combo, self.onefile_check, self.windowed_check,
+            self.clean_check, self.noconsole_check, self.noconfirm_check, self.strip_check,
+        ]
+        for first, second in zip(order, order[1:]):
+            QWidget.setTabOrder(first, second)
 
 
     def set_readiness(self, score):

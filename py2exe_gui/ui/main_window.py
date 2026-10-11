@@ -234,6 +234,7 @@ from py2exe_gui.ui.tabs import (
 from py2exe_gui.ui.tabs.settings_tab import THEME_LABEL_KEYS
 from py2exe_gui.ui.tabs.size_tab import ltr, size_text
 from py2exe_gui.ui.tray import BuildTray
+from py2exe_gui.ui.widgets import DropOverlay, NoticeBar
 
 # The side navigation (2.1): six sections, in the order the work happens.
 # Each holds one or more of the former tabs; "build" is one composed page.
@@ -420,6 +421,13 @@ class MainWindow(QMainWindow):
             section.set_chevrons(self._icon("chevron_down"), self._icon(side))
         for action, name in getattr(self, "_menu_icons", []):
             action.setIcon(self._icon(name))
+        self.notice_bar.set_icons(
+            {"info": self._icon("info", "accent"), "success": self._icon("ok", "success"),
+             "warning": self._icon("warning", "warning")},
+            close_icon=self._icon("close", "muted"),
+        )
+        from py2exe_gui.qt import QSize
+        self.drop_overlay.set_icon(self._icon("import", "accent").pixmap(QSize(48, 48)))
 
     def _apply_layout_direction(self):
         self.setLayoutDirection(
@@ -520,6 +528,10 @@ class MainWindow(QMainWindow):
         column_layout.setContentsMargins(0, 0, 0, 0)
         column_layout.setSpacing(0)
         column_layout.addWidget(self._create_page_bar())
+        # A line under the page bar for "saved", "applied", "finished":
+        # messages with nothing to decide are no longer modal dialogs.
+        self.notice_bar = NoticeBar()
+        column_layout.addWidget(self.notice_bar)
         # Pages above, log below, with a handle between them while the log is
         # open; folded, the log is one header line and the handle is locked.
         self.log_splitter = QSplitter(Qt.Orientation.Vertical)
@@ -543,6 +555,9 @@ class MainWindow(QMainWindow):
         layout.setSpacing(0)
         layout.addWidget(self.tabs.nav)
         layout.addWidget(column, 1)
+        # Shown while a file is dragged over the window (see dragEnterEvent).
+        self.drop_overlay = DropOverlay(central)
+        self.drop_overlay.set_texts(S.DROP_TITLE, S.DROP_HINT)
         # The SectionView itself is not shown: its nav and stack are placed
         # separately so the log and action bar sit under the pages only.
         self.tabs.setParent(central)
@@ -754,19 +769,34 @@ class MainWindow(QMainWindow):
         self.open_folder_btn = action(S.BTN_OPEN_FOLDER, self.open_output_folder, "flatBtn")
         row.addStretch(1)
 
+        # The stage reads beside the bar, not across it: text over a half
+        # filled bar was two colours at once.
+        self.progress_label = QLabel("")
+        self.progress_label.setObjectName("progressLabel")
+        self.progress_label.setVisible(False)
+        row.addWidget(self.progress_label)
         self.progress_bar = QProgressBar()
         self.progress_bar.setObjectName("buildProgress")
         self.progress_bar.setMinimum(0)
         self.progress_bar.setMaximum(100)
         self.progress_bar.setValue(0)
         self.progress_bar.setFormat(S.PROGRESS_READY)
-        self.progress_bar.setTextVisible(True)
-        self.progress_bar.setFixedWidth(260)
-        self.progress_bar.setMinimumHeight(22)
+        self.progress_bar.setTextVisible(False)
+        self.progress_bar.setFixedWidth(180)
+        self.progress_bar.setFixedHeight(10)
         self.progress_bar.setAccessibleName(S.PROGRESS_READY)
         self.progress_bar.setVisible(False)
+        self.progress_bar.valueChanged.connect(self._refresh_progress_label)
         row.addWidget(self.progress_bar)
         return bar
+
+    def _refresh_progress_label(self, *_args):
+        """Mirror the bar's format (stage + percentage) into the label."""
+        if hasattr(self, "progress_label"):
+            text = self.progress_bar.text()
+            self.progress_label.setText(text)
+            self.progress_label.setVisible(self.progress_bar.isVisibleTo(self))
+            self.progress_bar.setAccessibleName(text)
 
     # ── Status bar ─────────────────────────────────────────────────────────
 
@@ -781,6 +811,10 @@ class MainWindow(QMainWindow):
 
     def set_status(self, text: str):
         self.statusBar().showMessage(text)
+
+    def notify(self, text: str, level: str = "info", timeout_ms=None):
+        """Say ``text`` in the notice bar (no dialog to dismiss)."""
+        self.notice_bar.show_message(text, level, timeout_ms)
 
     # ─── Startup checks ─────────────────────────────────────────────────
 
@@ -878,9 +912,7 @@ class MainWindow(QMainWindow):
         self.advanced_tab.merge_hidden_imports(template["hidden_imports"])
         name = template_name(key)
         self._append_log(S.LOG_TEMPLATE_APPLIED.format(name=name))
-        QMessageBox.information(
-            self, S.MSG_SUCCESS, S.MSG_TEMPLATE_OK_FMT.format(name=name)
-        )
+        self.notify(S.MSG_TEMPLATE_OK_FMT.format(name=name), "success")
 
     # ─── Configuration ──────────────────────────────────────────────────
 
@@ -929,7 +961,7 @@ class MainWindow(QMainWindow):
             QMessageBox.critical(self, S.MSG_ERROR, S.ERR_SAVE_FAIL.format(error=str(e)))
             return
         self._append_log(S.LOG_SETTINGS_SAVED.format(path=file_path))
-        QMessageBox.information(self, S.MSG_SUCCESS, S.MSG_SAVED_OK)
+        self.notify(S.MSG_SAVED_OK, "success")
 
     def load_saved_settings(self):
         file_path, _ = QFileDialog.getOpenFileName(
@@ -953,7 +985,7 @@ class MainWindow(QMainWindow):
 
         self._apply_project(project, self._sections_of(data))
         self._append_log(S.LOG_SETTINGS_LOADED.format(path=file_path))
-        QMessageBox.information(self, S.MSG_SUCCESS, S.MSG_LOADED_OK)
+        self.notify(S.MSG_LOADED_OK, "success")
 
     def _confirm_untrusted_config(self, config: BuildConfig) -> bool:
         """Ask before applying a config that would make PyInstaller run code.
@@ -1436,6 +1468,7 @@ class MainWindow(QMainWindow):
         self.progress_bar.setValue(0)
         self.progress_bar.setFormat(S.PROGRESS_CONVERTING)
         self.progress_bar.setVisible(True)
+        self._refresh_progress_label()
         self.log_panel.set_expanded(True)
         self.set_status(S.STATUS_BUILDING)
 
@@ -1459,6 +1492,7 @@ class MainWindow(QMainWindow):
         label = getattr(S, f"STAGE_{stage_key.upper()}", "")
         if label:
             self.progress_bar.setFormat(S.PROGRESS_STAGE_FMT.format(stage=label))
+            self._refresh_progress_label()
             self.set_status(S.STATUS_BUILDING_STAGE_FMT.format(stage=label))
 
     def _notify_build_result(self, success: bool, name: str):
@@ -1548,10 +1582,14 @@ class MainWindow(QMainWindow):
 
         if success:
             self.progress_bar.setFormat(S.PROGRESS_DONE)
+            self._refresh_progress_label()
             self.set_status(S.STATUS_DONE_FMT.format(duration=ltr(f"{duration:.0f}s")))
-            QMessageBox.information(self, S.MSG_SUCCESS, message)
+            # The outcome stays until closed; the tray already pinged anyone
+            # who was looking elsewhere.
+            self.notify(message, "success", 0)
         else:
             self.progress_bar.setFormat(S.PROGRESS_FAILED)
+            self._refresh_progress_label()
             self.set_status(S.STATUS_CANCELLED if message == S.CONV_CANCELLED
                             else S.STATUS_FAILED)
             declined = [f for f in diagnosed if f.code == "nuitka_download_declined"]
@@ -1701,7 +1739,7 @@ class MainWindow(QMainWindow):
         if info is None:
             self._append_log(S.LOG_UPDATE_NONE.format(version=APP_VERSION))
             if interactive:
-                QMessageBox.information(self, S.MSG_SUCCESS, S.UPDATE_NONE)
+                self.notify(S.UPDATE_NONE, "info")
             return
 
         self._append_log(S.LOG_UPDATE_AVAILABLE.format(version=info.version, url=info.url))
@@ -1996,7 +2034,7 @@ class MainWindow(QMainWindow):
     def apply_doctor_fixes(self, fixes, rebuild: bool = False):
         """Apply fixes chosen on the Doctor tab, optionally rebuilding."""
         if not fixes:
-            QMessageBox.information(self, S.MSG_WARNING, S.DOCTOR_NOTHING_SELECTED)
+            self.notify(S.DOCTOR_NOTHING_SELECTED, "warning")
             return
         if self._build_in_progress():
             QMessageBox.warning(self, S.MSG_WARNING, S.MSG_DIAG_BUSY)
@@ -2640,9 +2678,9 @@ class MainWindow(QMainWindow):
         self._append_log(S.LOG_KIT_PUBLISHED.format(
             manifest=result.manifest_path, signature=result.signature_path
         ))
-        QMessageBox.information(self, S.MSG_SUCCESS, S.MSG_KIT_PUBLISHED_FMT.format(
+        self.notify(S.MSG_KIT_PUBLISHED_FMT.format(
             manifest=result.manifest_path, signature=result.signature_path
-        ))
+        ), "success", 0)
 
     # ─── Windows Sandbox ────────────────────────────────────────────────
 
@@ -2651,12 +2689,10 @@ class MainWindow(QMainWindow):
         config = self._current_config()
         output = output_path_for(config) if config.source else ""
         if not output:
-            QMessageBox.information(self, S.MSG_WARNING, S.MSG_SANDBOX_NO_BUILD)
+            self.notify(S.MSG_SANDBOX_NO_BUILD, "warning")
             return
         if not sandbox_available():
-            QMessageBox.information(
-                self, S.MSG_WARNING, S.SANDBOX_UNAVAILABLE.format(path=output)
-            )
+            self.notify(S.SANDBOX_UNAVAILABLE.format(path=output), "warning")
             return
         host, exe = wsb_for_output(output, config.onefile)
         path = os.path.join(build_root(config), f"{build_name(config)}.wsb")
@@ -2814,7 +2850,7 @@ class MainWindow(QMainWindow):
             QMessageBox.warning(self, S.MSG_WARNING, error)
             return
         self._append_log(S.LOG_ISS_WRITTEN.format(path=iss_path))
-        QMessageBox.information(self, S.MSG_SUCCESS, iss_path)
+        self.notify(S.MSG_ISS_WRITTEN_FMT.format(path=iss_path), "success", 0)
 
     def build_installer_now(self):
         """Generate the script and run ISCC on it (manual trigger)."""
@@ -2884,9 +2920,7 @@ class MainWindow(QMainWindow):
         if success:
             self._append_log(S.LOG_INSTALLER_OK.format(path=message))
             if interactive:
-                QMessageBox.information(
-                    self, S.MSG_SUCCESS, S.MSG_INSTALLER_OK.format(path=message)
-                )
+                self.notify(S.MSG_INSTALLER_OK.format(path=message), "success", 0)
         else:
             self._append_log(S.LOG_INSTALLER_FAIL.format(error=message))
             if interactive:
@@ -3661,8 +3695,20 @@ class MainWindow(QMainWindow):
     def dragEnterEvent(self, event):
         if event.mimeData().hasUrls():
             event.acceptProposedAction()
+            self.drop_overlay.cover(self.centralWidget())
+            self.drop_overlay.show()
+
+    def dragLeaveEvent(self, event):
+        self.drop_overlay.hide()
+        super().dragLeaveEvent(event)
+
+    def resizeEvent(self, event):
+        super().resizeEvent(event)
+        if getattr(self, "drop_overlay", None) is not None and self.drop_overlay.isVisible():
+            self.drop_overlay.cover(self.centralWidget())
 
     def dropEvent(self, event):
+        self.drop_overlay.hide()
         urls = event.mimeData().urls()
         if not urls:
             return

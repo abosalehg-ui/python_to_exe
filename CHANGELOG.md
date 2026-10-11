@@ -51,6 +51,20 @@ served as the icon set.
   (info/warning/danger), slim scrollbars, group titles above the frame on
   the side the layout direction puts them. New palette keys `warning` and
   `on_warning` in all four themes.
+- **A notice bar instead of informational dialogs**
+  (`py2exe_gui/ui/widgets/notice_bar.py`): "settings saved", "template
+  applied", "build finished", "no update", "nothing selected", the sandbox
+  and installer results appear in a tinted line under the page bar
+  (success/info go away by themselves, warnings and build results stay
+  until closed). Dialogs remain for questions and for errors that stop an
+  action.
+- **A visible drop target** (`py2exe_gui/ui/widgets/drop_overlay.py`): while
+  a file is dragged over the window, a dashed overlay says where it will go
+  (`.py` source, `.ico` icon, `.toml` project, anything else an extra file).
+- The build stage and percentage read beside the progress bar, not across it.
+- The Build form's tab order follows the reading order; English menus have
+  mnemonics (`&Project`, `&View`, `&Tools`, `&Help`); an empty log shows what
+  to do next.
 
 **Fixed**
 - **Every page scrolls**: eight tabs laid their groups straight onto the

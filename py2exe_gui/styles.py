@@ -776,6 +776,47 @@ QProgressBar#buildProgress {{
     font-size: {pt_small};
     font-weight: normal;
 }}
+/* The notice bar under the page bar: tinted by level, like the notices. */
+QFrame#noticeBar {{
+    background-color: rgba({accent_rgb}, 0.16);
+    border-bottom: 1px solid {accent};
+}}
+QFrame#noticeBar[level="success"] {{
+    background-color: rgba({success_rgb}, 0.16);
+    border-bottom: 1px solid {success};
+}}
+QFrame#noticeBar[level="warning"] {{
+    background-color: rgba({warning_rgb}, 0.18);
+    border-bottom: 1px solid {warning};
+}}
+QLabel#noticeText {{
+    color: {text};
+    background: transparent;
+}}
+QLabel#progressLabel {{
+    font-size: {pt_small};
+    color: {muted};
+}}
+/* The drag-and-drop overlay: a dashed frame over the whole content. */
+QWidget#dropOverlay {{
+    background-color: rgba({window_bg_rgb}, 0.88);
+}}
+QWidget#dropFrame {{
+    border: 2px dashed {accent};
+    border-radius: 12px;
+    background-color: rgba({accent_rgb}, 0.08);
+}}
+QLabel#dropText {{
+    font-size: {pt_about_head};
+    font-weight: bold;
+    color: {accent};
+    background: transparent;
+}}
+QLabel#dropHint {{
+    font-size: {pt_body};
+    color: {muted};
+    background: transparent;
+}}
 QTableWidget#shortcutsTable {{
     background-color: transparent;
     border: none;
@@ -830,7 +871,7 @@ def render_theme(
     values["title_side"] = "right" if rtl else "left"
     values["nav_border_side"] = "left" if rtl else "right"
     # "r, g, b" for the tinted notices (rgba() needs decimal channels).
-    for key in ("accent", "warning", "danger"):
+    for key in ("accent", "warning", "danger", "success", "window_bg"):
         values[f"{key}_rgb"] = hex_to_rgb(palette[key])
     values.update({f"pt_{name}": _pt(name, factor) for name in _BASE_SIZES})
     return _TEMPLATE.format(**values)

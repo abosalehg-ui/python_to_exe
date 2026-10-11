@@ -126,6 +126,8 @@ class LogPanel(QWidget):
         self.log_output.setReadOnly(True)
         self.log_output.setMinimumHeight(MIN_OPEN_HEIGHT)
         self.log_output.setAccessibleName(S.LOG_PANEL_TITLE)
+        # An empty log says what to do, not nothing.
+        self.log_output.setPlaceholderText(S.LOG_PANEL_EMPTY)
         layout.addWidget(self.log_output)
 
         self.toggle_btn.setChecked(False)

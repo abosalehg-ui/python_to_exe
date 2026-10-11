@@ -16,7 +16,7 @@ from py2exe_gui.qt import (  # noqa: E402
     QMessageBox,  # noqa: E402
     Qt,  # noqa: E402
 )
-from py2exe_gui.strings import En, set_locale  # noqa: E402
+from py2exe_gui.strings import En, S, set_locale  # noqa: E402
 from tests.conftest import MemoryKeyring  # noqa: E402
 
 pytestmark = pytest.mark.gui
@@ -135,14 +135,10 @@ def test_unticked_findings_are_not_applied(window, tmp_path):
     assert window.doctor_tab.checked_fixes() == []
 
 
-def test_apply_with_nothing_selected_says_so(window, monkeypatch):
-    shown = {}
-    monkeypatch.setattr(
-        QMessageBox, "information",
-        staticmethod(lambda *a, **k: shown.update(text=a[2]) or QMessageBox.StandardButton.Ok),
-    )
+def test_apply_with_nothing_selected_says_so(window):
     window.apply_doctor_fixes([])
-    assert shown
+    assert window.notice_bar.isVisibleTo(window)
+    assert window.notice_bar.text() == S.DOCTOR_NOTHING_SELECTED
 
 
 def test_apply_and_rebuild_starts_a_build(window, tmp_path, monkeypatch):

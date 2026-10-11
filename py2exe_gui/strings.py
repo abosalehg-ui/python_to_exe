@@ -1944,6 +1944,9 @@ class Ar:
     BTN_FONT_SMALLER_TIP = "تصغير الخط"
     BTN_FONT_LARGER_TIP = "تكبير الخط"
     UPDATES_HINT = "يُبلّغ فقط: لا يُنزَّل شيء ولا يُشغَّل نيابة عنك."
+    DROP_TITLE = "أفلت الملف هنا"
+    DROP_HINT = "ملف .py يصبح المصدر، و.ico الأيقونة، و.toml مشروعاً؛ وأي ملف آخر يُضاف إلى الملفات الإضافية."
+    MSG_ISS_WRITTEN_FMT = "تم توليد ملف .iss: {path}"
 
 class En:
     """English strings."""
@@ -3100,7 +3103,7 @@ class En:
     # ── 1.6: project file, command line, release ───────────────────────
     WINDOW_TITLE_PROJECT_FMT = "{project}[*] — {app}"
     TAB_RELEASE = "Release"
-    MENU_PROJECT = "Project"
+    MENU_PROJECT = "&Project"
     MENU_NEW_PROJECT = "New project"
     MENU_OPEN_PROJECT = "Open project…"
     MENU_RECENT_PROJECTS = "Recent projects"
@@ -3853,9 +3856,9 @@ class En:
     LOG_PANEL_TITLE = "Build log"
     LOG_PANEL_EMPTY = "No build yet. Choose a file, then press Start Build."
     LOG_PANEL_TOGGLE_TIP = "Show or fold the log (Ctrl+`)"
-    MENU_VIEW = "View"
-    MENU_TOOLS = "Tools"
-    MENU_HELP = "Help"
+    MENU_VIEW = "&View"
+    MENU_TOOLS = "&Tools"
+    MENU_HELP = "&Help"
     MENU_THEME = "Theme"
     MENU_LANGUAGE = "Language"
     MENU_ZOOM_IN = "Larger text"
@@ -3913,6 +3916,9 @@ class En:
     BTN_FONT_SMALLER_TIP = "Smaller text"
     BTN_FONT_LARGER_TIP = "Larger text"
     UPDATES_HINT = "Report only: nothing is downloaded or run on your behalf."
+    DROP_TITLE = "Drop the file here"
+    DROP_HINT = "A .py file becomes the source, .ico the icon, .toml a project; anything else is added to the extra files."
+    MSG_ISS_WRITTEN_FMT = "Generated the .iss script: {path}"
 
 LOCALES = {"ar": Ar, "en": En}
 

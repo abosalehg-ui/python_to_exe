@@ -300,7 +300,9 @@ def test_publish_writes_signed_files(window, tmp_path, monkeypatch):
     signature = (tmp_path / "dist" / "update.json.sig").read_bytes()
     verify_manifest(manifest, signature, read_key_file(key_file()).public_hex)
     assert parse_manifest(manifest)["version"] == "1.1.0"
-    assert shown and "update.json" in window.main_tab.log_text()
+    # 2.1: the result is a notice under the page bar, not a dialog.
+    assert not shown and "update.json" in window.main_tab.log_text()
+    assert "update.json" in window.notice_bar.text() and window.notice_bar.level == "success"
 
     tab.publish_url.setText("http://example.com/Tool.exe")
     warned = []
