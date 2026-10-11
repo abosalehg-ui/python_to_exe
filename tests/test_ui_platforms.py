@@ -73,12 +73,9 @@ def wait_packages(qapp, window):
 # ── The tab holds the two sections ────────────────────────────────────────
 
 
-def test_tab_is_registered_and_outside_simple_mode(window):
-    from py2exe_gui.ui.main_window import SIMPLE_MODE_TABS
-
-    keys = [key for key, _w, _t in window._all_tabs]
-    assert keys.index("platforms") == keys.index("release") + 1
-    assert "platforms" not in SIMPLE_MODE_TABS
+def test_tab_is_registered_in_the_distribute_section(window):
+    assert window.section_of(window.platforms_tab) == "distribute"
+    assert window.section_of(window.release_tab) == "distribute"
     assert window.platforms_tab in window._project_tabs
 
 
@@ -121,7 +118,7 @@ def test_banner_names_the_macos_only_format_on_linux(window):
     from py2exe_gui.qt import QLabel
 
     texts = [w.text() for w in window.platforms_tab.findChildren(QLabel)
-             if w.objectName() == "warningNotice"]
+             if w.objectName() == "noticeWarning"]
     assert any(Ar.FEATURE_DMG in t and "macOS" in t for t in texts)
     assert not any(Ar.FEATURE_DEB in t for t in texts)
 

@@ -15,7 +15,6 @@ from py2exe_gui.qt import (
     Qt,  # noqa: E402
 )
 from py2exe_gui.strings import Ar, En, set_locale  # noqa: E402
-from py2exe_gui.ui.main_window import SIMPLE_MODE_TABS  # noqa: E402
 from py2exe_gui.ui.tabs.home_tab import HomeTab, ProjectCard, SizeSparkline  # noqa: E402
 from tests.conftest import MemoryKeyring  # noqa: E402
 
@@ -63,13 +62,12 @@ def texts(card):
 # ── The tab ───────────────────────────────────────────────────────────────
 
 
-def test_home_is_the_first_tab_in_both_modes(window):
+def test_home_is_the_first_page_of_the_projects_section(window):
     assert isinstance(window.home_tab, HomeTab)
-    assert "home" in SIMPLE_MODE_TABS
     assert window.tabs.widget(0) is window.home_tab
     assert window.tabs.tabText(0) == Ar.TAB_HOME
-    window.set_simple_mode(False)
-    assert window.tabs.widget(0) is window.home_tab
+    assert window.section_of(window.home_tab) == "projects"
+    assert window.section_of(window.history_tab) == "projects"
 
 
 def test_without_projects_the_window_opens_on_main_with_the_empty_notice(window):

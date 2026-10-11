@@ -2,7 +2,7 @@
 
 from py2exe_gui.ui.tabs.about_tab import AboutTab
 from py2exe_gui.ui.tabs.advanced_tab import AdvancedTab
-from py2exe_gui.ui.tabs.base import BaseTab, browse_button, scrollable
+from py2exe_gui.ui.tabs.base import BaseTab, browse_button, scrollable, scrolled_layout
 from py2exe_gui.ui.tabs.batch_tab import BatchTab
 from py2exe_gui.ui.tabs.deploy_tab import DeployTab
 from py2exe_gui.ui.tabs.doctor_tab import DoctorTab
@@ -13,6 +13,7 @@ from py2exe_gui.ui.tabs.main_tab import MainTab
 from py2exe_gui.ui.tabs.platforms_tab import PlatformsTab
 from py2exe_gui.ui.tabs.release_tab import ReleaseTab
 from py2exe_gui.ui.tabs.runtime_tab import RuntimeTab
+from py2exe_gui.ui.tabs.settings_tab import SettingsTab
 from py2exe_gui.ui.tabs.size_tab import SizeTab
 from py2exe_gui.ui.tabs.templates_tab import TemplatesTab
 from py2exe_gui.ui.tabs.version_info_tab import VersionInfoTab
@@ -31,9 +32,11 @@ __all__ = [
     "PlatformsTab",
     "ReleaseTab",
     "RuntimeTab",
+    "SettingsTab",
     "SizeTab",
     "TemplatesTab",
     "VersionInfoTab",
     "browse_button",
     "scrollable",
+    "scrolled_layout",
 ]

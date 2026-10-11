@@ -6,6 +6,7 @@ that owns its own controls and the browse handlers that belong to it; the
 window keeps orchestration (threads, the build pipeline, shortcuts).
 """
 
+from py2exe_gui import icons
 from py2exe_gui.core.platform_support import (
     LINUX,
     MACOS,
@@ -19,6 +20,8 @@ from py2exe_gui.qt import (
     QLabel,
     QPushButton,
     QScrollArea,
+    QSize,
+    Qt,
     QVBoxLayout,
     QWidget,
 )
@@ -43,19 +46,35 @@ _NOTICE_FORMATS = {
 }
 
 
-def browse_button(label: str, handler) -> QPushButton:
-    """A '📂' button that screen readers and tooltips can actually describe.
+ICON_BUTTON_SIZE = 32
+ICON_SIZE = 18
 
-    Emoji-only buttons expose no accessible name of their own, so several
-    identical '📂' buttons were indistinguishable to assistive technology and
-    to anyone navigating by keyboard.
+
+def icon_button(icon_name: str, label: str, handler, size: int = ICON_BUTTON_SIZE) -> QPushButton:
+    """A square button that shows an icon and *says* ``label``.
+
+    The icon is drawn in the default colour here and recoloured by the window
+    for the active theme (``MainWindow._apply_icons`` reads ``iconName``).
+    The tooltip and the accessible name are not optional: an icon alone is
+    indistinguishable to assistive technology and to anyone new to the app.
     """
-    button = QPushButton("📂")
+    button = QPushButton()
+    button.setObjectName("iconBtn")
+    button.setProperty("iconName", icon_name)
+    button.setFixedSize(size, size)
+    button.setIconSize(QSize(ICON_SIZE, ICON_SIZE))
+    button.setIcon(icons.icon(icon_name))
     button.setToolTip(label)
     button.setAccessibleName(label)
     button.setAccessibleDescription(label)
+    button.setCursor(Qt.CursorShape.PointingHandCursor)
     button.clicked.connect(handler)
     return button
+
+
+def browse_button(label: str, handler, folder: bool = False) -> QPushButton:
+    """The "choose a file/folder" button next to a path field."""
+    return icon_button("browse_folder" if folder else "browse_file", label, handler)
 
 
 class BaseTab(QWidget):
@@ -66,9 +85,13 @@ class BaseTab(QWidget):
     the few actions that span tabs.
     """
 
-    def __init__(self, window=None, parent=None):
+    def __init__(self, window=None, parent=None, embedded=False):
         super().__init__(parent)
         self.window = window
+        # An embedded tab is one section of a larger scrolling page (the Build
+        # page): it must not bring a scroll area of its own, or the page would
+        # scroll inside a page.
+        self.embedded = bool(embedded)
         self._build()
 
     def _build(self):  # pragma: no cover - abstract
@@ -126,7 +149,8 @@ def platform_notice(*features, platform=None):
             paragraphs.append(getattr(S, attr).format(platform=platform_label(platform),
                                                       features=names))
     label = QLabel("\n".join(paragraphs))
-    label.setObjectName("warningNotice")
+    # A caution, not an error: the feature is skipped here, nothing breaks.
+    label.setObjectName("noticeWarning")
     label.setWordWrap(True)
     label.setAccessibleName(label.text())
     return label
@@ -142,4 +166,27 @@ def scrollable(widget: QWidget) -> QScrollArea:
 
 def vbox(parent: QWidget) -> QVBoxLayout:
     layout = QVBoxLayout(parent)
+    return layout
+
+
+def scrolled_layout(tab: QWidget) -> QVBoxLayout:
+    """The layout a tab adds its groups to, inside a scroll area.
+
+    Every tab goes through here. Eight of fifteen tabs used to lay their
+    groups straight onto the widget, and when the window was shorter than
+    their content (the default 1080x800 window, any 1366x768 laptop) Qt
+    squeezed the fields to a couple of pixels instead of scrolling.
+    """
+    if getattr(tab, "embedded", False):
+        layout = QVBoxLayout(tab)
+        layout.setContentsMargins(0, 0, 0, 0)
+        return layout
+    outer = QVBoxLayout(tab)
+    outer.setContentsMargins(0, 0, 0, 0)
+    content = QWidget()
+    layout = QVBoxLayout(content)
+    # Room above the first group box: its title sits in the margin and
+    # would be clipped by the top edge of the scroll area.
+    layout.setContentsMargins(6, 14, 6, 6)
+    outer.addWidget(scrollable(content))
     return layout

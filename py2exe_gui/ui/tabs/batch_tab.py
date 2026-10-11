@@ -13,14 +13,14 @@ from py2exe_gui.qt import (
     QVBoxLayout,
 )
 from py2exe_gui.strings import S
-from py2exe_gui.ui.tabs.base import BaseTab
+from py2exe_gui.ui.tabs.base import BaseTab, scrolled_layout
 
 
 class BatchTab(BaseTab):
     """The file queue, its controls, and the summary of the last run."""
 
     def _build(self):
-        layout = QVBoxLayout(self)
+        layout = scrolled_layout(self)
 
         files_group = QGroupBox(S.GROUP_BATCH_FILES)
         files_layout = QVBoxLayout(files_group)

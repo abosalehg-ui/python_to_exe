@@ -7,17 +7,16 @@ from py2exe_gui.qt import (
     QGroupBox,
     QLabel,
     QLineEdit,
-    QVBoxLayout,
 )
 from py2exe_gui.strings import S
-from py2exe_gui.ui.tabs.base import BaseTab, platform_notice
+from py2exe_gui.ui.tabs.base import BaseTab, platform_notice, scrolled_layout
 
 
 class VersionInfoTab(BaseTab):
     """Form for the optional Windows file metadata (--version-file)."""
 
     def _build(self):
-        layout = QVBoxLayout(self)
+        layout = scrolled_layout(self)
 
         # These fields become a Windows PE version resource. PyInstaller
         # accepts --version-file anywhere, but an ELF/Mach-O binary has

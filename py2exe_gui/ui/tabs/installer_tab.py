@@ -95,7 +95,7 @@ class InstallerTab(BaseTab):
             output_grid.addWidget(QLabel(label), row, 0)
             output_grid.addWidget(widget, row, 1)
             if handler is not None:
-                btn = browse_button(label, handler)
+                btn = browse_button(label, handler, folder=widget is self.inst_out_dir)
                 output_grid.addWidget(btn, row, 2)
         layout.addWidget(output)
 

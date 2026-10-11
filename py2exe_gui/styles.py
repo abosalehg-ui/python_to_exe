@@ -140,6 +140,8 @@ PALETTES: Dict[str, Dict[str, str]] = {
         "disabled_text": "#a6adc8",
         "danger": "#f38ba8",
         "danger_hover": "#eba0ac",
+        "warning": "#f9e2af",
+        "on_warning": "#1e1e2e",
         "success": "#a6e3a1",
         "success_hover": "#94e2d5",
         "tab_bg": "#45475a",
@@ -171,6 +173,8 @@ PALETTES: Dict[str, Dict[str, str]] = {
         "disabled_text": "#565a66",
         "danger": "#c00d33",
         "danger_hover": "#b82836",
+        "warning": "#9a6700",
+        "on_warning": "#ffffff",
         "success": "#166b2d",
         "success_hover": "#0f7278",
         "tab_bg": "#ccd0da",
@@ -200,6 +204,8 @@ PALETTES: Dict[str, Dict[str, str]] = {
         # so the button colours are lifted while keeping the hue.
         "danger": "#d88b94",
         "danger_hover": "#e3ab99",
+        "warning": "#ebcb8b",
+        "on_warning": "#2e3440",
         "success": "#a3be8c",
         "success_hover": "#b5cfa3",
         "tab_bg": "#434c5e",
@@ -228,6 +234,8 @@ PALETTES: Dict[str, Dict[str, str]] = {
         "disabled_text": "#a0a0a0",
         "danger": "#ff8080",
         "danger_hover": "#ffb0b0",
+        "warning": "#ffff00",
+        "on_warning": "#000000",
         "success": "#00ff00",
         "success_hover": "#a0ffa0",
         "tab_bg": "#000000",
@@ -253,105 +261,164 @@ QWidget {{
     font-size: {pt_body};
     color: {text};
 }}
+QToolTip {{
+    background-color: {surface};
+    color: {text};
+    border: 1px solid {border};
+    padding: 4px 8px;
+}}
+
+/* ── Group boxes: a 1px card with the title above the frame ─────────────── */
 QGroupBox {{
     font-weight: bold;
     font-size: {pt_group};
-    border: 2px solid {border};
+    border: 1px solid {border};
     border-radius: 8px;
-    margin-top: 12px;
-    padding-top: 10px;
+    margin-top: 18px;
+    padding-top: 8px;
     background-color: {surface};
 }}
 QGroupBox::title {{
     subcontrol-origin: margin;
-    subcontrol-position: top right;
-    padding: 0 10px;
+    subcontrol-position: top {title_side};
+    {title_side}: 8px;
+    top: 0px;
+    padding: 0 4px;
     color: {accent};
 }}
+
+/* ── Buttons: three tiers. Every button used to be a filled accent block,
+      so nothing read as the primary action. ───────────────────────────── */
 QPushButton {{
-    background-color: {accent};
-    color: {on_accent};
-    /* Transparent border keeps geometry stable when :focus adds a visible one. */
-    border: 2px solid transparent;
-    padding: 5px 12px;
+    background-color: transparent;
+    color: {text};
+    border: 1px solid {input_border};
+    padding: 6px 14px;
     border-radius: 6px;
-    font-weight: bold;
-    min-height: 16px;
+    font-weight: 600;
+    min-height: 22px;
 }}
 QPushButton:hover {{
-    background-color: {accent_hover};
+    background-color: {surface};
+    border-color: {accent};
 }}
 QPushButton:pressed {{
-    background-color: {accent_pressed};
+    background-color: {input_bg};
 }}
 /* Keyboard users could not tell which button had focus. */
 QPushButton:focus {{
     border: 2px solid {focus_ring};
+    padding: 5px 13px;
 }}
 QPushButton:disabled {{
-    background-color: {disabled_bg};
     color: {disabled_text};
+    border-color: {border};
+    background-color: transparent;
 }}
-QPushButton#dangerBtn {{
-    background-color: {danger};
+QPushButton#primaryBtn, QPushButton#successBtn, QPushButton#dangerBtn {{
+    border: 1px solid transparent;
     color: {on_accent};
 }}
-QPushButton#dangerBtn:hover {{
-    background-color: {danger_hover};
-    color: {on_accent};
+QPushButton#primaryBtn {{
+    background-color: {accent};
+}}
+QPushButton#primaryBtn:hover {{
+    background-color: {accent_hover};
+}}
+QPushButton#primaryBtn:pressed {{
+    background-color: {accent_pressed};
 }}
 QPushButton#successBtn {{
     background-color: {success};
-    color: {on_accent};
 }}
 QPushButton#successBtn:hover {{
     background-color: {success_hover};
-    color: {on_accent};
 }}
+QPushButton#dangerBtn {{
+    background-color: {danger};
+}}
+QPushButton#dangerBtn:hover {{
+    background-color: {danger_hover};
+}}
+QPushButton#primaryBtn:disabled, QPushButton#successBtn:disabled, QPushButton#dangerBtn:disabled {{
+    background-color: {disabled_bg};
+    color: {disabled_text};
+}}
+QPushButton#flatBtn {{
+    border-color: transparent;
+    font-weight: 500;
+}}
+QPushButton#flatBtn:hover {{
+    background-color: {surface};
+    border-color: {border};
+}}
+QPushButton#iconBtn {{
+    padding: 0;
+    min-height: 0;
+    min-width: 0;
+}}
+QPushButton#iconBtn:focus {{
+    padding: 0;
+}}
+
+/* ── Fields ─────────────────────────────────────────────────────────────── */
 QLineEdit, QComboBox, QSpinBox {{
     background-color: {input_bg};
-    border: 2px solid {input_border};
+    border: 1px solid {input_border};
     border-radius: 6px;
-    padding: 8px;
+    padding: 6px 10px;
+    min-height: 20px;
     color: {text};
+    selection-background-color: {accent};
+    selection-color: {on_accent};
 }}
 QLineEdit:focus, QComboBox:focus, QSpinBox:focus {{
-    border-color: {accent};
+    border: 2px solid {accent};
+    padding: 5px 9px;
 }}
 QLineEdit:disabled, QComboBox:disabled, QSpinBox:disabled {{
     background-color: {disabled_bg};
     color: {disabled_text};
 }}
+QComboBox QAbstractItemView {{
+    background-color: {surface};
+    color: {text};
+    border: 1px solid {border};
+    selection-background-color: {accent};
+    selection-color: {on_accent};
+    outline: 0;
+}}
 QTextEdit {{
     background-color: {log_bg};
-    border: 2px solid {border};
+    border: 1px solid {border};
     border-radius: 8px;
-    padding: 10px;
-    font-family: 'Consolas', 'Courier New', monospace;
+    padding: 8px;
+    font-family: 'Cascadia Mono', 'Consolas', 'Noto Sans Mono', 'DejaVu Sans Mono', monospace;
     font-size: {pt_log};
     color: {log_text};
 }}
 /* 1.5: release notes (input) and the Runtime Kit's code preview. */
 QPlainTextEdit {{
     background-color: {input_bg};
-    border: 2px solid {input_border};
+    border: 1px solid {input_border};
     border-radius: 6px;
     padding: 6px;
     color: {text};
 }}
 QPlainTextEdit#codeView {{
     background-color: {log_bg};
-    border: 2px solid {border};
-    font-family: 'Consolas', 'Courier New', monospace;
+    border: 1px solid {border};
+    font-family: 'Cascadia Mono', 'Consolas', 'Noto Sans Mono', 'DejaVu Sans Mono', monospace;
     font-size: {pt_log};
     color: {log_text};
 }}
 QListWidget, QTreeWidget, QTableWidget {{
     background-color: {input_bg};
     color: {text};
-    border: 2px solid {input_border};
+    border: 1px solid {input_border};
     border-radius: 6px;
-    padding: 5px;
+    padding: 4px;
+    outline: 0;
 }}
 QTableWidget {{
     gridline-color: {input_border};
@@ -380,67 +447,141 @@ QScrollArea, QScrollArea > QWidget > QWidget {{
     background: transparent;
     border: none;
 }}
-QCheckBox {{
+QCheckBox, QRadioButton {{
     spacing: 8px;
+    min-height: 24px;
 }}
-QCheckBox::indicator {{
-    width: 20px;
-    height: 20px;
-    border-radius: 4px;
-    border: 2px solid {input_border};
+QCheckBox::indicator, QRadioButton::indicator {{
+    width: 18px;
+    height: 18px;
+    border: 1px solid {input_border};
     background-color: {input_bg};
 }}
-QCheckBox::indicator:checked {{
+QCheckBox::indicator {{
+    border-radius: 4px;
+}}
+QRadioButton::indicator {{
+    border-radius: 9px;
+}}
+QCheckBox::indicator:checked, QRadioButton::indicator:checked {{
     background-color: {accent};
     border-color: {accent};
 }}
-QCheckBox:focus {{
+QCheckBox::indicator:hover, QRadioButton::indicator:hover {{
+    border-color: {accent};
+}}
+QCheckBox:focus, QRadioButton:focus {{
     color: {accent};
 }}
 QProgressBar {{
-    border: 2px solid {border};
+    border: 1px solid {border};
     border-radius: 6px;
     text-align: center;
     background-color: {surface};
     color: {text};
-    font-weight: bold;
+    font-weight: 600;
 }}
 QProgressBar::chunk {{
     background-color: {accent};
-    border-radius: 4px;
+    border-radius: 5px;
 }}
+
+/* ── Tabs (sub-tabs inside a section, and the Runtime Kit preview) ──────── */
 QTabWidget::pane {{
-    border: 2px solid {border};
+    border: 1px solid {border};
     border-radius: 8px;
-    background-color: {surface};
+    background-color: transparent;
+    top: -1px;
 }}
 QTabBar::tab {{
-    background-color: {tab_bg};
-    padding: 10px 20px;
-    margin: 2px;
-    border-radius: 6px;
-    color: {text};
+    background-color: transparent;
+    padding: 8px 16px;
+    margin: 0;
+    border: 1px solid transparent;
+    border-bottom: 2px solid transparent;
+    color: {muted};
 }}
 QTabBar::tab:selected {{
-    background-color: {accent};
-    color: {on_accent};
+    color: {accent};
+    border-bottom: 2px solid {accent};
+    font-weight: bold;
+}}
+QTabBar::tab:hover {{
+    color: {text};
 }}
 QTabBar::tab:focus {{
-    border: 2px solid {focus_ring};
+    border: 1px solid {focus_ring};
 }}
+QTabWidget#subTabs::pane {{
+    border: none;
+    border-top: 1px solid {border};
+    border-radius: 0;
+}}
+QTabWidget#subTabs > QTabBar::tab {{
+    padding: 10px 18px;
+}}
+
+/* ── Scrollbars: slim, no arrows ────────────────────────────────────────── */
+QScrollBar:vertical {{
+    background: transparent;
+    width: 10px;
+    margin: 2px;
+}}
+QScrollBar:horizontal {{
+    background: transparent;
+    height: 10px;
+    margin: 2px;
+}}
+QScrollBar::handle:vertical, QScrollBar::handle:horizontal {{
+    background: {input_border};
+    border-radius: 3px;
+    min-height: 24px;
+    min-width: 24px;
+}}
+QScrollBar::handle:vertical:hover, QScrollBar::handle:horizontal:hover {{
+    background: {muted};
+}}
+QScrollBar::add-line, QScrollBar::sub-line, QScrollBar::add-page, QScrollBar::sub-page {{
+    background: none;
+    border: none;
+    height: 0;
+    width: 0;
+}}
+QSplitter::handle {{
+    background-color: {border};
+}}
+QSplitter::handle:vertical {{
+    height: 1px;
+}}
+QSplitter::handle:disabled {{
+    background-color: {border};
+}}
+
+/* ── Menus and the status bar ───────────────────────────────────────────── */
 QStatusBar {{
     background-color: {statusbar_bg};
     color: {muted};
+    border-top: 1px solid {border};
+}}
+QStatusBar::item {{
+    border: none;
+}}
+QLabel#statusVersions {{
+    color: {muted};
+    font-size: {pt_small};
+    padding: 0 8px;
 }}
 /* The Project menu (1.6). Unstyled, the platform's light menu bar sat above
    the dark window with light text on it. */
 QMenuBar {{
     background-color: {statusbar_bg};
     color: {text};
+    border-bottom: 1px solid {border};
 }}
 QMenuBar::item {{
     background: transparent;
-    padding: 4px 10px;
+    padding: 5px 12px;
+    border-radius: 4px;
 }}
 QMenuBar::item:selected, QMenu::item:selected {{
     background-color: {accent};
@@ -450,9 +591,11 @@ QMenu {{
     background-color: {surface};
     color: {text};
     border: 1px solid {border};
+    padding: 4px;
 }}
 QMenu::item {{
-    padding: 5px 24px;
+    padding: 6px 28px 6px 12px;
+    border-radius: 4px;
 }}
 QMenu::item:disabled {{
     color: {disabled_text};
@@ -462,6 +605,11 @@ QMenu::separator {{
     background: {border};
     margin: 4px 8px;
 }}
+QMenu::icon {{
+    padding-left: 8px;
+}}
+
+/* ── Labels and notices ─────────────────────────────────────────────────── */
 QLabel#titleLabel {{
     font-size: {pt_title};
     font-weight: bold;
@@ -471,19 +619,29 @@ QLabel#subtitleLabel {{
     font-size: {pt_small};
     color: {muted};
 }}
-/* A platform or update notice above a tab's contents. Reads as a callout
-   rather than another field label. */
+/* Three notice tiers, tinted rather than solid so the text keeps the
+   theme's own colour and contrast. */
 QLabel#noticeLabel {{
     font-size: {pt_small};
-    color: {on_accent};
-    background-color: {accent};
+    color: {text};
+    background-color: rgba({accent_rgb}, 0.16);
+    border: 1px solid {accent};
+    border-radius: 6px;
+    padding: 8px 12px;
+}}
+QLabel#noticeWarning {{
+    font-size: {pt_small};
+    color: {text};
+    background-color: rgba({warning_rgb}, 0.18);
+    border: 1px solid {warning};
     border-radius: 6px;
     padding: 8px 12px;
 }}
 QLabel#warningNotice {{
     font-size: {pt_small};
-    color: {on_accent};
-    background-color: {danger};
+    color: {text};
+    background-color: rgba({danger_rgb}, 0.16);
+    border: 1px solid {danger};
     border-radius: 6px;
     padding: 8px 12px;
 }}
@@ -512,10 +670,161 @@ QFrame#aboutSeparator {{
     max-height: 1px;
     border: none;
 }}
+
+/* ── 2.1: side navigation, page bar, build-page sections, log, actions ──── */
+QListWidget#sideNav {{
+    background-color: {statusbar_bg};
+    border: none;
+    border-{nav_border_side}: 1px solid {border};
+    border-radius: 0;
+    padding: 8px 6px;
+    font-size: {pt_group};
+    outline: 0;
+}}
+QListWidget#sideNav::item {{
+    padding: 0 10px;
+    border-radius: 6px;
+    color: {text};
+}}
+QListWidget#sideNav::item:hover {{
+    background-color: {surface};
+}}
+QListWidget#sideNav::item:selected {{
+    background-color: {accent};
+    color: {on_accent};
+    font-weight: bold;
+}}
+QFrame#pageBar {{
+    background-color: {statusbar_bg};
+    border-bottom: 1px solid {border};
+}}
+QLabel#pageTitle {{
+    font-size: {pt_group};
+    font-weight: bold;
+    color: {text};
+}}
+QLabel#pageFile {{
+    font-size: {pt_small};
+    color: {muted};
+}}
+QToolButton#sectionHeader {{
+    background-color: {surface};
+    border: 1px solid {border};
+    border-radius: 8px;
+    padding: 8px 12px;
+    text-align: left;
+    font-weight: bold;
+    font-size: {pt_group};
+    color: {text};
+}}
+QToolButton#sectionHeader:hover {{
+    border-color: {accent};
+}}
+QToolButton#sectionHeader:checked {{
+    border-bottom-left-radius: 0;
+    border-bottom-right-radius: 0;
+    color: {accent};
+}}
+QToolButton#sectionHeader:focus {{
+    border: 2px solid {focus_ring};
+}}
+QLabel#sectionSubtitle {{
+    font-size: {pt_small};
+    color: {muted};
+    padding: 0 8px;
+}}
+QFrame#sectionBody {{
+    border: 1px solid {border};
+    border-top: none;
+    border-bottom-left-radius: 8px;
+    border-bottom-right-radius: 8px;
+}}
+QWidget#logPanel {{
+    border-top: 1px solid {border};
+}}
+QFrame#logHeader {{
+    background-color: {statusbar_bg};
+}}
+QToolButton#logToggle {{
+    background-color: transparent;
+    border: 1px solid transparent;
+    border-radius: 4px;
+    padding: 4px 8px;
+    font-weight: bold;
+    color: {text};
+}}
+QToolButton#logToggle:hover {{
+    background-color: {surface};
+}}
+QToolButton#logToggle:focus {{
+    border: 1px solid {focus_ring};
+}}
+QLabel#logLastLine {{
+    font-family: 'Cascadia Mono', 'Consolas', 'Noto Sans Mono', 'DejaVu Sans Mono', monospace;
+    font-size: {pt_log};
+    color: {muted};
+}}
+QTextEdit#logOutput {{
+    border: none;
+    border-radius: 0;
+}}
+QFrame#actionBar {{
+    background-color: {statusbar_bg};
+    border-top: 1px solid {border};
+}}
+QProgressBar#buildProgress {{
+    font-size: {pt_small};
+    font-weight: normal;
+}}
+/* The notice bar under the page bar: tinted by level, like the notices. */
+QFrame#noticeBar {{
+    background-color: rgba({accent_rgb}, 0.16);
+    border-bottom: 1px solid {accent};
+}}
+QFrame#noticeBar[level="success"] {{
+    background-color: rgba({success_rgb}, 0.16);
+    border-bottom: 1px solid {success};
+}}
+QFrame#noticeBar[level="warning"] {{
+    background-color: rgba({warning_rgb}, 0.18);
+    border-bottom: 1px solid {warning};
+}}
+QLabel#noticeText {{
+    color: {text};
+    background: transparent;
+}}
+QLabel#progressLabel {{
+    font-size: {pt_small};
+    color: {muted};
+}}
+/* The drag-and-drop overlay: a dashed frame over the whole content. */
+QWidget#dropOverlay {{
+    background-color: rgba({window_bg_rgb}, 0.88);
+}}
+QWidget#dropFrame {{
+    border: 2px dashed {accent};
+    border-radius: 12px;
+    background-color: rgba({accent_rgb}, 0.08);
+}}
+QLabel#dropText {{
+    font-size: {pt_about_head};
+    font-weight: bold;
+    color: {accent};
+    background: transparent;
+}}
+QLabel#dropHint {{
+    font-size: {pt_body};
+    color: {muted};
+    background: transparent;
+}}
+QTableWidget#shortcutsTable {{
+    background-color: transparent;
+    border: none;
+}}
 /* 2.0: one card per recent project in the projects workspace. */
 QFrame#projectCard {{
-    background-color: {input_bg};
-    border: 2px solid {input_border};
+    background-color: {surface};
+    border: 1px solid {border};
     border-radius: 10px;
 }}
 QFrame#projectCard QLabel {{
@@ -534,6 +843,20 @@ QLabel#projectCurrent {{
 """
 
 
+def hex_to_rgb(value: str) -> str:
+    """``"#89b4fa"`` → ``"137, 180, 250"``, for ``rgba()`` in the stylesheet."""
+    value = value.lstrip("#")
+    return ", ".join(str(int(value[i:i + 2], 16)) for i in (0, 2, 4))
+
+
+def _is_rtl(locale: str) -> bool:
+    # Imported lazily: strings.py has no Qt and no dependency on this module,
+    # but keeping styles importable on its own is worth the local import.
+    from py2exe_gui.strings import LOCALE_LAYOUT
+
+    return LOCALE_LAYOUT.get(locale) == "rtl"
+
+
 def render_theme(
     theme: str,
     locale: str = "default",
@@ -544,6 +867,12 @@ def render_theme(
     factor = clamp_scale(scale)
     values = dict(palette)
     values["font_family"] = font_family_css(locale)
+    rtl = _is_rtl(locale)
+    values["title_side"] = "right" if rtl else "left"
+    values["nav_border_side"] = "left" if rtl else "right"
+    # "r, g, b" for the tinted notices (rgba() needs decimal channels).
+    for key in ("accent", "warning", "danger", "success", "window_bg"):
+        values[f"{key}_rgb"] = hex_to_rgb(palette[key])
     values.update({f"pt_{name}": _pt(name, factor) for name in _BASE_SIZES})
     return _TEMPLATE.format(**values)
 

@@ -22,7 +22,7 @@ from py2exe_gui.ui.finding_text import (
     fix_label,
     origin_label,
 )
-from py2exe_gui.ui.tabs.base import BaseTab
+from py2exe_gui.ui.tabs.base import BaseTab, scrolled_layout
 
 # Data roles on each list item: the Finding itself.
 FINDING_ROLE = Qt.ItemDataRole.UserRole
@@ -32,7 +32,7 @@ class DoctorTab(BaseTab):
     """Shows what the doctor and the last build/run found, with fixes."""
 
     def _build(self):
-        layout = QVBoxLayout(self)
+        layout = scrolled_layout(self)
 
         hint = QLabel(S.DOCTOR_HINT)
         hint.setObjectName("aboutMuted")

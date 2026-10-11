@@ -1,4 +1,4 @@
-"""Project templates, settings save/load and the language selector."""
+"""Project templates and settings save/load (appearance moved to Settings in 2.1)."""
 
 from py2exe_gui.qt import (
     QComboBox,
@@ -9,26 +9,16 @@ from py2exe_gui.qt import (
     QTextEdit,
     QVBoxLayout,
 )
-from py2exe_gui.strings import S, available_locales, current_locale
+from py2exe_gui.strings import S
 from py2exe_gui.templates import TEMPLATES, template_description, template_name
-from py2exe_gui.ui.tabs.base import BaseTab
-
-# Theme value → the locale attribute holding its display name. "auto" first,
-# matching styles.theme_names().
-THEME_LABEL_KEYS = (
-    ("auto", "THEME_LABEL_AUTO"),
-    ("dark", "THEME_LABEL_DARK"),
-    ("light", "THEME_LABEL_LIGHT"),
-    ("nord", "THEME_LABEL_NORD"),
-    ("high-contrast", "THEME_LABEL_HIGH_CONTRAST"),
-)
+from py2exe_gui.ui.tabs.base import BaseTab, scrolled_layout
 
 
 class TemplatesTab(BaseTab):
-    """Templates, saved presets, appearance and language."""
+    """Templates and saved presets."""
 
     def _build(self):
-        layout = QVBoxLayout(self)
+        layout = scrolled_layout(self)
 
         templates_group = QGroupBox(S.GROUP_TEMPLATES)
         templates_layout = QVBoxLayout(templates_group)
@@ -101,32 +91,6 @@ class TemplatesTab(BaseTab):
         save_layout.addLayout(save_btn_layout)
         layout.addWidget(save_group)
 
-        # ── Appearance ──
-        theme_row = QHBoxLayout()
-        theme_row.addWidget(QLabel(S.THEME_SELECT_LABEL))
-        self.theme_combo = QComboBox()
-        self.theme_combo.setAccessibleName(S.THEME_SELECT_LABEL)
-        for code, label in THEME_LABEL_KEYS:
-            self.theme_combo.addItem(getattr(S, label), code)
-        self.theme_combo.currentIndexChanged.connect(self.window_action("_on_theme_changed"))
-        theme_row.addWidget(self.theme_combo)
-        theme_row.addStretch()
-        layout.addLayout(theme_row)
-
-        # Language selector (Phase 3)
-        lang_row = QHBoxLayout()
-        lang_row.addWidget(QLabel(S.LANGUAGE_LABEL))
-        self.language_combo = QComboBox()
-        current = current_locale()
-        for code, native in available_locales().items():
-            self.language_combo.addItem(native, code)
-            if code == current:
-                self.language_combo.setCurrentIndex(self.language_combo.count() - 1)
-        self.language_combo.currentIndexChanged.connect(self.window_action("_on_language_changed"))
-        lang_row.addWidget(self.language_combo)
-        lang_row.addStretch()
-        layout.addLayout(lang_row)
-
         layout.addStretch()
 
 
@@ -170,17 +134,3 @@ class TemplatesTab(BaseTab):
     def selected_preset(self) -> str:
         """The highlighted preset name, or '' when the list is empty."""
         return self.presets_combo.currentData() or ""
-
-    # ── Appearance ─────────────────────────────────────────────────────────
-
-    def set_theme(self, theme: str):
-        """Point the theme selector at ``theme`` without firing the handler."""
-        index = self.theme_combo.findData(theme)
-        if index < 0:
-            return
-        self.theme_combo.blockSignals(True)
-        self.theme_combo.setCurrentIndex(index)
-        self.theme_combo.blockSignals(False)
-
-    def selected_theme(self) -> str:
-        return self.theme_combo.currentData() or "dark"

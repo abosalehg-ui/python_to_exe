@@ -16,8 +16,7 @@ from py2exe_gui.qt import (  # noqa: E402
     QMessageBox,  # noqa: E402
     Qt,  # noqa: E402
 )
-from py2exe_gui.strings import En, set_locale  # noqa: E402
-from py2exe_gui.ui.main_window import SIMPLE_MODE_TABS  # noqa: E402
+from py2exe_gui.strings import En, S, set_locale  # noqa: E402
 from tests.conftest import MemoryKeyring  # noqa: E402
 
 pytestmark = pytest.mark.gui
@@ -56,11 +55,10 @@ def list_codes(window):
 # ── Tab and badge ──────────────────────────────────────────────────────────
 
 
-def test_doctor_tab_is_part_of_simple_mode(window):
-    assert "doctor" in SIMPLE_MODE_TABS
+def test_doctor_tab_is_in_the_check_section(window):
     shown = [window.tabs.widget(i) for i in range(window.tabs.count())]
     assert window.doctor_tab in shown
-    assert len(shown) == len(SIMPLE_MODE_TABS)
+    assert window.section_of(window.doctor_tab) == "check"
 
 
 def test_without_a_source_the_badge_is_hidden(window):
@@ -86,7 +84,7 @@ def test_clean_script_shows_all_clear(window, tmp_path):
     window.main_tab.source_input.setText(make_source(tmp_path, "print(1)\n"))
     window.run_doctor()
     assert window.doctor_tab.findings_list.item(0).text() == En.DOCTOR_ALL_CLEAR
-    assert window.main_tab.readiness_btn.text() == "🩺 100/100"
+    assert window.main_tab.readiness_btn.text() == "100/100"
 
 
 def test_badge_opens_the_doctor_tab(window, tmp_path):
@@ -137,14 +135,10 @@ def test_unticked_findings_are_not_applied(window, tmp_path):
     assert window.doctor_tab.checked_fixes() == []
 
 
-def test_apply_with_nothing_selected_says_so(window, monkeypatch):
-    shown = {}
-    monkeypatch.setattr(
-        QMessageBox, "information",
-        staticmethod(lambda *a, **k: shown.update(text=a[2]) or QMessageBox.StandardButton.Ok),
-    )
+def test_apply_with_nothing_selected_says_so(window):
     window.apply_doctor_fixes([])
-    assert shown
+    assert window.notice_bar.isVisibleTo(window)
+    assert window.notice_bar.text() == S.DOCTOR_NOTHING_SELECTED
 
 
 def test_apply_and_rebuild_starts_a_build(window, tmp_path, monkeypatch):

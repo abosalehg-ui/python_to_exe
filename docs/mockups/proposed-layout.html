@@ -1,0 +1,201 @@
+<title>Python to EXE 2.1 Layout</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;600&family=IBM+Plex+Mono&display=swap">
+<style>
+/* Layout: a desktop-window mockup (menu bar, side nav, page, bottom log, action bar) rendered as one fixed-ratio frame; tokens mirror py2exe_gui/styles.py (Catppuccin Mocha / Latte). */
+:root {
+  --bg: #eff1f5; --surface: #e6e9ef; --input: #ffffff; --border: #ccd0da; --fg: #4c4f69; --muted: #5c5f73;
+  --accent: #1052d8; --on-accent: #ffffff; --success: #166b2d; --danger: #c00d33; --warning: #9a6700; --warning-bg: #fff3c4;
+  --log-bg: #ffffff; --log-fg: #1a7f37;
+  --font: "IBM Plex Sans Arabic", "Segoe UI", Tahoma, "Noto Naskh Arabic", sans-serif;
+  --mono: "IBM Plex Mono", Consolas, "Noto Sans Mono", monospace;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #1e1e2e; --surface: #313244; --input: #45475a; --border: #45475a; --fg: #cdd6f4; --muted: #a6adc8;
+  --accent: #89b4fa; --on-accent: #1e1e2e; --success: #a6e3a1; --danger: #f38ba8; --warning: #f9e2af; --warning-bg: #3b3a2a;
+  --log-bg: #181825; --log-fg: #a6e3a1; color-scheme: dark;
+} }
+:root[data-theme="dark"] {
+  --bg: #1e1e2e; --surface: #313244; --input: #45475a; --border: #45475a; --fg: #cdd6f4; --muted: #a6adc8;
+  --accent: #89b4fa; --on-accent: #1e1e2e; --success: #a6e3a1; --danger: #f38ba8; --warning: #f9e2af; --warning-bg: #3b3a2a;
+  --log-bg: #181825; --log-fg: #a6e3a1; color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body { background: var(--bg); color: var(--fg); font-family: var(--font); direction: rtl; padding-inline: 16px; padding-block: 24px 40px; line-height: 1.55; }
+.wrap { max-width: 1120px; margin: 0 auto; display: grid; gap: 20px; }
+h1 { font-size: 1.35rem; font-weight: 600; margin: 0; text-wrap: balance; }
+.lead { color: var(--muted); margin: 0; max-width: 70ch; }
+.legend { display: flex; flex-wrap: wrap; gap: 8px 18px; font-size: .85rem; color: var(--muted); }
+.legend b { color: var(--accent); font-weight: 600; }
+svg { width: 1em; height: 1em; stroke: currentColor; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; flex: none; }
+
+/* ── the window ── */
+.win { border: 1px solid var(--border); border-radius: 10px; overflow: hidden; background: var(--bg); box-shadow: 0 12px 40px rgba(0,0,0,.18); display: grid; grid-template-rows: auto 1fr auto auto; min-height: 640px; }
+.menubar { display: flex; gap: 2px; padding: 4px 8px; background: var(--surface); border-bottom: 1px solid var(--border); font-size: .85rem; }
+.menubar span { padding: 3px 10px; border-radius: 5px; }
+.menubar span u { text-decoration: underline; text-underline-offset: 2px; }
+.menubar span.open { background: var(--accent); color: var(--on-accent); }
+.body { display: grid; grid-template-columns: 200px minmax(0,1fr); min-height: 0; }
+nav { background: var(--surface); border-inline-end: 1px solid var(--border); padding: 10px 8px; display: flex; flex-direction: column; gap: 2px; }
+nav a { display: flex; align-items: center; gap: 10px; padding: 9px 12px; border-radius: 6px; color: var(--fg); text-decoration: none; font-size: .95rem; min-height: 40px; }
+nav a svg { font-size: 20px; color: var(--muted); }
+nav a.active { background: var(--accent); color: var(--on-accent); font-weight: 600; }
+nav a.active svg { color: var(--on-accent); }
+nav .gap { flex: 1; }
+nav .collapse { color: var(--muted); font-size: .8rem; justify-content: center; }
+main { display: grid; grid-template-rows: auto minmax(0,1fr) auto; min-width: 0; }
+.pagebar { display: flex; align-items: center; gap: 12px; padding: 8px 18px; border-bottom: 1px solid var(--border); min-height: 42px; font-size: .9rem; }
+.pagebar .title { font-weight: 600; font-size: 1rem; }
+.pagebar .file { color: var(--muted); font-family: var(--mono); font-size: .8rem; direction: ltr; }
+.pagebar .spacer { flex: 1; }
+.badge { display: inline-flex; align-items: center; gap: 6px; padding: 2px 10px; border-radius: 999px; font-size: .8rem; font-weight: 600; border: 1px solid var(--success); color: var(--success); }
+.page { padding: 16px 18px; overflow: auto; display: grid; gap: 14px; align-content: start; }
+.field { display: grid; grid-template-columns: 120px minmax(0,1fr) auto; gap: 10px; align-items: center; font-size: .9rem; }
+.field label { color: var(--muted); }
+.input { background: var(--input); border: 1px solid var(--border); border-radius: 6px; padding: 6px 10px; min-height: 32px; font-family: var(--mono); font-size: .82rem; direction: ltr; text-align: left; color: var(--fg); overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.input.ph { color: var(--muted); font-family: var(--font); direction: rtl; text-align: right; }
+.ibtn { width: 32px; height: 32px; display: inline-flex; align-items: center; justify-content: center; border: 1px solid var(--border); border-radius: 6px; background: var(--input); color: var(--fg); font-size: 16px; }
+.ibtns { display: flex; gap: 6px; }
+.opts { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 8px 18px; font-size: .9rem; }
+.chk { display: flex; align-items: center; gap: 8px; }
+.chk i { width: 18px; height: 18px; border-radius: 4px; border: 1px solid var(--border); background: var(--input); display: inline-flex; align-items: center; justify-content: center; font-style: normal; }
+.chk i.on { background: var(--accent); border-color: var(--accent); color: var(--on-accent); font-size: 12px; }
+.chk code { font-family: var(--mono); font-size: .8rem; color: var(--muted); direction: ltr; unicode-bidi: isolate; }
+details { border: 1px solid var(--border); border-radius: 8px; background: transparent; }
+details summary { list-style: none; cursor: pointer; display: flex; align-items: center; gap: 10px; padding: 10px 14px; font-weight: 600; font-size: .92rem; }
+details summary::-webkit-details-marker { display: none; }
+details summary .chev { transition: transform .15s; font-size: 16px; color: var(--muted); }
+details[open] summary .chev { transform: rotate(-90deg); }
+details summary .sub { color: var(--muted); font-weight: 400; font-size: .82rem; margin-inline-start: auto; }
+details .inner { padding: 4px 14px 14px; display: grid; gap: 10px; border-top: 1px solid var(--border); }
+.section-title { font-size: .8rem; letter-spacing: .04em; color: var(--muted); font-weight: 600; margin: 4px 0 -4px; }
+.logpanel { border-top: 1px solid var(--border); background: var(--log-bg); font-family: var(--mono); font-size: .78rem; }
+.logpanel .head { display: flex; align-items: center; gap: 10px; padding: 6px 14px; font-family: var(--font); font-size: .85rem; color: var(--muted); border-bottom: 1px solid var(--border); }
+.logpanel .head .last { color: var(--fg); font-family: var(--mono); font-size: .78rem; direction: ltr; margin-inline-start: auto; }
+.logpanel pre { margin: 0; padding: 8px 14px; color: var(--log-fg); direction: ltr; text-align: left; white-space: pre-wrap; max-height: 96px; overflow: hidden; }
+.logpanel pre .w { color: var(--warning); } .logpanel pre .m { color: var(--muted); }
+.actions { display: flex; align-items: center; gap: 10px; padding: 8px 14px; border-top: 1px solid var(--border); background: var(--surface); min-height: 52px; flex-wrap: wrap; }
+.btn { display: inline-flex; align-items: center; gap: 8px; padding: 0 14px; height: 36px; border-radius: 6px; font-size: .9rem; font-weight: 600; border: 1px solid transparent; }
+.btn.primary { background: var(--success); color: var(--on-accent); padding-inline-end: 8px; }
+.btn.primary .caret { border-inline-start: 1px solid rgba(0,0,0,.2); padding-inline-start: 8px; margin-inline-start: 4px; font-size: 12px; }
+.btn.flat { background: transparent; color: var(--fg); border-color: transparent; font-weight: 500; }
+.progress { margin-inline-start: auto; display: flex; align-items: center; gap: 10px; font-size: .82rem; color: var(--muted); }
+.bar { width: 180px; height: 8px; border-radius: 4px; background: var(--input); overflow: hidden; border: 1px solid var(--border); }
+.bar i { display: block; height: 100%; width: 42%; background: var(--accent); }
+.progress .t { font-family: var(--mono); font-variant-numeric: tabular-nums; direction: ltr; }
+.statusbar { display: flex; gap: 16px; padding: 4px 14px; font-size: .78rem; color: var(--muted); background: var(--surface); border-top: 1px solid var(--border); }
+.statusbar .end { margin-inline-start: auto; }
+
+/* notes */
+.notes { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px; }
+.note { border-inline-start: 3px solid var(--accent); padding: 4px 12px; font-size: .88rem; }
+.note b { display: block; color: var(--accent); font-weight: 600; margin-bottom: 2px; }
+.cmp { width: 100%; border-collapse: collapse; font-size: .88rem; }
+.cmp th, .cmp td { text-align: right; padding: 8px 10px; border-bottom: 1px solid var(--border); }
+.cmp th { color: var(--muted); font-weight: 600; font-size: .8rem; }
+.cmp td.n { font-family: var(--mono); font-variant-numeric: tabular-nums; direction: ltr; text-align: right; }
+.cmp td.good { color: var(--success); font-weight: 600; }
+@media (max-width: 760px) {
+  .body { grid-template-columns: 56px minmax(0,1fr); }
+  nav a span, nav .collapse { display: none; }
+  nav a { justify-content: center; padding: 9px 0; }
+  .field { grid-template-columns: 1fr; }
+  .progress { margin-inline-start: 0; width: 100%; }
+  .bar { flex: 1; width: auto; }
+  .pagebar .file { display: none; }
+}
+@media (prefers-reduced-motion: reduce) { details summary .chev { transition: none; } }
+</style>
+
+<div class="wrap">
+  <div>
+    <h1>التخطيط المقترح لنافذة Python to EXE Converter 2.1</h1>
+    <p class="lead">نموذج ثابت يوضح ما تقترحه خطة <span dir="ltr">UX_REDESIGN_PLAN.md</span>: شريط جانبي بستة أقسام بدل 15 تبويباً، صفحة بناء بأقسام مطوية بدل وضعين، سجل سفلي مشترك، وشريط إجراءات واحد بفعل رئيسي واحد. الألوان هي لوحتا Mocha وLatte الحاليتان كما هما؛ المثال يعرض حالة بناء جارٍ.</p>
+  </div>
+  <div class="legend"><span><b>1</b> قوائم كاملة</span><span><b>2</b> شريط جانبي</span><span><b>3</b> شريط الصفحة مع شارة الطبيب</span><span><b>4</b> أقسام مطوية</span><span><b>5</b> لوحة السجل</span><span><b>6</b> شريط الإجراءات والتقدم</span><span><b>7</b> شريط حالة حقيقي</span></div>
+
+  <div class="win" aria-label="نموذج النافذة">
+    <div class="menubar"><span class="open"><u>ا</u>لمشروع</span><span><u>ع</u>رض</span><span>أ<u>د</u>وات</span><span><u>م</u>ساعدة</span></div>
+    <div class="body">
+      <nav aria-label="الأقسام">
+        <a href="#projects"><svg viewBox="0 0 24 24"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg><span>المشاريع</span></a>
+        <a href="#build" class="active"><svg viewBox="0 0 24 24"><path d="m15 12-8.5 8.5a2.1 2.1 0 1 1-3-3L12 9"/><path d="M17.6 15.1 21 11.7l-2-2-1.4 1.4"/><path d="M14 6.5 9.5 2 7 4.5 11.5 9"/><path d="m12 9 4-4 3 3-4 4"/></svg><span>البناء</span></a>
+        <a href="#check"><svg viewBox="0 0 24 24"><path d="M4.8 2.3A.3.3 0 1 0 5 2H4a2 2 0 0 0-2 2v5a6 6 0 0 0 6 6 6 6 0 0 0 6-6V4a2 2 0 0 0-2-2h-1a.2.2 0 1 0 .3.3"/><path d="M8 15v1a6 6 0 0 0 6 6 6 6 0 0 0 6-6v-4"/><circle cx="20" cy="10" r="2"/></svg><span>الفحص</span></a>
+        <a href="#dist"><svg viewBox="0 0 24 24"><path d="M11 21.7 3.5 17.4a1 1 0 0 1-.5-.9V7.5a1 1 0 0 1 .5-.9l7.5-4.3a1 1 0 0 1 1 0l7.5 4.3a1 1 0 0 1 .5.9v9a1 1 0 0 1-.5.9L12 21.7a1 1 0 0 1-1 0z"/><path d="m3.3 7 8.7 5 8.7-5"/><path d="M12 22V12"/></svg><span>التوزيع</span></a>
+        <a href="#tools"><svg viewBox="0 0 24 24"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.8-3.8a6 6 0 0 1-7.9 7.9l-6.9 6.9a2.1 2.1 0 0 1-3-3l6.9-6.9a6 6 0 0 1 7.9-7.9z"/></svg><span>الأدوات</span></a>
+        <a href="#settings"><svg viewBox="0 0 24 24"><path d="M12.2 2h-.4a2 2 0 0 0-2 2v.2a2 2 0 0 1-1 1.7l-.4.3a2 2 0 0 1-2 0l-.2-.1a2 2 0 0 0-2.7.7l-.2.4a2 2 0 0 0 .7 2.7l.2.1a2 2 0 0 1 1 1.7v.6a2 2 0 0 1-1 1.8l-.2.1a2 2 0 0 0-.7 2.7l.2.4a2 2 0 0 0 2.7.7l.2-.1a2 2 0 0 1 2 0l.4.2a2 2 0 0 1 1 1.7V20a2 2 0 0 0 2 2h.4a2 2 0 0 0 2-2v-.2a2 2 0 0 1 1-1.7l.4-.3a2 2 0 0 1 2 0l.2.1a2 2 0 0 0 2.7-.7l.2-.4a2 2 0 0 0-.7-2.7l-.2-.1a2 2 0 0 1-1-1.7v-.6a2 2 0 0 1 1-1.8l.2-.1a2 2 0 0 0 .7-2.7l-.2-.4a2 2 0 0 0-2.7-.7l-.2.1a2 2 0 0 1-2 0l-.4-.2a2 2 0 0 1-1-1.7V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg><span>الإعدادات</span></a>
+        <span class="gap"></span>
+        <a href="#collapse" class="collapse">◂ طيّ الشريط</a>
+      </nav>
+      <main>
+        <div class="pagebar">
+          <span class="title">البناء</span>
+          <span class="file">~/projects/notes/app.py</span>
+          <span class="spacer"></span>
+          <span class="badge"><svg viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></svg> الجاهزية 92/100</span>
+        </div>
+        <div class="page">
+          <div class="field"><label for="src">ملف المصدر</label><div class="input" id="src">/home/user/projects/notes/app.py</div><div class="ibtns"><span class="ibtn" title="اختر ملف .py" aria-label="اختر ملف .py"><svg viewBox="0 0 24 24"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><path d="m18 14-1.6 1.6"/><circle cx="14.5" cy="12.5" r="2.5"/></svg></span></div></div>
+          <div class="field"><label for="name">اسم الملف الناتج</label><div class="input" id="name">notes</div><span></span></div>
+          <div class="field"><label for="out">مجلد الإخراج</label><div class="input" id="out">/home/user/projects/notes/dist</div><div class="ibtns"><span class="ibtn" title="اختر مجلداً" aria-label="اختر مجلداً"><svg viewBox="0 0 24 24"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg></span></div></div>
+          <div class="field"><label for="icon">أيقونة البرنامج</label><div class="input ph" id="icon">اختياري. ملف .ico أو .png</div><div class="ibtns"><span class="ibtn" title="اختر أيقونة" aria-label="اختر أيقونة"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.1-3.1a2 2 0 0 0-2.8 0L6 21"/></svg></span><span class="ibtn" title="استوديو الأيقونات" aria-label="استوديو الأيقونات"><svg viewBox="0 0 24 24"><circle cx="13.5" cy="6.5" r=".5"/><circle cx="17.5" cy="10.5" r=".5"/><circle cx="8.5" cy="7.5" r=".5"/><circle cx="6.5" cy="12.5" r=".5"/><path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c.9 0 1.7-.7 1.7-1.7 0-.4-.2-.8-.4-1.1-.3-.3-.4-.7-.4-1.1 0-.9.7-1.7 1.7-1.7H16c3.3 0 6-2.7 6-6 0-4.9-4.5-8.4-10-8.4"/></svg></span></div></div>
+
+          <div class="section-title">خيارات البناء</div>
+          <div class="opts">
+            <span class="chk"><i class="on">✓</i>ملف واحد <code>--onefile</code></span>
+            <span class="chk"><i></i>بدون نافذة أوامر <code>--windowed</code></span>
+            <span class="chk"><i class="on">✓</i>تنظيف قبل البناء <code>--clean</code></span>
+            <span class="chk"><i></i>تجريد الرموز <code>--strip</code></span>
+          </div>
+          <div class="field"><label for="engine">محرك البناء</label><div class="input ph" id="engine">PyInstaller 6.22 (الافتراضي، الأوسع توافقاً) ▾</div><span></span></div>
+
+          <details>
+            <summary><svg class="chev" viewBox="0 0 24 24"><path d="m15 18-6-6 6-6"/></svg>ملفات ومكتبات إضافية<span class="sub">ملفان، 3 مكتبات مخفية</span></summary>
+            <div class="inner"><div class="field"><label>ملفات مرفقة</label><div class="input">assets/ → assets ; config.toml → .</div><span class="ibtn" title="إضافة" aria-label="إضافة"><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg></span></div><div class="field"><label>مكتبات مخفية</label><div class="input">PIL._tkinter_finder, pkg_resources.py2_warn, yaml</div><span class="ibtn" title="اكتشاف تلقائي" aria-label="اكتشاف تلقائي"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg></span></div></div>
+          </details>
+          <details>
+            <summary><svg class="chev" viewBox="0 0 24 24"><path d="m15 18-6-6 6-6"/></svg>هوية الملف<span class="sub">الإصدار 1.4.2 · Version Info مفعّل</span></summary>
+          </details>
+          <details>
+            <summary><svg class="chev" viewBox="0 0 24 24"><path d="m15 18-6-6 6-6"/></svg>قبل البناء وبعده<span class="sub">splash · manifest · توقيع · اختبار دخاني</span></summary>
+          </details>
+        </div>
+        <div class="logpanel">
+          <div class="head"><svg viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></svg>سجل البناء<span class="last">INFO: Analyzing hidden import 'yaml'</span></div>
+          <pre><span class="m">14:02:11</span>  Building: notes (PyInstaller 6.22, onefile)
+<span class="m">14:02:12</span>  INFO: Analyzing /home/user/projects/notes/app.py
+<span class="m">14:02:19</span>  <span class="w">WARNING: Hidden import 'tkinter' not found</span>
+<span class="m">14:02:20</span>  INFO: Analyzing hidden import 'yaml'</pre>
+        </div>
+        <div class="actions">
+          <span class="btn primary"><svg viewBox="0 0 24 24"><rect x="5" y="5" width="14" height="14" rx="2"/></svg>إيقاف البناء<span class="caret">▾</span></span>
+          <span class="btn flat"><svg viewBox="0 0 24 24"><path d="m4 17 6-6-6-6M12 19h8"/></svg>معاينة الأمر</span>
+          <span class="btn flat"><svg viewBox="0 0 24 24"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>فتح مجلد الإخراج</span>
+          <span class="progress"><span>المرحلة 2 من 5: تحليل الاعتماديات</span><span class="bar"><i></i></span><span class="t">42% · 1:24</span></span>
+        </div>
+      </main>
+    </div>
+    <div class="statusbar"><span>يبني… تحليل الاعتماديات</span><span>Python 3.12.4 · PyInstaller 6.22.3</span><span class="end">notes.p2e.toml · محفوظ</span></div>
+  </div>
+
+  <div class="notes">
+    <div class="note"><b>لماذا شريط جانبي</b>الأقسام الستة تظهر دائماً بأي عرض نافذة؛ شريط التبويبات الحالي يحتاج 1661px ويخفي ستة تبويبات خلف أسهم في العرض الافتراضي.</div>
+    <div class="note"><b>لماذا الطي بدل وضعين</b>المبتدئ يرى أربعة حقول وأربعة خيارات. المتقدم يفتح ما يحتاج، والحالة تُحفظ. لا حوار ترحيب ولا زر تبديل وضع.</div>
+    <div class="note"><b>لماذا السجل في الأسفل</b>يبقى مرئياً من أي قسم أثناء البناء، ويطوى إلى سطر واحد في الخمول فلا يأخذ ثلث الصفحة.</div>
+    <div class="note"><b>فعل رئيسي واحد</b>زر «ابنِ» يتحول إلى «إيقاف» أثناء البناء. التقدم في الشريط نفسه، لا صندوق مستقل بارتفاع 77px يقول «0%».</div>
+    <div class="note"><b>الأيقونات</b>مجموعة SVG واحدة بسمك خط ثابت تُلوَّن من لوحة السمة. الإيموجي تبقى في رسائل السجل فقط حيث تدل على الخطورة.</div>
+    <div class="note"><b>الأعلام بالاتجاه الصحيح</b><code dir="ltr">--onefile</code> داخل النص العربي معزول اتجاهياً، فلا تُعرض «(onefile--)» كما في الواجهة الحالية.</div>
+  </div>
+
+  <table class="cmp" aria-label="مقارنة قبل وبعد">
+    <thead><tr><th>المقياس</th><th>الواجهة الحالية</th><th>التخطيط المقترح</th></tr></thead>
+    <tbody>
+      <tr><td>أقسام التنقل من المستوى الأول</td><td class="n">15</td><td class="n good">6</td></tr>
+      <tr><td>مساحة ثابتة حول المحتوى</td><td class="n">≈ 338 px</td><td class="n good">≈ 150 px</td></tr>
+      <tr><td>ارتفاع المحتوى الأدنى للنافذة</td><td class="n">1195 px</td><td class="n good">≤ 640 px</td></tr>
+      <tr><td>أزرار في شريط الإجراءات</td><td class="n">6 بوزن واحد</td><td class="n good">1 رئيسي + 2 ثانوي</td></tr>
+      <tr><td>نقرات حتى أول بناء</td><td class="n">4</td><td class="n good">2</td></tr>
+      <tr><td>مصدر الأيقونات</td><td>إيموجي من خط النظام</td><td class="good">SVG داخل الحزمة</td></tr>
+    </tbody>
+  </table>
+</div>

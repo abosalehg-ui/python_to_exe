@@ -1,6 +1,7 @@
 """Reusable dialogs for the main window."""
 
 from py2exe_gui.qt import (
+    QAbstractItemView,
     QApplication,
     QDialog,
     QDialogButtonBox,
@@ -9,6 +10,8 @@ from py2exe_gui.qt import (
     QLineEdit,
     QPushButton,
     Qt,
+    QTableWidget,
+    QTableWidgetItem,
     QTextEdit,
     QVBoxLayout,
 )
@@ -88,55 +91,52 @@ class CommandPreviewDialog(QDialog):
         self.setWindowTitle(f"{S.DIALOG_PREVIEW_TITLE} — {S.MSG_COPIED}")
 
 
-class WelcomeDialog(QDialog):
-    """First-run mode picker.
+class ShortcutsDialog(QDialog):
+    """Every keyboard shortcut, from the same table the window binds.
 
-    Eight tabs of PyInstaller options is a lot to meet at once when all you
-    wanted was to turn one script into an .exe. This asks, once, which of the
-    two tab sets to show, and the answer is remembered.
+    The shortcuts were documented only in the README; a window that binds
+    twenty of them should be able to show them.
     """
 
-    def __init__(self, parent=None):
+    def __init__(self, rows, parent=None):
         super().__init__(parent)
-        self.setWindowTitle(S.WELCOME_TITLE)
-        self.setMinimumWidth(480)
+        self.setWindowTitle(S.SHORTCUTS_TITLE)
+        self.setMinimumSize(460, 420)
         self.setLayoutDirection(_inherited_direction(parent))
-        # Records the choice; simple mode is the default if the dialog is
-        # dismissed with the window close button.
-        self.simple_mode = True
-
         layout = QVBoxLayout(self)
+        hint = QLabel(S.SHORTCUTS_HINT)
+        hint.setObjectName("aboutMuted")
+        layout.addWidget(hint)
 
-        heading = QLabel(S.WELCOME_TITLE)
-        heading.setObjectName("aboutHeading")
-        layout.addWidget(heading)
+        self.table = QTableWidget(len(rows), 2)
+        self.table.setObjectName("shortcutsTable")
+        self.table.horizontalHeader().setVisible(False)
+        self.table.verticalHeader().setVisible(False)
+        self.table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
+        self.table.setSelectionMode(QAbstractItemView.SelectionMode.NoSelection)
+        self.table.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+        self.table.setShowGrid(False)
+        self.table.setAccessibleName(S.SHORTCUTS_TITLE)
+        for row, (keys, description) in enumerate(rows):
+            key_item = QTableWidgetItem(keys)
+            key_item.setTextAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
+            self.table.setItem(row, 0, key_item)
+            self.table.setItem(row, 1, QTableWidgetItem(description))
+        self.table.resizeColumnsToContents()
+        self.table.horizontalHeader().setStretchLastSection(True)
+        layout.addWidget(self.table)
 
-        body = QLabel(S.WELCOME_BODY)
-        body.setObjectName("aboutBody")
-        body.setWordWrap(True)
-        layout.addWidget(body)
-
+        close_btn = QPushButton(S.BTN_CLOSE)
+        close_btn.setAccessibleName(S.BTN_CLOSE)
+        close_btn.clicked.connect(self.accept)
         btn_row = QHBoxLayout()
-        simple_btn = QPushButton(S.WELCOME_CHOOSE_SIMPLE)
-        simple_btn.setObjectName("successBtn")
-        simple_btn.setAccessibleName(S.WELCOME_CHOOSE_SIMPLE)
-        simple_btn.clicked.connect(self._choose_simple)
-
-        advanced_btn = QPushButton(S.WELCOME_CHOOSE_ADVANCED)
-        advanced_btn.setAccessibleName(S.WELCOME_CHOOSE_ADVANCED)
-        advanced_btn.clicked.connect(self._choose_advanced)
-
-        btn_row.addWidget(simple_btn)
-        btn_row.addWidget(advanced_btn)
+        btn_row.addStretch()
+        btn_row.addWidget(close_btn)
         layout.addLayout(btn_row)
 
-    def _choose_simple(self):
-        self.simple_mode = True
-        self.accept()
-
-    def _choose_advanced(self):
-        self.simple_mode = False
-        self.accept()
+    def rows(self):
+        return [(self.table.item(r, 0).text(), self.table.item(r, 1).text())
+                for r in range(self.table.rowCount())]
 
 
 class PresetNameDialog(QDialog):

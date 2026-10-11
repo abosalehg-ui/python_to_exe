@@ -15,7 +15,6 @@ from py2exe_gui.qt import (
     Qt,  # noqa: E402
 )
 from py2exe_gui.strings import En, S, set_locale  # noqa: E402
-from py2exe_gui.ui.main_window import SIMPLE_MODE_TABS  # noqa: E402
 from tests.conftest import MemoryKeyring  # noqa: E402
 from tests.test_size_analyzer import make_build  # noqa: E402
 
@@ -76,8 +75,8 @@ def doctor_codes(window):
 # ── Tab and settings ───────────────────────────────────────────────────────
 
 
-def test_size_tab_is_in_simple_mode(window):
-    assert "size" in SIMPLE_MODE_TABS
+def test_size_tab_is_in_the_check_section(window):
+    assert window.section_of(window.size_tab) == "check"
     shown = [window.tabs.widget(i) for i in range(window.tabs.count())]
     assert window.size_tab in shown
 
@@ -345,21 +344,20 @@ def test_report_can_be_turned_off(window, tmp_path, monkeypatch):
 # ── Windows Sandbox ────────────────────────────────────────────────────────
 
 
-def test_sandbox_needs_a_build(window, tmp_path, monkeypatch):
+def test_sandbox_needs_a_build(window, tmp_path):
     window.main_tab.source_input.setText(make_source(tmp_path))
-    shown = []
-    answer(monkeypatch, "information", QMessageBox.StandardButton.Ok, shown)
     window.open_in_sandbox()
-    assert shown == [S.MSG_SANDBOX_NO_BUILD]
+    # 2.1: a notice under the page bar, not a dialog to dismiss.
+    assert window.notice_bar.isVisibleTo(window)
+    assert window.notice_bar.text() == S.MSG_SANDBOX_NO_BUILD
+    assert window.notice_bar.level == "warning"
 
 
 def test_sandbox_unavailable_explains_the_alternative(window, tmp_path, monkeypatch):
     point_at_build(window, make_build(tmp_path))
     monkeypatch.setattr("py2exe_gui.ui.main_window.sandbox_available", lambda: False)
-    shown = []
-    answer(monkeypatch, "information", QMessageBox.StandardButton.Ok, shown)
     window.open_in_sandbox()
-    assert os.path.join("dist", "app") in shown[0]
+    assert os.path.join("dist", "app") in window.notice_bar.text()
 
 
 def test_sandbox_writes_and_opens_a_wsb(window, tmp_path, monkeypatch):
