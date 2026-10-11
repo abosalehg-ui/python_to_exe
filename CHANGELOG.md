@@ -5,6 +5,62 @@ follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### 2.0.0-dev — Every platform, every engine (milestone 5: offline licensing)
+
+#### Added
+- **`p2e_runtime.license`** (ships inside the user's app; standard library
+  plus the kit's existing Ed25519 verifier, no new dependency): a licence is
+  a JSON payload `{name, email, product, expiry (optional), features[]}`
+  signed with Ed25519 and encoded as grouped base32 (`XXXXX-XXXXX-…`,
+  tolerant of case, whitespace, dashes and O/0, I/1, B/8 mix-ups).
+  `verify(key, public_key, product)` returns a `LicenseInfo` or `None` for a
+  bad signature, the wrong product, an expired key or garbage and never
+  raises on user input; `inspect()` also says *why* (`invalid`, `expired`,
+  `wrong_product`); `check(key)` uses the public key and product bundled in
+  `p2e_runtime.json`. The expiry day itself is still valid.
+- **Converter side** (`core/licensing.py`): the licence key pair is created
+  and stored with the **1.5 update-key mechanism** (`update_signing`: same
+  file format, same `signing/` folder, owner-only permissions) in a file of
+  its own, `license_signing_key.json`, so whoever issues licences cannot
+  publish updates. Requests are validated (name, product, email shape, ISO
+  expiry not in the past, feature names) and every issued key is checked
+  with the runtime's verifier before it is returned. A new Runtime Kit
+  service **`licensing`** embeds the product name and the **public** key
+  only (`p2e.toml` → `[runtime_kit] licensing, license_product,
+  license_public_key`). A test walks every file of a written kit and a
+  saved `p2e.toml` and proves the private key is in neither.
+- **GUI**: a *🔑 Offline licensing* group in the Runtime Kit tab (product,
+  public key, *Use my licence key*, create/back up/import for the licence
+  key) and a **licence generator dialog** (name, email, product, expiry or
+  perpetual, features → key, with *Copy the key*). The 1.5 key export/import
+  handlers were generalised over the two key files.
+- **Command line**: `py2exe-gui license issue --name N [--email E]
+  [--product P] [--expiry YYYY-MM-DD] [--feature F]… [--create-key]`,
+  `license key [--create-key]`, `license verify KEY [--product P]`. The key
+  pair is created only after a yes or `--create-key`; a broken key file is
+  never replaced silently.
+- Finding codes `kit_license_key_missing`, `kit_license_key_invalid`
+  (errors that stop the build) and `kit_license_client_side` (info, shown
+  whenever licensing is on).
+
+#### Honesty
+- The UI, the doctor, the command line and the docs (Arabic and English)
+  say the same thing: a check inside a distributed program deters casual
+  copying and makes keys impossible to forge without the private key, but
+  can be patched out by whoever holds the program, and the expiry relies on
+  the customer's clock. No server, no stronger promise anywhere.
+
+#### Verified
+- Real PyInstaller 6.22.3 build on Linux (Python 3.11) with licensing on
+  (`tests/test_runtime_license_e2e.py`, marked `slow`): built in 8.0 s,
+  7.3 MB; the program accepted a valid key (also typed in lower case with
+  spaces) and refused a key with one letter changed, another product's key,
+  an expired key, another developer's key and garbage, all without a
+  traceback; a key for a short name, an email and one feature is 311
+  characters; verification inside the frozen app took ~10 ms. Every file
+  under `dist/` and `build/` was scanned: the private key is in none, the
+  public key is. **Not executed:** the build on Windows or macOS.
+
 ### 2.0.0-dev — Every platform, every engine (milestone 4: CI generator and Linux/macOS packagers)
 
 #### Added

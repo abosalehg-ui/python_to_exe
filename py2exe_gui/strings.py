@@ -1721,6 +1721,122 @@ class Ar:
     CLI_CI_CONFIRM_OVERWRITE = "الملف {path} موجود. استبداله؟"
     CLI_CI_WRITTEN = "✅ كُتب {path}"
 
+    # ── 2.0 milestone 5: offline licensing ──
+    KIT_NAME_LICENSING = "🔑 ترخيص دون إنترنت"
+    KIT_DESC_LICENSING = (
+        "مفاتيح ترخيص موقَّعة بـ Ed25519 يتحقق منها برنامجك بالمفتاح العام المضمّن دون أي اتصال: "
+        "p2e_runtime.license.check(key). يردع النسخ العَرَضي فقط؛ لا يمنع من يعدّل البرنامج نفسه."
+    )
+    GROUP_KIT_LICENSE = "🔑 الترخيص دون إنترنت"
+    KIT_LICENSE_HONESTY = (
+        "⚠️ بصراحة: التحقق يجري داخل البرنامج الموزَّع نفسه. هذا يردع النسخ العَرَضي ويمنع تزوير "
+        "المفاتيح دون مفتاحك الخاص، لكن من يملك البرنامج يستطيع إزالة التحقق بتعديل ملفه، وتاريخ "
+        "الانتهاء يعتمد على ساعة جهازه. لا يوجد خادم ولا حماية أقوى من ذلك هنا."
+    )
+    KIT_LICENSE_PRODUCT_LABEL = "اسم المنتج في المفتاح:"
+    KIT_LICENSE_PRODUCT_PLACEHOLDER = "اتركه فارغاً ليُستخدم اسم البرنامج"
+    KIT_LICENSE_PUBLIC_KEY_LABEL = "المفتاح العام للترخيص:"
+    KIT_LICENSE_PUBLIC_KEY_PLACEHOLDER = "64 خانة ست عشرية — يُملأ من مفتاح الترخيص"
+    BTN_KIT_LICENSE_USE_MY_KEY = "🔑 استخدم مفتاح الترخيص"
+    KIT_LICENSE_KEY_STATUS_NONE = (
+        "لا يوجد مفتاح ترخيص بعد. يُنشأ بالزر أدناه (مفتاح مستقل عن مفتاح التحديثات، بنفس "
+        "المجلد والصلاحيات)."
+    )
+    KIT_LICENSE_KEY_STATUS_FMT = "مفتاح الترخيص: {fingerprint}… — المفتاح الخاص محفوظ في:\n{path}"
+    BTN_KIT_LICENSE_KEY_CREATE = "🔐 إنشاء مفتاح الترخيص"
+    BTN_KIT_LICENSE_KEY_EXPORT = "💾 نسخة احتياطية"
+    BTN_KIT_LICENSE_KEY_IMPORT = "📥 استيراد مفتاح"
+    BTN_KIT_LICENSE_ISSUE = "🎫 إصدار مفتاح ترخيص…"
+    KIT_LICENSE_API_HINT = (
+        "من برنامجك: from p2e_runtime import license ثم info = license.check(key) — تعود None "
+        "لمفتاح مزوَّر أو منتهٍ أو لمنتج آخر، وinfo.has_feature('pro') للميزات، "
+        "وlicense.inspect(...) يقول لماذا رُفض المفتاح."
+    )
+    MSG_KIT_LICENSE_KEY_REPLACE_CONFIRM = (
+        "⚠️ يوجد مفتاح ترخيص بالفعل ({fingerprint}…).\n\n"
+        "كل مفتاح ترخيص أصدرته حتى الآن سيُرفض في البناءات التي تضمّن المفتاح الجديد.\n\n"
+        "سيُحفظ المفتاح الحالي باسم جديد ولن يُحذف. الاستبدال على أي حال؟"
+    )
+    MSG_KIT_LICENSE_KEY_EXPORT_WARNING = (
+        "⚠️ هذا الملف هو مفتاح الترخيص الخاص. من يملكه يستطيع إصدار مفاتيح ترخيص تقبلها برامجك.\n\n"
+        "• احفظه في مكان آمن خارج مجلد المشروع.\n"
+        "• لا ترفعه إلى git ولا تضعه داخل البرنامج.\n"
+        "• إن فقدته فلن تستطيع إصدار مفاتيح للبناءات التي وزّعتها.\n\n"
+        "المتابعة؟"
+    )
+    DIALOG_KIT_LICENSE_KEY_EXPORT = "حفظ نسخة احتياطية من مفتاح الترخيص"
+    DIALOG_KIT_LICENSE_KEY_IMPORT = "استيراد مفتاح ترخيص"
+    LOG_KIT_LICENSE_KEY_CREATED = "🔐 أُنشئ مفتاح ترخيص جديد: {fingerprint}…"
+    LOG_KIT_LICENSE_KEY_IMPORTED = "📥 استُورد مفتاح الترخيص: {fingerprint}…"
+    LOG_KIT_LICENSE_KEY_EXPORTED = "💾 حُفظت نسخة احتياطية من مفتاح الترخيص في: {path}"
+    LOG_KIT_LICENSE_ISSUED = "🎫 أُصدر مفتاح ترخيص لـ {name} — {product} — {expiry} — {length} حرفاً"
+    ERR_KIT_LICENSE_NO_KEY = "لا يوجد مفتاح ترخيص. أنشئه أو استورده أولاً من تبويب مكتبة التشغيل."
+    KIT_LICENSE_NO_EXPIRY = "بلا انتهاء"
+
+    LICENSE_DIALOG_TITLE = "🎫 إصدار مفتاح ترخيص"
+    LICENSE_DIALOG_HEADING = (
+        "يُوقَّع المفتاح بمفتاحك الخاص على هذا الجهاز الآن ولا يُرسل شيء. برنامجك يتحقق منه "
+        "بالمفتاح العام المضمّن في البناء."
+    )
+    LICENSE_NAME_LABEL = "اسم العميل:"
+    LICENSE_EMAIL_LABEL = "البريد الإلكتروني (اختياري):"
+    LICENSE_PRODUCT_LABEL = "المنتج:"
+    LICENSE_EXPIRY_LABEL = "تاريخ الانتهاء:"
+    LICENSE_NO_EXPIRY_CHECK = "بلا انتهاء (دائم)"
+    LICENSE_FEATURES_LABEL = "الميزات (مفصولة بفواصل):"
+    LICENSE_FEATURES_PLACEHOLDER = "مثال: pro, export"
+    LICENSE_KEY_LABEL = "مفتاح الترخيص — انسخه وأرسله للعميل:"
+    LICENSE_RESULT_FMT = "{name} — {product} — {expiry} — {count} ميزة — {length} حرفاً"
+    BTN_LICENSE_ISSUE = "🎫 إصدار المفتاح"
+    BTN_LICENSE_COPY = "📋 نسخ المفتاح"
+    BTN_LICENSE_CLOSE = "إغلاق"
+    MSG_LICENSE_COPIED = "تم نسخ المفتاح إلى الحافظة"
+    LICENSE_ERR_NAME_MISSING = "اكتب اسم العميل."
+    LICENSE_ERR_PRODUCT_MISSING = "اكتب اسم المنتج."
+    LICENSE_ERR_EMAIL_INVALID = "البريد الإلكتروني غير صالح: {value}"
+    LICENSE_ERR_EXPIRY_INVALID = "تاريخ الانتهاء يجب أن يكون بصيغة YYYY-MM-DD: {value}"
+    LICENSE_ERR_EXPIRY_PAST = "تاريخ الانتهاء في الماضي: {value}"
+    LICENSE_ERR_FEATURE_INVALID = "اسم ميزة غير صالح (حروف وأرقام و _ . - فقط): {value}"
+
+    FINDING_KIT_LICENSE_KEY_MISSING_TITLE = "الترخيص مفعّل بلا مفتاح عام"
+    FINDING_KIT_LICENSE_KEY_MISSING_DETAIL = (
+        "أنشئ مفتاح الترخيص في تبويب مكتبة التشغيل ثم اضغط «استخدم مفتاح الترخيص»، أو ألصق "
+        "المفتاح العام (64 خانة ست عشرية). دون مفتاح لا يستطيع البرنامج التحقق من أي مفتاح ترخيص."
+    )
+    FINDING_KIT_LICENSE_KEY_INVALID_TITLE = "المفتاح العام للترخيص غير صالح"
+    FINDING_KIT_LICENSE_KEY_INVALID_DETAIL = (
+        "يجب أن يكون المفتاح العام 64 خانة ست عشرية (مفتاح Ed25519 عام). استخدم زر "
+        "«استخدم مفتاح الترخيص» بدل النسخ اليدوي."
+    )
+    FINDING_KIT_LICENSE_CLIENT_SIDE_TITLE = "الترخيص يُفحص داخل البرنامج فقط"
+    FINDING_KIT_LICENSE_CLIENT_SIDE_DETAIL = (
+        "مفاتيح الترخيص لا يمكن تزويرها دون مفتاحك الخاص، لكن التحقق يجري في برنامج يملكه العميل "
+        "ويمكن إزالته بتعديل الملف التنفيذي. يردع النسخ العَرَضي ولا يمنع من يصرّ على الاختراق."
+    )
+
+    CLI_HELP_LICENSE = "مفاتيح الترخيص دون إنترنت: issue (إصدار) أو key (المفتاح) أو verify (تحقق)"
+    CLI_HELP_LICENSE_NAME = "اسم العميل (مطلوب مع issue)"
+    CLI_HELP_LICENSE_EMAIL = "بريد العميل الإلكتروني (اختياري)"
+    CLI_HELP_LICENSE_PRODUCT = "اسم المنتج؛ الافتراضي اسم البرنامج في p2e.toml"
+    CLI_HELP_LICENSE_EXPIRY = "آخر يوم صلاحية YYYY-MM-DD؛ بلا قيمة = دائم"
+    CLI_HELP_LICENSE_FEATURE = "ميزة تُضاف إلى المفتاح (كرّر الخيار لأكثر من ميزة)"
+    CLI_HELP_LICENSE_KEY_TEXT = "مفتاح الترخيص المطلوب التحقق منه (مع verify)"
+    CLI_HELP_LICENSE_CREATE = "أنشئ مفتاح الترخيص إن لم يوجد (مع key، أو مع issue بدل السؤال)"
+    CLI_LICENSE_KEY_STATUS = "مفتاح الترخيص: {fingerprint}…\nالمفتاح العام: {public}\nالملف: {path}"
+    CLI_LICENSE_NO_KEY = "لا يوجد مفتاح ترخيص في {path}. أنشئه بـ: py2exe-gui license key --create"
+    CLI_LICENSE_CONFIRM_CREATE = "لا يوجد مفتاح ترخيص. إنشاء مفتاح جديد في {path}؟"
+    CLI_LICENSE_KEY_CREATED = "🔐 أُنشئ مفتاح ترخيص: {fingerprint}… ({path})"
+    CLI_LICENSE_PRODUCT_REQUIRED = "لا يوجد ملف مشروع هنا ولا --product؛ حدّد اسم المنتج."
+    CLI_LICENSE_ISSUED = "🎫 مفتاح ترخيص لـ {name} — {product} — {expiry} — {length} حرفاً:"
+    CLI_LICENSE_CANNOT_ISSUE = "لا يمكن إصدار المفتاح:"
+    CLI_LICENSE_KEY_REQUIRED = "اكتب المفتاح المطلوب التحقق منه بعد verify."
+    CLI_LICENSE_VERIFY_FMT = "{status} — {name} — {product} — {expiry} — الميزات: {features}"
+    CLI_LICENSE_STATUS_VALID = "✅ صالح"
+    CLI_LICENSE_STATUS_INVALID = "❌ غير صالح (توقيع خاطئ أو مفتاح مشوَّه أو مفتاح عام آخر)"
+    CLI_LICENSE_STATUS_EXPIRED = "⌛ منتهٍ"
+    CLI_LICENSE_STATUS_WRONG_PRODUCT = "⚠️ لمنتج آخر"
+    CLI_LICENSE_NO_FEATURES = "لا شيء"
+
 
 class En:
     """English strings."""
@@ -3463,6 +3579,127 @@ class En:
     CLI_CI_CONFIRM = "Write the file to {path}?"
     CLI_CI_CONFIRM_OVERWRITE = "{path} exists. Replace it?"
     CLI_CI_WRITTEN = "✅ Wrote {path}"
+
+    # ── 2.0 milestone 5: offline licensing ──
+    KIT_NAME_LICENSING = "🔑 Offline licence keys"
+    KIT_DESC_LICENSING = (
+        "Ed25519-signed licence keys your app checks with the embedded public key, with no "
+        "connection at all: p2e_runtime.license.check(key). Deters casual copying only; it "
+        "does not stop someone who edits the program itself."
+    )
+    GROUP_KIT_LICENSE = "🔑 Offline licensing"
+    KIT_LICENSE_HONESTY = (
+        "⚠️ Plainly: the check runs inside the distributed program itself. That deters casual "
+        "copying and makes keys impossible to forge without your private key, but whoever holds "
+        "the program can patch the check out of its file, and the expiry relies on their clock. "
+        "There is no server and no stronger protection here."
+    )
+    KIT_LICENSE_PRODUCT_LABEL = "Product name in the key:"
+    KIT_LICENSE_PRODUCT_PLACEHOLDER = "Leave empty to use the app's name"
+    KIT_LICENSE_PUBLIC_KEY_LABEL = "Licence public key:"
+    KIT_LICENSE_PUBLIC_KEY_PLACEHOLDER = "64 hex characters — filled from your licence key"
+    BTN_KIT_LICENSE_USE_MY_KEY = "🔑 Use my licence key"
+    KIT_LICENSE_KEY_STATUS_NONE = (
+        "No licence key yet. Create one with the button below (a key of its own, separate from "
+        "the update key, in the same folder with the same permissions)."
+    )
+    KIT_LICENSE_KEY_STATUS_FMT = "Licence key: {fingerprint}… — the private key is stored in:\n{path}"
+    BTN_KIT_LICENSE_KEY_CREATE = "🔐 Create licence key"
+    BTN_KIT_LICENSE_KEY_EXPORT = "💾 Back up"
+    BTN_KIT_LICENSE_KEY_IMPORT = "📥 Import key"
+    BTN_KIT_LICENSE_ISSUE = "🎫 Issue a licence key…"
+    KIT_LICENSE_API_HINT = (
+        "From your app: from p2e_runtime import license then info = license.check(key) — None "
+        "for a forged, expired or other product's key, info.has_feature('pro') for features, "
+        "and license.inspect(...) says why a key was refused."
+    )
+    MSG_KIT_LICENSE_KEY_REPLACE_CONFIRM = (
+        "⚠️ A licence key already exists ({fingerprint}…).\n\n"
+        "Every licence key you issued so far will be refused by builds that embed the new "
+        "key.\n\n"
+        "The current key will be kept under a new name, not deleted. Replace it anyway?"
+    )
+    MSG_KIT_LICENSE_KEY_EXPORT_WARNING = (
+        "⚠️ This file is your private licence key. Whoever holds it can issue licence keys "
+        "your programs accept.\n\n"
+        "• Keep it somewhere safe outside the project folder.\n"
+        "• Never commit it to git or put it inside the program.\n"
+        "• If you lose it, you cannot issue keys for the builds you shipped.\n\n"
+        "Continue?"
+    )
+    DIALOG_KIT_LICENSE_KEY_EXPORT = "Save a backup of the licence key"
+    DIALOG_KIT_LICENSE_KEY_IMPORT = "Import a licence key"
+    LOG_KIT_LICENSE_KEY_CREATED = "🔐 New licence key created: {fingerprint}…"
+    LOG_KIT_LICENSE_KEY_IMPORTED = "📥 Licence key imported: {fingerprint}…"
+    LOG_KIT_LICENSE_KEY_EXPORTED = "💾 Licence key backup saved to: {path}"
+    LOG_KIT_LICENSE_ISSUED = "🎫 Licence key issued for {name} — {product} — {expiry} — {length} characters"
+    ERR_KIT_LICENSE_NO_KEY = "No licence key. Create or import one first, in the Runtime Kit tab."
+    KIT_LICENSE_NO_EXPIRY = "never expires"
+
+    LICENSE_DIALOG_TITLE = "🎫 Issue a licence key"
+    LICENSE_DIALOG_HEADING = (
+        "The key is signed with your private key on this machine, now; nothing is sent. Your "
+        "app checks it with the public key embedded in the build."
+    )
+    LICENSE_NAME_LABEL = "Customer name:"
+    LICENSE_EMAIL_LABEL = "Email (optional):"
+    LICENSE_PRODUCT_LABEL = "Product:"
+    LICENSE_EXPIRY_LABEL = "Expiry date:"
+    LICENSE_NO_EXPIRY_CHECK = "No expiry (perpetual)"
+    LICENSE_FEATURES_LABEL = "Features (comma-separated):"
+    LICENSE_FEATURES_PLACEHOLDER = "e.g. pro, export"
+    LICENSE_KEY_LABEL = "Licence key — copy it and send it to the customer:"
+    LICENSE_RESULT_FMT = "{name} — {product} — {expiry} — {count} feature(s) — {length} characters"
+    BTN_LICENSE_ISSUE = "🎫 Issue the key"
+    BTN_LICENSE_COPY = "📋 Copy the key"
+    BTN_LICENSE_CLOSE = "Close"
+    MSG_LICENSE_COPIED = "Key copied to clipboard"
+    LICENSE_ERR_NAME_MISSING = "Enter the customer's name."
+    LICENSE_ERR_PRODUCT_MISSING = "Enter the product name."
+    LICENSE_ERR_EMAIL_INVALID = "The email address is not valid: {value}"
+    LICENSE_ERR_EXPIRY_INVALID = "The expiry must be YYYY-MM-DD: {value}"
+    LICENSE_ERR_EXPIRY_PAST = "The expiry date is in the past: {value}"
+    LICENSE_ERR_FEATURE_INVALID = "Not a valid feature name (letters, digits, _ . - only): {value}"
+
+    FINDING_KIT_LICENSE_KEY_MISSING_TITLE = "Licensing is on, but there is no public key"
+    FINDING_KIT_LICENSE_KEY_MISSING_DETAIL = (
+        "Create the licence key in the Runtime Kit tab and press “Use my licence key”, or paste "
+        "the public key (64 hex characters). Without it the app cannot check any licence key."
+    )
+    FINDING_KIT_LICENSE_KEY_INVALID_TITLE = "The licence public key is not valid"
+    FINDING_KIT_LICENSE_KEY_INVALID_DETAIL = (
+        "The public key must be 64 hex characters (an Ed25519 public key). Use “Use my licence "
+        "key” instead of copying by hand."
+    )
+    FINDING_KIT_LICENSE_CLIENT_SIDE_TITLE = "Licences are checked inside the program only"
+    FINDING_KIT_LICENSE_CLIENT_SIDE_DETAIL = (
+        "Licence keys cannot be forged without your private key, but the check runs in a "
+        "program the customer holds and can be patched out of the executable. It deters casual "
+        "copying; it does not stop a determined attacker."
+    )
+
+    CLI_HELP_LICENSE = "offline licence keys: issue, key (the key pair) or verify"
+    CLI_HELP_LICENSE_NAME = "the customer's name (required with issue)"
+    CLI_HELP_LICENSE_EMAIL = "the customer's email (optional)"
+    CLI_HELP_LICENSE_PRODUCT = "the product name; defaults to the app's name in p2e.toml"
+    CLI_HELP_LICENSE_EXPIRY = "last valid day, YYYY-MM-DD; omit for a perpetual key"
+    CLI_HELP_LICENSE_FEATURE = "a feature to put in the key (repeat for several)"
+    CLI_HELP_LICENSE_KEY_TEXT = "the licence key to check (with verify)"
+    CLI_HELP_LICENSE_CREATE = "create the licence key if there is none (with key, or with issue instead of asking)"
+    CLI_LICENSE_KEY_STATUS = "Licence key: {fingerprint}…\nPublic key: {public}\nFile: {path}"
+    CLI_LICENSE_NO_KEY = "No licence key at {path}. Create one with: py2exe-gui license key --create"
+    CLI_LICENSE_CONFIRM_CREATE = "There is no licence key. Create a new one at {path}?"
+    CLI_LICENSE_KEY_CREATED = "🔐 Licence key created: {fingerprint}… ({path})"
+    CLI_LICENSE_PRODUCT_REQUIRED = "No project file here and no --product; name the product."
+    CLI_LICENSE_ISSUED = "🎫 Licence key for {name} — {product} — {expiry} — {length} characters:"
+    CLI_LICENSE_CANNOT_ISSUE = "The key cannot be issued:"
+    CLI_LICENSE_KEY_REQUIRED = "Give the key to check after verify."
+    CLI_LICENSE_VERIFY_FMT = "{status} — {name} — {product} — {expiry} — features: {features}"
+    CLI_LICENSE_STATUS_VALID = "✅ valid"
+    CLI_LICENSE_STATUS_INVALID = "❌ invalid (bad signature, mangled key or another public key)"
+    CLI_LICENSE_STATUS_EXPIRED = "⌛ expired"
+    CLI_LICENSE_STATUS_WRONG_PRODUCT = "⚠️ for another product"
+    CLI_LICENSE_NO_FEATURES = "none"
 
 
 LOCALES = {"ar": Ar, "en": En}

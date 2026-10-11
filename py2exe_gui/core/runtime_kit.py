@@ -48,6 +48,7 @@ SERVICE_MODULES = {
     "crash_reporter": "p2e_runtime.crash",
     "single_instance": "p2e_runtime.single_instance",
     "updater": "p2e_runtime.updates",
+    "licensing": "p2e_runtime.license",
 }
 
 #: Keys of the translated texts the runtime shows (see ``runtime_texts``).
@@ -115,6 +116,15 @@ def validate(kit: RuntimeKitConfig, onefile: bool = True,
             )
         if not onefile:
             findings.append(Finding("kit_update_needs_installer", SEVERITY_INFO))
+    if kit.licensing:
+        key = kit.license_public_key.strip()
+        if not key:
+            findings.append(Finding("kit_license_key_missing", SEVERITY_ERROR))
+        elif not is_public_key(key):
+            findings.append(Finding("kit_license_key_invalid", SEVERITY_ERROR))
+        # Said every time, on purpose: a check inside a distributed program
+        # can be patched out by whoever holds the program.
+        findings.append(Finding("kit_license_client_side", SEVERITY_INFO))
     support = kit.support_url.strip()
     if kit.crash_reporter and support:
         from p2e_runtime.crash import is_safe_support_url
@@ -180,6 +190,13 @@ def runtime_config_dict(
         if allow_insecure_localhost:
             updater["allow_insecure_localhost"] = True
         services["updater"] = updater
+    if kit.licensing:
+        # The public half only. The private key never leaves the developer's
+        # config folder (core/licensing.py); a test proves no build holds it.
+        services["licensing"] = {
+            "product": kit.license_product.strip() or app_name,
+            "public_key": kit.license_public_key.strip().lower(),
+        }
     return {
         "format": 1,
         "app": {

@@ -75,6 +75,8 @@ FINDING_CODES = (
     "appimagetool_missing", "appimagetool_download_failed", "package_version_missing",
     "package_icon_placeholder", "package_icon_icns", "package_maintainer_missing",
     "package_failed", "ci_output_outside_repo", "ci_not_git", "ci_signing_not_configured",
+    # 2.0: offline licensing (core/licensing, runtime_kit)
+    "kit_license_key_missing", "kit_license_key_invalid", "kit_license_client_side",
 )
 
 # Penalty per finding when computing the readiness score.

@@ -26,9 +26,10 @@ version metadata, build history, and a Windows manifest editor.
 | **Signed self-updater** *(1.5)* | `update.json` signed with **Ed25519** (pure-Python verifier that passes the RFC 8032 test vectors); HTTPS only, redirects to HTTP refused, size and SHA-256 checked before anything is replaced. One-file EXEs swap in place and restart; folder builds launch a verified installer. Key pair and a *Create signed update.json* helper in the app |
 | **Nuitka engine** *(2.0)* | Choose **PyInstaller** or **Nuitka** (`engine` in `p2e.toml`, or `build --engine nuitka`). Nuitka compiles your modules to C: typically fewer antivirus false positives and extraction made **harder, not impossible**; builds are slower because a C compiler runs. What an engine cannot do (Runtime Kit, manifest...) is named before building; fixes are translated to Nuitka's options or marked as having no equivalent — no engine ever gets an option it does not have. The doctor checks the C compiler (MSVC/MinGW on Windows, gcc/clang elsewhere), the Python version and, on Linux, `patchelf`/`readelf`. **No download without your consent**: if Nuitka asks to download a tool, you are asked, for that build only. The size lab reads Nuitka's compilation report |
 | **Project file** *(1.6)* | One `p2e.toml` in your repository describes the whole project — build, Version Info, manifest, installer, signing (never the password), Runtime Kit and release settings. Paths are relative to the file, so a fresh checkout builds the same way. The GUI, presets, history and the command line all use this one model |
-| **Command line** *(1.6)* | `py2exe-gui init / doctor / build / size / compare / env / release / package / ci`, headless, no PyQt5 needed — for CI and scripts. Build logs stream with stage markers |
+| **Command line** *(1.6)* | `py2exe-gui init / doctor / build / size / compare / env / release / package / ci / license`, headless, no PyQt5 needed — for CI and scripts. Build logs stream with stage markers |
 | **Linux and macOS packages** *(2.0)* | An **AppImage** (`appimagetool`), a **`.deb`** (`dpkg-deb`, with `control`, a `.desktop` entry and an icon) and a **`.dmg`** (`hdiutil`, an `.app` bundle) from the same build, from the Platforms tab or `py2exe-gui package`; uploaded with the release. `appimagetool` and its runtime file are downloaded **only after you say yes**, and the tool runs with `--runtime-file` so it never goes online during a build |
 | **CI generator** *(2.0)* | `py2exe-gui ci` writes `.github/workflows/p2e-release.yml` into your repository — a Windows/macOS/Linux matrix that installs this command line (no Qt) and runs `release` against `p2e.toml`, pip and build caching, artifact uploads, and a GitHub Release on a `v*` tag — after showing you the whole file. Certificates and passwords are referenced as `${{ secrets.NAME }}` only; a test checks that secret-looking values never reach the file |
+| **Offline licensing** *(2.0)* | **Ed25519-signed licence keys** (name, email, product, optional expiry, features) in grouped base32 (`XXXXX-XXXXX-…`, tolerant of case, spaces, dashes and O/0, I/1, B/8 mix-ups). Your app checks them **with no connection at all** against the public key embedded in the build: `p2e_runtime.license.check(key)` returns `None` for a forged, expired, tampered or other product's key and never raises. A generator dialog and `py2exe-gui license issue\|key\|verify`. The private key stays in your config folder; a test proves it reaches neither the build nor `p2e.toml`. **Plainly:** a check inside a distributed program deters casual copying only — whoever holds the program can patch it out; there is no server and no stronger promise |
 | **One-click release** *(1.6)* | Version bump everywhere at once → notes drafted from `git log` → doctor gate → build → sign → installer → portable ZIP → `SHA256SUMS.txt` → signed `update.json` → git tag → GitHub release → winget manifests. A dry run shows every action first; nothing is tagged or uploaded before you confirm |
 | **Icon Studio** *(1.3)* | Real multi-size `.ico` (16–256px) from an image or from letters, drawn with Qt — no Pillow needed |
 | **Smart Analysis** | AST-based import detection (incl. `__import__` and `importlib`), `requirements.txt` import, hidden-imports auto-suggest |
@@ -181,6 +182,7 @@ headless and never imports PyQt5. Every command takes `--project PATH`
 | `py2exe-gui release (--set-version X.Y.Z \| --bump major\|minor\|patch) [--notes FILE] [--dry-run] [--push-tag] [--no-tag] [--no-publish] [--allow-doctor-errors] [--allow-downloads] [--yes]` | The release pipeline (below); `--allow-downloads` lets the packages step fetch `appimagetool` |
 | `py2exe-gui package [--format appimage\|deb\|dmg] [--yes] [--allow-downloads] [--json]` | Package the last build: AppImage and `.deb` on Linux, `.dmg` on macOS. Formats default to `[packaging]` in `p2e.toml`; files go to `release/<version>/` |
 | `py2exe-gui ci [--yes] [--print] [--python X.Y] [--tool REQ] [--branch NAME]` | Show the whole `.github/workflows/p2e-release.yml`, then write it with your consent (`--print` only shows it) |
+| `py2exe-gui license issue --name N [--email E] [--product P] [--expiry YYYY-MM-DD] [--feature F]… [--create-key]` · `license key [--create-key]` · `license verify KEY [--product P]` | Issue a licence key for a customer (product from `--product` or `p2e.toml`), show or create the licence key pair (created after a yes or `--create-key`), and check a key against your own public key — all local, no network |
 
 **Consent works as in the window.** A step that reaches the network, installs
 or deletes — and a project file whose settings would run its own code
@@ -232,6 +234,50 @@ tab) writes `.github/workflows/p2e-release.yml` at the root of your repository:
 **Not yet run on Windows or macOS:** the `.dmg`, signing and notarization
 steps are written with their standard commands and tested as text only; what
 was exercised for real is the Linux job (AppImage and `.deb`).
+
+### Offline licensing (2.0)
+
+> **Plainly, first:** a licence key is checked **inside the program the
+> customer holds**. The signature makes a key impossible to forge without your
+> private key, but whoever holds the program can patch the check out of the
+> executable, and the expiry relies on their clock. This **deters casual
+> copying**; it does not stop a determined attacker. There is no activation
+> server, and neither the app nor this document promises more.
+
+How it works:
+
+1. In the **Runtime Kit** tab turn on **🔑 Offline licence keys**, create the
+   **licence key** (an Ed25519 pair separate from the update key, in the same
+   `signing/` folder with the same file format and owner-only permissions) and
+   press **Use my licence key**. The **public** key and the product name are
+   embedded in `p2e_runtime.json` inside the build and saved in `p2e.toml`.
+2. **🎫 Issue a licence key…** (or `py2exe-gui license issue`) takes the
+   customer's name, email, the product, an expiry date and features and prints
+   a key such as `AG3DS-PLF3J-GX6V3-…` to copy and send. A key is a version
+   byte + the 64-byte signature + the JSON payload, base32 in groups of five;
+   case, spaces, dashes and O/0, I/1, B/8 mix-ups do not matter.
+3. In your app:
+
+```python
+from p2e_runtime import license
+
+info = license.check(key_typed_by_the_user)      # None = forged/expired/other product/garbage
+if info is not None and info.has_feature("pro"):
+    ...
+status, info = license.inspect(key, public_key, product)  # why: invalid/expired/wrong_product
+```
+
+`verify()`, `check()` and `inspect()` never raise on user input.
+
+**Measured here** (Linux, Python 3.11, PyInstaller 6.22.3,
+`tests/test_runtime_license_e2e.py`): a small app with licensing built in
+8.0 s, 7.3 MB; a key for a short name, an email and one feature is 311
+characters (260 base32 letters); verification inside the frozen app takes
+~10 ms. The built program was run with a valid key (accepted), a key with
+one letter changed, another product's key, an expired key, another
+developer's key and garbage (all refused, no traceback), and every file under
+`dist/` and `build/` was scanned: the private key is in none of them, the
+public key is. Not built on Windows or macOS.
 
 ## Release
 
@@ -292,7 +338,10 @@ warning, refused inside the project folder) and **import**. *Publish an
 update* writes `update.json` and `update.json.sig` next to a new build;
 nothing is uploaded. Your app calls `p2e_runtime.updates.check()` and
 `apply(info)` from its own UI; an opt-in check at start-up asks with a native
-dialog on Windows.
+dialog on Windows. The **Offline licensing** group (2.0) opens with the plain
+statement that a client-side check only deters casual copying, then holds the
+product name, the embedded licence public key (*Use my licence key*), the
+licence key's own create/back up/import, and **Issue a licence key…**.
 
 ### 🚀 Release
 Version field with patch/minor/major buttons and **Apply to every tab** (a
@@ -451,6 +500,20 @@ including ones you sign and distribute. Only accept it from a source you trust.
   or the log. **If you lose it, programs you shipped can no longer be
   updated** — back it up.
 
+### Offline licensing
+
+- The private licence key is a file of its own,
+  `<config folder>/signing/license_signing_key.json`, with the update key's
+  format and owner-only permissions, and never in the project, a build, a
+  settings file or the log; a test walks every file of a written Runtime Kit
+  and a `p2e.toml` to check. Replacing it asks first and keeps the old file
+  under a new name, since every key you issued is refused by builds that
+  embed a new one.
+- The check runs **inside the distributed program**: it deters casual copying
+  and makes keys impossible to forge, but it can be patched out of the
+  executable, and the expiry relies on the customer's clock. No server, no
+  telemetry, no connection of any kind.
+
 ### Project files and the release
 
 - A `p2e.toml` is shared content. Opening one goes through the same
@@ -595,8 +658,9 @@ See [IDEAS.md](IDEAS.md) for the full roadmap. Currently:
   update manifest, winget manifests)
 - 🚧 **2.0 (in progress):** ✅ engine layer `core/engines/` (milestone 1),
   ✅ Nuitka engine (milestone 2), ✅ compare mode and start-up benchmark (milestone 3),
-  ✅ CI generator and AppImage/.deb/.dmg packagers (milestone 4); next licensing, projects
-  workspace, PySide6 — see [PRODUCT_ROADMAP.md](PRODUCT_ROADMAP.md)
+  ✅ CI generator and AppImage/.deb/.dmg packagers (milestone 4), ✅ offline licensing
+  (milestone 5); next projects workspace, PySide6 — see
+  [PRODUCT_ROADMAP.md](PRODUCT_ROADMAP.md)
 - ⏳ **Next:** venv management, multi-file projects, Linux/macOS installers,
   `.spec` editor, VirusTotal, PySide6 migration —
   see [UI_IMPROVEMENT_PLAN.md](UI_IMPROVEMENT_PLAN.md)

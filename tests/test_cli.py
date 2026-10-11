@@ -41,6 +41,7 @@ def run(*argv, yes=False, interactive=False, answers=()):
 def isolated(tmp_path, monkeypatch):
     monkeypatch.setattr(cli, "ENVS_ROOT", str(tmp_path / "envs"))
     monkeypatch.setattr(cli, "SIGNING_KEY_FILE", str(tmp_path / "key" / "k.json"))
+    monkeypatch.setattr(cli, "LICENSE_KEY_FILE", str(tmp_path / "key" / "license.json"))
     monkeypatch.chdir(tmp_path)
 
 
@@ -664,3 +665,119 @@ def test_cli_still_never_imports_pyqt5_for_the_new_commands(tmp_path):
     result = subprocess.run([sys.executable, "-c", code], capture_output=True, text=True,
                             cwd=ROOT, timeout=120)
     assert result.returncode == 0, result.stderr
+
+
+# ── license (2.0) ─────────────────────────────────────────────────────────
+
+
+def license_key():
+    from py2exe_gui.core.update_signing import read_key_file
+
+    return read_key_file(cli.LICENSE_KEY_FILE)
+
+
+def test_license_key_reports_none_then_creates_one_on_request(tmp_path):
+    r = run("license", "key")
+    assert r.code == cli.EXIT_PROJECT and "license key --create" in r.err
+    assert not os.path.exists(cli.LICENSE_KEY_FILE)
+    r = run("license", "key", "--create-key")
+    assert r.code == 0, r.err
+    key = license_key()
+    assert key.public_hex in r.out and cli.LICENSE_KEY_FILE in r.out
+    assert key.seed.hex() not in r.out
+    assert En.KIT_LICENSE_HONESTY in r.out
+    if sys.platform != "win32":
+        import stat
+
+        assert stat.S_IMODE(os.stat(cli.LICENSE_KEY_FILE).st_mode) == 0o600
+    # Asking again shows the same key and creates nothing.
+    assert license_key() == key and run("license", "key").code == 0
+    assert cli.SIGNING_KEY_FILE != cli.LICENSE_KEY_FILE
+    assert not os.path.exists(cli.SIGNING_KEY_FILE)
+
+
+def test_license_issue_asks_before_creating_a_key(project):
+    r = run("license", "issue", "--name", "Sara")
+    assert r.code == cli.EXIT_CONSENT and not os.path.exists(cli.LICENSE_KEY_FILE)
+    r = run("license", "issue", "--name", "Sara", answers=("y",), interactive=True)
+    assert r.code == 0, r.err
+    assert os.path.exists(cli.LICENSE_KEY_FILE)
+
+
+def test_license_issue_verify_round_trip(project):
+    from p2e_runtime import license as rlic
+
+    r = run("license", "issue", "--name", "Sara", "--email", "sara@example.com",
+            "--feature", "pro", "--feature", "export", "--feature", "pro",
+            "--expiry", "2099-01-01", "--create-key")
+    assert r.code == 0, r.err
+    key = license_key()
+    lines = [line for line in r.out.splitlines() if line.strip()]
+    text = next(line for line in lines if set(line) <= set("ABCDEFGHIJKLMNOPQRSTUVWXYZ234567-"))
+    info = rlic.verify(text, key.public_hex, "app")  # the project's build name
+    assert info.name == "Sara" and info.email == "sara@example.com"
+    assert info.features == ("pro", "export") and info.expiry == "2099-01-01"
+    assert "Sara" in r.out and "2099-01-01" in r.out and key.seed.hex() not in r.out
+
+    r = run("license", "verify", text)
+    assert r.code == 0 and En.CLI_LICENSE_STATUS_VALID in r.out and "pro, export" in r.out
+    r = run("license", "verify", text, "--product", "Other")
+    assert r.code == cli.EXIT_FAILED and En.CLI_LICENSE_STATUS_WRONG_PRODUCT in r.out
+    r = run("license", "verify", text.lower().replace("-", " "))
+    assert r.code == 0
+    r = run("license", "verify", "ABCDE-FGHIJ")
+    assert r.code == cli.EXIT_FAILED and En.CLI_LICENSE_STATUS_INVALID in r.out
+    r = run("license", "verify")
+    assert r.code == cli.EXIT_USAGE
+
+
+def test_license_verify_reports_expiry(project):
+    from py2exe_gui.core.licensing import LicenseRequest, issue, load_or_create_key
+
+    key, _ = load_or_create_key(cli.LICENSE_KEY_FILE)
+    import datetime
+
+    text = issue(LicenseRequest(name="Sara", product="app", expiry="2020-01-01"), key,
+                 today=datetime.date(2019, 12, 1))
+    r = run("license", "verify", text)
+    assert r.code == cli.EXIT_FAILED and En.CLI_LICENSE_STATUS_EXPIRED in r.out
+    assert "2020-01-01" in r.out
+
+
+def test_license_issue_rejects_a_bad_request(project):
+    r = run("license", "issue", "--create-key")
+    assert r.code == cli.EXIT_USAGE and En.LICENSE_ERR_NAME_MISSING in r.err
+    assert not os.path.exists(cli.LICENSE_KEY_FILE)  # nothing created for a bad request
+    r = run("license", "issue", "--name", "Sara", "--email", "nope", "--expiry", "2000-01-01",
+            "--feature", "bad feature", "--create-key")
+    assert r.code == cli.EXIT_USAGE
+    assert "nope" in r.err and "2000-01-01" in r.err and "bad feature" in r.err
+
+
+def test_license_issue_without_a_project_needs_a_product(tmp_path):
+    r = run("license", "issue", "--name", "Sara", "--create-key")
+    assert r.code == cli.EXIT_PROJECT and En.CLI_LICENSE_PRODUCT_REQUIRED in r.err
+    r = run("license", "issue", "--name", "Sara", "--product", "Tool", "--create-key")
+    assert r.code == 0, r.err
+    assert "Tool" in r.out
+
+
+def test_license_product_prefers_the_project_setting(project):
+    edit(project, lambda p: setattr(p.build.runtime_kit, "license_product", "My Product"))
+    r = run("license", "issue", "--name", "Sara", "--create-key")
+    assert r.code == 0 and "My Product" in r.out
+
+
+def test_license_verify_without_a_key(project):
+    r = run("license", "verify", "ABCDE")
+    assert r.code == cli.EXIT_PROJECT and "license key --create" in r.err
+
+
+def test_license_key_file_broken(project):
+    os.makedirs(os.path.dirname(cli.LICENSE_KEY_FILE))
+    with open(cli.LICENSE_KEY_FILE, "w") as f:
+        f.write("{broken")
+    r = run("license", "issue", "--name", "Sara", "--create-key")
+    assert r.code == cli.EXIT_PROJECT
+    with open(cli.LICENSE_KEY_FILE) as f:
+        assert f.read() == "{broken"  # never replaced silently
