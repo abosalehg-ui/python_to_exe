@@ -2,7 +2,7 @@
 
 `main_window.py` was the largest module in the project with zero coverage.
 These run offscreen (QT_QPA_PLATFORM=offscreen, set in conftest) so they work
-in CI without a display server, and are skipped entirely when PyQt5 is absent
+in CI without a display server, and are skipped entirely when no Qt binding is installed
 so the core-only test job is unaffected.
 """
 
@@ -10,12 +10,13 @@ import os
 
 import pytest
 
-pytest.importorskip("PyQt5", reason="PyQt5 not installed")
-
-from PyQt5.QtCore import Qt  # noqa: E402
-from PyQt5.QtWidgets import QMessageBox  # noqa: E402
+pytest.importorskip("py2exe_gui.qt", reason="no Qt binding (PySide6/PyQt5) installed")
 
 from py2exe_gui.core import BuildConfig  # noqa: E402
+from py2exe_gui.qt import (
+    QMessageBox,  # noqa: E402
+    Qt,  # noqa: E402
+)
 from py2exe_gui.strings import set_locale  # noqa: E402
 from py2exe_gui.ui.main_window import SIMPLE_MODE_TABS  # noqa: E402
 from tests.conftest import MemoryKeyring  # noqa: E402
@@ -115,7 +116,7 @@ def test_log_receives_startup_messages(window):
 
 def test_every_icon_only_button_has_an_accessible_name(window):
     """Regression: five identical '📂' buttons announced nothing useful."""
-    from PyQt5.QtWidgets import QPushButton
+    from py2exe_gui.qt import QPushButton
 
     bare = []
     for btn in window.findChildren(QPushButton):
@@ -210,7 +211,7 @@ def test_clear_history_asks_for_confirmation(window, monkeypatch):
 
     def fake_question(*args, **kwargs):
         asked["value"] = True
-        return QMessageBox.No
+        return QMessageBox.StandardButton.No
 
     monkeypatch.setattr(QMessageBox, "question", staticmethod(fake_question))
     window.clear_history()
@@ -224,7 +225,7 @@ def test_clear_history_proceeds_when_confirmed(window, monkeypatch):
 
     window.history.add(make_record("a.py", "a", True, 1.0, {}))
     monkeypatch.setattr(
-        QMessageBox, "question", staticmethod(lambda *a, **k: QMessageBox.Yes)
+        QMessageBox, "question", staticmethod(lambda *a, **k: QMessageBox.StandardButton.Yes)
     )
     window.clear_history()
     assert len(window.history) == 0
@@ -249,7 +250,7 @@ def test_loading_a_config_with_a_runtime_hook_warns(window, tmp_path, monkeypatc
 
     def fake_question(*args, **kwargs):
         warned["value"] = True
-        return QMessageBox.No
+        return QMessageBox.StandardButton.No
 
     monkeypatch.setattr(QMessageBox, "question", staticmethod(fake_question))
     window.load_saved_settings()
@@ -268,13 +269,13 @@ def test_loading_a_clean_config_does_not_warn(window, tmp_path, monkeypatch):
         staticmethod(lambda *a, **k: (str(good), "")),
     )
     monkeypatch.setattr(
-        QMessageBox, "information", staticmethod(lambda *a, **k: QMessageBox.Ok)
+        QMessageBox, "information", staticmethod(lambda *a, **k: QMessageBox.StandardButton.Ok)
     )
     asked = {"value": False}
     monkeypatch.setattr(
         QMessageBox,
         "question",
-        staticmethod(lambda *a, **k: asked.update(value=True) or QMessageBox.Yes),
+        staticmethod(lambda *a, **k: asked.update(value=True) or QMessageBox.StandardButton.Yes),
     )
     window.load_saved_settings()
 
@@ -373,7 +374,7 @@ def test_arabic_locale_lays_out_right_to_left(qapp, tmp_path, monkeypatch):
     from py2exe_gui.ui.main_window import MainWindow
 
     win = MainWindow()
-    assert win.layoutDirection() == Qt.RightToLeft
+    assert win.layoutDirection() == Qt.LayoutDirection.RightToLeft
     win.close()
 
 
@@ -384,7 +385,7 @@ def test_english_locale_lays_out_left_to_right(qapp, tmp_path, monkeypatch):
     from py2exe_gui.ui.main_window import MainWindow
 
     win = MainWindow()
-    assert win.layoutDirection() == Qt.LeftToRight
+    assert win.layoutDirection() == Qt.LayoutDirection.LeftToRight
     win.close()
 
 
@@ -393,9 +394,9 @@ def test_dialogs_follow_the_locale_not_a_hardcoded_direction(qapp):
     from py2exe_gui.ui.dialogs import AddImportDialog
 
     set_locale("en")
-    qapp.setLayoutDirection(Qt.LeftToRight)
+    qapp.setLayoutDirection(Qt.LayoutDirection.LeftToRight)
     dialog = AddImportDialog()
-    assert dialog.layoutDirection() == Qt.LeftToRight
+    assert dialog.layoutDirection() == Qt.LayoutDirection.LeftToRight
     dialog.close()
 
 
@@ -482,7 +483,7 @@ def test_retranslate_switches_locale_without_restart(window):
     # 2.0: the projects workspace is the first tab; Main follows it.
     assert window.tabs.tabText(0) == En.TAB_HOME
     assert window.tabs.tabText(window.tabs.indexOf(window.main_tab)) == En.TAB_MAIN
-    assert window.layoutDirection() == Qt.LeftToRight
+    assert window.layoutDirection() == Qt.LayoutDirection.LeftToRight
 
 
 def test_retranslate_preserves_the_form(window, project):
@@ -754,7 +755,7 @@ def test_applying_a_preset_with_dangerous_flags_asks_first(window, monkeypatch):
 
     def fake_question(*args, **kwargs):
         asked.append(args)
-        return QMessageBox.No
+        return QMessageBox.StandardButton.No
 
     monkeypatch.setattr(QMessageBox, "question", staticmethod(fake_question))
     window.presets.put(
@@ -918,7 +919,7 @@ def test_update_check_reports_a_newer_release(window, monkeypatch):
         lambda *a, **k: UpdateInfo("99.0.0", "https://example.invalid/r"),
     )
     monkeypatch.setattr(
-        QMessageBox, "question", staticmethod(lambda *a, **k: QMessageBox.Close)
+        QMessageBox, "question", staticmethod(lambda *a, **k: QMessageBox.StandardButton.Close)
     )
     window.check_for_updates()
     assert "99.0.0" in window.main_tab.log_text()

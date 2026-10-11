@@ -10,22 +10,21 @@ through the form.
 import subprocess
 import time
 
-from PyQt5.QtCore import QThread, pyqtSignal
-
 from py2exe_gui.core.batch_runner import CANCELLED, FAILED, RUNNING, SUCCESS, job_config
 from py2exe_gui.core.build_runner import popen_options
 from py2exe_gui.core.engines import engine_for
+from py2exe_gui.qt import QThread, Signal
 from py2exe_gui.strings import S
 
 
 class BatchThread(QThread):
     """Executes ``jobs`` in order, emitting progress for each one."""
 
-    log_signal = pyqtSignal(str)
+    log_signal = Signal(str)
     # (index, total, status) — lets the tab repaint one row without a rebuild.
-    job_signal = pyqtSignal(int, int, str)
-    progress_signal = pyqtSignal(int)
-    finished_signal = pyqtSignal(bool)
+    job_signal = Signal(int, int, str)
+    progress_signal = Signal(int)
+    finished_signal = Signal(bool)
 
     def __init__(self, jobs, base_config, python_for=None, options_for=None):
         super().__init__()

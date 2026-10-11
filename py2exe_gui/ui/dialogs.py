@@ -1,7 +1,6 @@
 """Reusable dialogs for the main window."""
 
-from PyQt5.QtCore import Qt
-from PyQt5.QtWidgets import (
+from py2exe_gui.qt import (
     QApplication,
     QDialog,
     QDialogButtonBox,
@@ -9,10 +8,10 @@ from PyQt5.QtWidgets import (
     QLabel,
     QLineEdit,
     QPushButton,
+    Qt,
     QTextEdit,
     QVBoxLayout,
 )
-
 from py2exe_gui.strings import S
 
 
@@ -21,7 +20,7 @@ def _inherited_direction(parent) -> Qt.LayoutDirection:
     if parent is not None:
         return parent.layoutDirection()
     app = QApplication.instance()
-    return app.layoutDirection() if app else Qt.LeftToRight
+    return app.layoutDirection() if app else Qt.LayoutDirection.LeftToRight
 
 
 class AddImportDialog(QDialog):
@@ -41,7 +40,7 @@ class AddImportDialog(QDialog):
         self.input = QLineEdit()
         self.input.setPlaceholderText(S.DIALOG_ADD_IMPORT_PLACEHOLDER)
 
-        buttons = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
+        buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel)
         buttons.accepted.connect(self.accept)
         buttons.rejected.connect(self.reject)
 
@@ -69,7 +68,7 @@ class CommandPreviewDialog(QDialog):
 
         self.text_view = QTextEdit()
         self.text_view.setReadOnly(True)
-        self.text_view.setLayoutDirection(Qt.LeftToRight)
+        self.text_view.setLayoutDirection(Qt.LayoutDirection.LeftToRight)
         self.text_view.setPlainText(self._command_text)
         layout.addWidget(self.text_view)
 
@@ -156,7 +155,7 @@ class PresetNameDialog(QDialog):
         self.input.setAccessibleName(S.PRESET_NAME_PROMPT)
         layout.addWidget(self.input)
 
-        buttons = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
+        buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel)
         buttons.accepted.connect(self.accept)
         buttons.rejected.connect(self.reject)
         layout.addWidget(buttons)
@@ -191,9 +190,9 @@ class ReleaseConfirmDialog(QDialog):
         layout.addWidget(note)
 
         buttons = QDialogButtonBox()
-        self.release_btn = buttons.addButton(S.BTN_CONFIRM_RELEASE, QDialogButtonBox.AcceptRole)
+        self.release_btn = buttons.addButton(S.BTN_CONFIRM_RELEASE, QDialogButtonBox.ButtonRole.AcceptRole)
         self.release_btn.setObjectName("successBtn")
-        buttons.addButton(S.BTN_CANCEL_RELEASE, QDialogButtonBox.RejectRole)
+        buttons.addButton(S.BTN_CANCEL_RELEASE, QDialogButtonBox.ButtonRole.RejectRole)
         buttons.accepted.connect(self.accept)
         buttons.rejected.connect(self.reject)
         layout.addWidget(buttons)
@@ -236,7 +235,7 @@ class CiPreviewDialog(QDialog):
         heading = QLabel(S.CI_DIALOG_HEADING.format(path=_ltr(path)))
         heading.setWordWrap(True)
         heading.setObjectName("aboutHeading")
-        heading.setTextInteractionFlags(Qt.TextSelectableByMouse)
+        heading.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
         layout.addWidget(heading)
         if exists:
             warning = QLabel(S.CI_DIALOG_OVERWRITE_NOTE)
@@ -246,8 +245,8 @@ class CiPreviewDialog(QDialog):
 
         self.text_view = QTextEdit()
         self.text_view.setReadOnly(True)
-        self.text_view.setLayoutDirection(Qt.LeftToRight)
-        self.text_view.setLineWrapMode(QTextEdit.NoWrap)
+        self.text_view.setLayoutDirection(Qt.LayoutDirection.LeftToRight)
+        self.text_view.setLineWrapMode(QTextEdit.LineWrapMode.NoWrap)
         self.text_view.setPlainText(text)
         self.text_view.setAccessibleName(S.CI_DIALOG_TITLE)
         layout.addWidget(self.text_view, 1)
@@ -261,11 +260,11 @@ class CiPreviewDialog(QDialog):
         layout.addWidget(note)
 
         buttons = QDialogButtonBox()
-        copy_btn = buttons.addButton(S.BTN_COPY_WORKFLOW, QDialogButtonBox.ActionRole)
+        copy_btn = buttons.addButton(S.BTN_COPY_WORKFLOW, QDialogButtonBox.ButtonRole.ActionRole)
         copy_btn.clicked.connect(self._copy_to_clipboard)
-        self.write_btn = buttons.addButton(S.BTN_WRITE_WORKFLOW, QDialogButtonBox.AcceptRole)
+        self.write_btn = buttons.addButton(S.BTN_WRITE_WORKFLOW, QDialogButtonBox.ButtonRole.AcceptRole)
         self.write_btn.setObjectName("successBtn")
-        buttons.addButton(S.BTN_CANCEL_WORKFLOW, QDialogButtonBox.RejectRole)
+        buttons.addButton(S.BTN_CANCEL_WORKFLOW, QDialogButtonBox.ButtonRole.RejectRole)
         buttons.accepted.connect(self.accept)
         buttons.rejected.connect(self.reject)
         layout.addWidget(buttons)

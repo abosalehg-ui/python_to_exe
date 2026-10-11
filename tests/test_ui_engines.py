@@ -5,11 +5,10 @@ import subprocess
 
 import pytest
 
-pytest.importorskip("PyQt5", reason="PyQt5 not installed")
-
-from PyQt5.QtWidgets import QMessageBox  # noqa: E402
+pytest.importorskip("py2exe_gui.qt", reason="no Qt binding (PySide6/PyQt5) installed")
 
 from py2exe_gui.core.config import BuildConfig  # noqa: E402
+from py2exe_gui.qt import QMessageBox  # noqa: E402
 from py2exe_gui.strings import S, set_locale  # noqa: E402
 from tests.test_ui_runtime import FakeThread, enable  # noqa: E402
 from tests.test_ui_size import answer, make_source, window  # noqa: E402,F401
@@ -100,7 +99,7 @@ def test_a_runtime_kit_build_is_refused_with_nuitka(window, tmp_path, no_build, 
     enable(window, "crash_reporter")
     choose(window, "nuitka")
     warned = []
-    answer(monkeypatch, "warning", QMessageBox.Ok, warned)
+    answer(monkeypatch, "warning", QMessageBox.StandardButton.Ok, warned)
     window.start_conversion()
     assert FakeThread.last is None
     assert warned and "--runtime-hook" in warned[0]
@@ -114,8 +113,8 @@ def test_download_consent_is_asked_then_given_for_one_build(window, tmp_path, no
     with open(os.path.join(DATA, "download_declined.log"), encoding="utf-8") as f:
         window._build_output = f.read().splitlines()
     asked = []
-    answer(monkeypatch, "question", QMessageBox.Yes, asked)
-    answer(monkeypatch, "critical", QMessageBox.Ok)
+    answer(monkeypatch, "question", QMessageBox.StandardButton.Yes, asked)
+    answer(monkeypatch, "critical", QMessageBox.StandardButton.Ok)
     window.on_conversion_finished(False, S.CONV_FAILED_MSG)
     assert asked and "appimagetool" in asked[-1]
     # The rebuild carries the consent; the one after it does not.
@@ -132,7 +131,7 @@ def test_declining_the_download_builds_nothing(window, tmp_path, no_build,  # no
     first = FakeThread.last
     with open(os.path.join(DATA, "download_declined.log"), encoding="utf-8") as f:
         window._build_output = f.read().splitlines()
-    answer(monkeypatch, "question", QMessageBox.No)
+    answer(monkeypatch, "question", QMessageBox.StandardButton.No)
     window.on_conversion_finished(False, S.CONV_FAILED_MSG)
     assert FakeThread.last is first
     assert not window._allow_downloads_once
@@ -144,7 +143,7 @@ def test_the_preview_shows_the_nuitka_command(window, tmp_path, monkeypatch):  #
     shown = []
     monkeypatch.setattr("py2exe_gui.ui.main_window.CommandPreviewDialog",
                         lambda cmd, parent=None: shown.append(cmd) or type(
-                            "D", (), {"exec_": lambda self: 0})())
+                            "D", (), {"exec": lambda self: 0})())
     window.preview_command()
     assert shown and shown[0][1:3] == ["-m", "nuitka"]
 

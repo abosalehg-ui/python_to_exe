@@ -5,17 +5,16 @@ it off the UI thread and turns its callbacks into signals, so the checklist
 updates live while PyInstaller, signtool or an upload is running.
 """
 
-from PyQt5.QtCore import QThread, pyqtSignal
-
 from py2exe_gui.core.release.pipeline import run_release
+from py2exe_gui.qt import QThread, Signal
 
 
 class ReleaseThread(QThread):
-    log_signal = pyqtSignal(str)
+    log_signal = Signal(str)
     #: A ``StepResult`` (running, then its final status).
-    step_signal = pyqtSignal(object)
+    step_signal = Signal(object)
     #: (context, list of StepResult)
-    finished_signal = pyqtSignal(object, object)
+    finished_signal = Signal(object, object)
 
     def __init__(self, context):
         super().__init__()

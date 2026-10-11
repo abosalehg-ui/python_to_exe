@@ -8,10 +8,11 @@ problems from ``core/licensing.py`` are rendered through ``strings``.
 import datetime
 from typing import Callable, Optional
 
-from PyQt5.QtCore import QDate, Qt
-from PyQt5.QtWidgets import (
+from py2exe_gui.core.licensing import LicenseRequest, parse_features, validate_request
+from py2exe_gui.qt import (
     QApplication,
     QCheckBox,
+    QDate,
     QDateEdit,
     QDialog,
     QDialogButtonBox,
@@ -21,10 +22,9 @@ from PyQt5.QtWidgets import (
     QLineEdit,
     QPlainTextEdit,
     QPushButton,
+    Qt,
     QVBoxLayout,
 )
-
-from py2exe_gui.core.licensing import LicenseRequest, parse_features, validate_request
 from py2exe_gui.strings import S
 from py2exe_gui.ui.dialogs import _inherited_direction
 from py2exe_gui.ui.tabs.runtime_tab import bidi, code_run
@@ -65,18 +65,18 @@ class LicenseGeneratorDialog(QDialog):
         form = QFormLayout()
         self.name_edit = QLineEdit()
         self.email_edit = QLineEdit()
-        self.email_edit.setLayoutDirection(Qt.LeftToRight)
+        self.email_edit.setLayoutDirection(Qt.LayoutDirection.LeftToRight)
         self.product_edit = QLineEdit(product)
-        self.product_edit.setLayoutDirection(Qt.LeftToRight)
+        self.product_edit.setLayoutDirection(Qt.LayoutDirection.LeftToRight)
         self.features_edit = QLineEdit()
         self.features_edit.setPlaceholderText(bidi(S.LICENSE_FEATURES_PLACEHOLDER))
-        self.features_edit.setLayoutDirection(Qt.LeftToRight)
+        self.features_edit.setLayoutDirection(Qt.LayoutDirection.LeftToRight)
 
         expiry_row = QHBoxLayout()
         self.expiry_edit = QDateEdit()
         self.expiry_edit.setCalendarPopup(True)
         self.expiry_edit.setDisplayFormat("yyyy-MM-dd")
-        self.expiry_edit.setLayoutDirection(Qt.LeftToRight)
+        self.expiry_edit.setLayoutDirection(Qt.LayoutDirection.LeftToRight)
         in_a_year = self._today + datetime.timedelta(days=365)
         self.expiry_edit.setDate(QDate(in_a_year.year, in_a_year.month, in_a_year.day))
         self.no_expiry = QCheckBox(bidi(S.LICENSE_NO_EXPIRY_CHECK))
@@ -103,7 +103,7 @@ class LicenseGeneratorDialog(QDialog):
         self.issue_btn.setObjectName("successBtn")
         self.issue_btn.setAccessibleName(S.BTN_LICENSE_ISSUE)
         self.issue_btn.clicked.connect(self.issue)
-        layout.addWidget(self.issue_btn, alignment=Qt.AlignLeading)
+        layout.addWidget(self.issue_btn, alignment=Qt.AlignmentFlag.AlignLeading)
 
         self.problems = QLabel()
         self.problems.setObjectName("warningNotice")
@@ -113,15 +113,15 @@ class LicenseGeneratorDialog(QDialog):
 
         self.result = QLabel()
         self.result.setWordWrap(True)
-        self.result.setTextInteractionFlags(Qt.TextSelectableByMouse)
+        self.result.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
         layout.addWidget(self.result)
         self.key_label = QLabel(bidi(S.LICENSE_KEY_LABEL))
         layout.addWidget(self.key_label)
         self.key_view = QPlainTextEdit()
         self.key_view.setObjectName("codeView")
         self.key_view.setReadOnly(True)
-        self.key_view.setLayoutDirection(Qt.LeftToRight)
-        self.key_view.setLineWrapMode(QPlainTextEdit.WidgetWidth)
+        self.key_view.setLayoutDirection(Qt.LayoutDirection.LeftToRight)
+        self.key_view.setLineWrapMode(QPlainTextEdit.LineWrapMode.WidgetWidth)
         self.key_view.setAccessibleName(S.LICENSE_KEY_LABEL)
         self.key_view.setMinimumHeight(90)
         layout.addWidget(self.key_view, 1)
@@ -132,10 +132,10 @@ class LicenseGeneratorDialog(QDialog):
         layout.addWidget(honesty)
 
         buttons = QDialogButtonBox()
-        self.copy_btn = buttons.addButton(S.BTN_LICENSE_COPY, QDialogButtonBox.ActionRole)
+        self.copy_btn = buttons.addButton(S.BTN_LICENSE_COPY, QDialogButtonBox.ButtonRole.ActionRole)
         self.copy_btn.setEnabled(False)
         self.copy_btn.clicked.connect(self.copy_key)
-        buttons.addButton(S.BTN_LICENSE_CLOSE, QDialogButtonBox.RejectRole)
+        buttons.addButton(S.BTN_LICENSE_CLOSE, QDialogButtonBox.ButtonRole.RejectRole)
         buttons.rejected.connect(self.reject)
         layout.addWidget(buttons)
 

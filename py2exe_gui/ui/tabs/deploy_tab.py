@@ -1,6 +1,9 @@
 """Splash screen, Windows manifest, code signing and the smoke test."""
 
-from PyQt5.QtWidgets import (
+from py2exe_gui.core import SigningConfig
+from py2exe_gui.core.platform_support import CODE_SIGNING, MANIFEST
+from py2exe_gui.core.project_file import ManifestSettings, SigningSettings
+from py2exe_gui.qt import (
     QCheckBox,
     QGridLayout,
     QGroupBox,
@@ -10,10 +13,6 @@ from PyQt5.QtWidgets import (
     QSpinBox,
     QVBoxLayout,
 )
-
-from py2exe_gui.core import SigningConfig
-from py2exe_gui.core.platform_support import CODE_SIGNING, MANIFEST
-from py2exe_gui.core.project_file import ManifestSettings, SigningSettings
 from py2exe_gui.strings import S
 from py2exe_gui.ui.tabs.base import BaseTab, browse_button, platform_notice
 
@@ -102,7 +101,7 @@ class DeployTab(BaseTab):
 
         signing_layout.addWidget(QLabel(S.SIGNING_PASSWORD_LABEL), 3, 0)
         self.signing_password = QLineEdit()
-        self.signing_password.setEchoMode(QLineEdit.Password)
+        self.signing_password.setEchoMode(QLineEdit.EchoMode.Password)
         self.signing_password.setPlaceholderText(S.SIGNING_PASSWORD_PLACEHOLDER)
         signing_layout.addWidget(self.signing_password, 3, 1, 1, 2)
 

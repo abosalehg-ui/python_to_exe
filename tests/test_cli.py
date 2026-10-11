@@ -1,6 +1,6 @@
 """The command line: parsing, exit codes, consent, and every command.
 
-Runs without PyQt5 (the core CI job has none), and one test proves the CLI
+Runs without Qt (the core CI job has no binding), and one test proves the CLI
 never imports it.
 """
 
@@ -137,15 +137,16 @@ def test_arabic_output(script):
     assert "أُنشئ" in out.getvalue()
 
 
-def test_the_cli_never_imports_pyqt5(tmp_path, script):
-    """The headless path works where PyQt5 cannot even be imported."""
+def test_the_cli_never_imports_qt(tmp_path, script):
+    """The headless path works where neither Qt binding can even be imported."""
     code = (
-        "import sys; sys.modules['PyQt5'] = None\n"
+        "import sys; sys.modules['PyQt5'] = sys.modules['PySide6'] = None\n"
         "from py2exe_gui.app import main\n"
         f"rc = main(['--lang', 'en', 'init', {str(script)!r}, '--project', "
         f"{str(tmp_path / 'x.toml')!r}])\n"
-        "assert not any(m == 'PyQt5' or m.startswith('PyQt5.') for m in sys.modules "
-        "if sys.modules[m] is not None)\n"
+        "assert not any(m.split('.')[0] in ('PyQt5', 'PySide6') "
+        "for m in sys.modules if sys.modules[m] is not None)\n"
+        "assert 'py2exe_gui.qt' not in sys.modules\n"
         "sys.exit(rc)\n"
     )
     result = subprocess.run([sys.executable, "-c", code], cwd=ROOT, capture_output=True,
@@ -657,8 +658,8 @@ def test_release_and_package_download_flags_parse():
     assert parser.parse_args(["ci", "--print", "--python", "3.11"]).print_only
 
 
-def test_cli_still_never_imports_pyqt5_for_the_new_commands(tmp_path):
-    code = ("import sys\nsys.modules['PyQt5'] = None\n"
+def test_cli_still_never_imports_qt_for_the_new_commands(tmp_path):
+    code = ("import sys\nsys.modules['PyQt5'] = sys.modules['PySide6'] = None\n"
             "from py2exe_gui import cli\n"
             "sys.exit(cli.main(['--lang', 'en', 'package', '--help']) or "
             "cli.main(['--lang', 'en', 'ci', '--help']))")

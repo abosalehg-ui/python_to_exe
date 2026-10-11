@@ -9,23 +9,24 @@ started here is the same build as the Convert button's.
 
 import os
 
-from PyQt5.QtCore import Qt
-from PyQt5.QtGui import QColor, QPainter, QPen
-from PyQt5.QtWidgets import (
-    QFrame,
-    QHBoxLayout,
-    QLabel,
-    QPushButton,
-    QVBoxLayout,
-    QWidget,
-)
-
 from py2exe_gui.core.size_analyzer import format_size
 from py2exe_gui.core.workspace import (
     STATUS_MISSING,
     ProjectSummary,
     short_time,
     sparkline_points,
+)
+from py2exe_gui.qt import (
+    QColor,
+    QFrame,
+    QHBoxLayout,
+    QLabel,
+    QPainter,
+    QPen,
+    QPushButton,
+    Qt,
+    QVBoxLayout,
+    QWidget,
 )
 from py2exe_gui.strings import S
 from py2exe_gui.texts import is_rtl
@@ -52,7 +53,7 @@ def _label(text: str, object_name: str = "", wrap: bool = True) -> QLabel:
     if object_name:
         label.setObjectName(object_name)
     label.setWordWrap(wrap)
-    label.setTextInteractionFlags(Qt.TextSelectableByMouse)
+    label.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
     return label
 
 
@@ -76,16 +77,16 @@ class SizeSparkline(QWidget):
         self.setAccessibleName(text)
 
     def points(self):
-        rtl = self.layoutDirection() == Qt.RightToLeft
+        rtl = self.layoutDirection() == Qt.LayoutDirection.RightToLeft
         return sparkline_points(self.sizes, self.width(), self.height(), rtl=rtl, padding=5)
 
     def paintEvent(self, _event):
         painter = QPainter(self)
-        painter.setRenderHint(QPainter.Antialiasing)
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
         width, height = self.width(), self.height()
         base = QPen(QColor(self.colors["muted"]))
         base.setWidthF(1.0)
-        base.setStyle(Qt.DotLine)
+        base.setStyle(Qt.PenStyle.DotLine)
         painter.setPen(base)
         painter.drawLine(5, height - 5, width - 5, height - 5)
         points = self.points()
@@ -94,13 +95,13 @@ class SizeSparkline(QWidget):
             return
         line = QPen(QColor(self.colors["accent"]))
         line.setWidthF(2.0)
-        line.setCapStyle(Qt.RoundCap)
-        line.setJoinStyle(Qt.RoundJoin)
+        line.setCapStyle(Qt.PenCapStyle.RoundCap)
+        line.setJoinStyle(Qt.PenJoinStyle.RoundJoin)
         painter.setPen(line)
         for (x1, y1), (x2, y2) in zip(points, points[1:]):
             painter.drawLine(int(round(x1)), int(round(y1)), int(round(x2)), int(round(y2)))
         newest_x, newest_y = points[-1]
-        painter.setPen(Qt.NoPen)
+        painter.setPen(Qt.PenStyle.NoPen)
         painter.setBrush(QColor(self.colors["success"]))
         painter.drawEllipse(int(round(newest_x)) - 3, int(round(newest_y)) - 3, 7, 7)
         painter.end()
@@ -115,7 +116,7 @@ class ProjectCard(QFrame):
         self.summary = summary
         self.path = summary.path
         self.setObjectName("projectCard")
-        self.setFrameShape(QFrame.StyledPanel)
+        self.setFrameShape(QFrame.Shape.StyledPanel)
         self.setAccessibleName(summary.display_name())
         layout = QVBoxLayout(self)
         layout.setContentsMargins(14, 12, 14, 12)

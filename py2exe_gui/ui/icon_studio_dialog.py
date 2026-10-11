@@ -6,25 +6,34 @@ assembles the .ico. No imaging library is needed.
 
 import os
 
-from PyQt5.QtCore import QBuffer, QByteArray, QIODevice, QRectF, QSize, Qt
-from PyQt5.QtGui import QColor, QFont, QImage, QPainter, QPainterPath, QPixmap
-from PyQt5.QtWidgets import (
+from py2exe_gui.core.icon_studio import ICO_SIZES, monogram, pack_ico
+from py2exe_gui.qt import (
+    QBuffer,
     QButtonGroup,
+    QByteArray,
+    QColor,
     QColorDialog,
     QComboBox,
     QDialog,
     QFileDialog,
+    QFont,
     QGridLayout,
     QHBoxLayout,
+    QImage,
+    QIODevice,
     QLabel,
     QLineEdit,
     QMessageBox,
+    QPainter,
+    QPainterPath,
+    QPixmap,
     QPushButton,
     QRadioButton,
+    QRectF,
+    QSize,
+    Qt,
     QVBoxLayout,
 )
-
-from py2exe_gui.core.icon_studio import ICO_SIZES, monogram, pack_ico
 from py2exe_gui.strings import S
 from py2exe_gui.ui.dialogs import _inherited_direction
 
@@ -43,11 +52,11 @@ def _contrasting_text(color: QColor) -> QColor:
 
 def render_image_icon(source: QImage, size: int) -> QImage:
     """``source`` fitted (not cropped) into a transparent square."""
-    canvas = QImage(size, size, QImage.Format_ARGB32)
+    canvas = QImage(size, size, QImage.Format.Format_ARGB32)
     canvas.fill(Qt.transparent)
-    scaled = source.scaled(size, size, Qt.KeepAspectRatio, Qt.SmoothTransformation)
+    scaled = source.scaled(size, size, Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation)
     painter = QPainter(canvas)
-    painter.setRenderHint(QPainter.SmoothPixmapTransform)
+    painter.setRenderHint(QPainter.RenderHint.SmoothPixmapTransform)
     painter.drawImage((size - scaled.width()) // 2, (size - scaled.height()) // 2, scaled)
     painter.end()
     return canvas
@@ -55,11 +64,11 @@ def render_image_icon(source: QImage, size: int) -> QImage:
 
 def render_text_icon(text: str, size: int, color: QColor, shape: str) -> QImage:
     """Letters on a coloured shape, legible down to 16px."""
-    canvas = QImage(size, size, QImage.Format_ARGB32)
+    canvas = QImage(size, size, QImage.Format.Format_ARGB32)
     canvas.fill(Qt.transparent)
     painter = QPainter(canvas)
-    painter.setRenderHint(QPainter.Antialiasing)
-    painter.setRenderHint(QPainter.TextAntialiasing)
+    painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+    painter.setRenderHint(QPainter.RenderHint.TextAntialiasing)
 
     rect = QRectF(0, 0, size, size)
     path = QPainterPath()
@@ -79,7 +88,7 @@ def render_text_icon(text: str, size: int, color: QColor, shape: str) -> QImage:
         font.setPixelSize(max(6, int(size * (0.62 if len(text) == 1 else 0.46))))
         painter.setFont(font)
         painter.setPen(_contrasting_text(color))
-        painter.drawText(rect, Qt.AlignCenter, text)
+        painter.drawText(rect, Qt.AlignmentFlag.AlignCenter, text)
     painter.end()
     return canvas
 
@@ -87,7 +96,7 @@ def render_text_icon(text: str, size: int, color: QColor, shape: str) -> QImage:
 def png_bytes(image: QImage) -> bytes:
     data = QByteArray()
     buffer = QBuffer(data)
-    buffer.open(QIODevice.WriteOnly)
+    buffer.open(QIODevice.OpenModeFlag.WriteOnly)
     image.save(buffer, "PNG")
     buffer.close()
     return bytes(data)
@@ -159,9 +168,9 @@ class IconStudioDialog(QDialog):
         for size in PREVIEW_SIZES:
             slot = QLabel()
             slot.setFixedSize(QSize(size, size))
-            slot.setAlignment(Qt.AlignCenter)
+            slot.setAlignment(Qt.AlignmentFlag.AlignCenter)
             slot.setAccessibleName(f"{S.ICON_STUDIO_PREVIEW} {size}px")
-            preview_row.addWidget(slot, alignment=Qt.AlignBottom)
+            preview_row.addWidget(slot, alignment=Qt.AlignmentFlag.AlignBottom)
             self.previews.append((size, slot))
         preview_row.addStretch(1)
         layout.addLayout(preview_row)

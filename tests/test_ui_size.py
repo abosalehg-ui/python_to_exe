@@ -6,13 +6,14 @@ import sys
 
 import pytest
 
-pytest.importorskip("PyQt5", reason="PyQt5 not installed")
-
-from PyQt5.QtCore import Qt  # noqa: E402
-from PyQt5.QtWidgets import QMessageBox  # noqa: E402
+pytest.importorskip("py2exe_gui.qt", reason="no Qt binding (PySide6/PyQt5) installed")
 
 from py2exe_gui.core import BuildConfig  # noqa: E402
 from py2exe_gui.core.venv_manager import env_dir_for, env_python  # noqa: E402
+from py2exe_gui.qt import (
+    QMessageBox,  # noqa: E402
+    Qt,  # noqa: E402
+)
 from py2exe_gui.strings import En, S, set_locale  # noqa: E402
 from py2exe_gui.ui.main_window import SIMPLE_MODE_TABS  # noqa: E402
 from tests.conftest import MemoryKeyring  # noqa: E402
@@ -179,12 +180,12 @@ def test_create_env_asks_first_and_shows_the_commands(window, tmp_path, monkeypa
     monkeypatch.setattr("py2exe_gui.ui.main_window.find_uv", lambda: "")
     window.main_tab.source_input.setText(make_source(tmp_path))
     asked = []
-    answer(monkeypatch, "question", QMessageBox.No, asked)
+    answer(monkeypatch, "question", QMessageBox.StandardButton.No, asked)
     window.create_build_env()
     assert window.env_thread is None
     assert "venv" in asked[0] and "PyYAML" in asked[0]
 
-    answer(monkeypatch, "question", QMessageBox.Yes)
+    answer(monkeypatch, "question", QMessageBox.StandardButton.Yes)
     window.create_build_env()
     assert window.env_thread.started
     assert window.env_thread.plan.install[-1] == "PyYAML"
@@ -194,7 +195,7 @@ def test_create_env_rejects_a_missing_base_python(window, tmp_path, monkeypatch)
     window.main_tab.source_input.setText(make_source(tmp_path))
     window.size_tab.base_python.setText(str(tmp_path / "no-python"))
     warned = []
-    answer(monkeypatch, "warning", QMessageBox.Ok, warned)
+    answer(monkeypatch, "warning", QMessageBox.StandardButton.Ok, warned)
     window.create_build_env()
     assert warned and window.env_thread is None
 
@@ -212,7 +213,7 @@ def test_env_finished_then_builds(window, tmp_path, monkeypatch):
 def test_env_failure_is_reported(window, tmp_path, monkeypatch):
     window.main_tab.source_input.setText(make_source(tmp_path))
     shown = []
-    answer(monkeypatch, "critical", QMessageBox.Ok, shown)
+    answer(monkeypatch, "critical", QMessageBox.StandardButton.Ok, shown)
     started = []
     monkeypatch.setattr(window, "start_conversion", lambda: started.append(True))
     window._on_env_finished(type("P", (), {"python": "x"})(), False, [], "boom", True)
@@ -230,7 +231,7 @@ def test_delete_env(window, tmp_path, monkeypatch):
     source = make_source(tmp_path)
     env = fake_env(window, source)
     window.main_tab.source_input.setText(source)
-    answer(monkeypatch, "question", QMessageBox.Yes)
+    answer(monkeypatch, "question", QMessageBox.StandardButton.Yes)
     window.delete_build_env()
     assert not os.path.exists(env)
 
@@ -255,7 +256,7 @@ def test_start_with_missing_env_offers_to_create_it(window, tmp_path, monkeypatc
     window.size_tab.isolated_radio.setChecked(True)
     calls = []
     monkeypatch.setattr(window, "create_build_env", lambda **kw: calls.append(kw))
-    answer(monkeypatch, "question", QMessageBox.Yes)
+    answer(monkeypatch, "question", QMessageBox.StandardButton.Yes)
     window.start_conversion()
     assert calls == [{"then_build": True}]
     assert window.conversion_thread is None
@@ -277,7 +278,7 @@ def test_analyze_shows_breakdown_and_suggestions(window, tmp_path):
     names = [tab.breakdown.topLevelItem(i).text(0) for i in range(tab.breakdown.topLevelItemCount())]
     assert names[0] == "numpy"
     assert S.SIZE_GROUP_RUNTIME in names
-    suggestion = tab.suggestions.item(0).data(Qt.UserRole)
+    suggestion = tab.suggestions.item(0).data(Qt.ItemDataRole.UserRole)
     assert suggestion.params["package"] == "tkinter"
 
 
@@ -286,7 +287,7 @@ def test_applying_a_suggestion_excludes_it(window, tmp_path):
     window.analyze_last_build()
     window.size_tab._apply(rebuild=False)
     assert "--exclude-module tkinter" in window.advanced_tab.extra_args.text()
-    assert window.size_tab.suggestions.item(0).data(Qt.UserRole) is None  # list emptied
+    assert window.size_tab.suggestions.item(0).data(Qt.ItemDataRole.UserRole) is None  # list emptied
 
 
 def test_size_hints_follow_the_language(window, tmp_path):
@@ -323,7 +324,7 @@ def test_finished_build_stores_size_in_history(window, tmp_path, monkeypatch):
     config = make_build(tmp_path)
     point_at_build(window, config)
     window._build_config_snapshot = config.to_dict()
-    answer(monkeypatch, "information", QMessageBox.Ok)
+    answer(monkeypatch, "information", QMessageBox.StandardButton.Ok)
     monkeypatch.setattr(window, "_run_post_build_actions", lambda _c: None)
     window.on_conversion_finished(True, "ok")
     assert window.history.records[0].size_bytes == 6 * 1024 * 1024
@@ -335,7 +336,7 @@ def test_report_can_be_turned_off(window, tmp_path, monkeypatch):
     point_at_build(window, config)
     window.size_tab.report_auto.setChecked(False)
     window._build_config_snapshot = config.to_dict()
-    answer(monkeypatch, "information", QMessageBox.Ok)
+    answer(monkeypatch, "information", QMessageBox.StandardButton.Ok)
     monkeypatch.setattr(window, "_run_post_build_actions", lambda _c: None)
     window.on_conversion_finished(True, "ok")
     assert window._last_report_path == ""
@@ -347,7 +348,7 @@ def test_report_can_be_turned_off(window, tmp_path, monkeypatch):
 def test_sandbox_needs_a_build(window, tmp_path, monkeypatch):
     window.main_tab.source_input.setText(make_source(tmp_path))
     shown = []
-    answer(monkeypatch, "information", QMessageBox.Ok, shown)
+    answer(monkeypatch, "information", QMessageBox.StandardButton.Ok, shown)
     window.open_in_sandbox()
     assert shown == [S.MSG_SANDBOX_NO_BUILD]
 
@@ -356,7 +357,7 @@ def test_sandbox_unavailable_explains_the_alternative(window, tmp_path, monkeypa
     point_at_build(window, make_build(tmp_path))
     monkeypatch.setattr("py2exe_gui.ui.main_window.sandbox_available", lambda: False)
     shown = []
-    answer(monkeypatch, "information", QMessageBox.Ok, shown)
+    answer(monkeypatch, "information", QMessageBox.StandardButton.Ok, shown)
     window.open_in_sandbox()
     assert os.path.join("dist", "app") in shown[0]
 

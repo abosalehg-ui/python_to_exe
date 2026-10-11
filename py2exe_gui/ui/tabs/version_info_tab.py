@@ -1,15 +1,14 @@
 """Windows file metadata embedded into the produced EXE."""
 
-from PyQt5.QtWidgets import (
+from py2exe_gui.core import VersionInfo
+from py2exe_gui.core.platform_support import VERSION_INFO
+from py2exe_gui.qt import (
     QGridLayout,
     QGroupBox,
     QLabel,
     QLineEdit,
     QVBoxLayout,
 )
-
-from py2exe_gui.core import VersionInfo
-from py2exe_gui.core.platform_support import VERSION_INFO
 from py2exe_gui.strings import S
 from py2exe_gui.ui.tabs.base import BaseTab, platform_notice
 

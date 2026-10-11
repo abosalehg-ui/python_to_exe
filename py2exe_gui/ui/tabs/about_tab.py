@@ -1,19 +1,20 @@
 """Application information."""
 
-from PyQt5.QtCore import Qt
-from PyQt5.QtWidgets import (
+from py2exe_gui.constants import APP_NAME, APP_VERSION, COPYRIGHT, DEVELOPER, EMAIL
+from py2exe_gui.qt import (
     QCheckBox,
     QFrame,
     QLabel,
     QPushButton,
     QScrollArea,
+    Qt,
     QVBoxLayout,
     QWidget,
 )
-
-from py2exe_gui.constants import APP_NAME, APP_VERSION, COPYRIGHT, DEVELOPER, EMAIL
+from py2exe_gui.qt import describe as qt_describe
 from py2exe_gui.strings import S
 from py2exe_gui.ui.tabs.base import BaseTab
+from py2exe_gui.ui.tabs.size_tab import ltr
 
 
 class AboutTab(BaseTab):
@@ -22,15 +23,15 @@ class AboutTab(BaseTab):
     def _build(self):
         inner = QWidget()
         layout = QVBoxLayout(inner)
-        layout.setAlignment(Qt.AlignTop)
+        layout.setAlignment(Qt.AlignmentFlag.AlignTop)
         layout.setSpacing(8)
 
         def add_label(text, object_name, *, bold=False):
             label = QLabel(text)
             label.setObjectName(object_name)
             label.setWordWrap(True)
-            label.setAlignment(Qt.AlignCenter)
-            label.setTextInteractionFlags(Qt.TextSelectableByMouse)
+            label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            label.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
             if bold:
                 font = label.font()
                 font.setBold(True)
@@ -41,12 +42,13 @@ class AboutTab(BaseTab):
         def add_separator():
             line = QFrame()
             line.setObjectName("aboutSeparator")
-            line.setFrameShape(QFrame.HLine)
-            line.setFrameShadow(QFrame.Plain)
+            line.setFrameShape(QFrame.Shape.HLine)
+            line.setFrameShadow(QFrame.Shadow.Plain)
             layout.addWidget(line)
 
         add_label(f"🐍 {APP_NAME}", "aboutHeading")
         add_label(S.ABOUT_VERSION_FMT.format(version=APP_VERSION), "aboutSubheading")
+        self.qt_label = add_label(S.ABOUT_QT_FMT.format(binding=ltr(qt_describe())), "aboutMuted")
 
         # Update check: report-only, and opt-in for the automatic one. Nothing
         # is ever downloaded or run on the user's behalf.
@@ -80,7 +82,7 @@ class AboutTab(BaseTab):
         features.setWordWrap(True)
         # Feature bullets read as a block; centring a list looks wrong in both
         # directions, so follow the inherited layout direction instead.
-        features.setAlignment(Qt.AlignLeft | Qt.AlignTop)
+        features.setAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignTop)
         layout.addWidget(features)
         layout.addStretch()
 

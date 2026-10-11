@@ -7,8 +7,8 @@ the core's) job.
 
 import re
 
-from PyQt5.QtCore import Qt
-from PyQt5.QtWidgets import (
+from py2exe_gui.core.config import RUNTIME_SERVICES, RuntimeKitConfig
+from py2exe_gui.qt import (
     QCheckBox,
     QFormLayout,
     QGroupBox,
@@ -17,12 +17,11 @@ from PyQt5.QtWidgets import (
     QLineEdit,
     QPlainTextEdit,
     QPushButton,
+    Qt,
     QTabWidget,
     QVBoxLayout,
     QWidget,
 )
-
-from py2exe_gui.core.config import RUNTIME_SERVICES, RuntimeKitConfig
 from py2exe_gui.strings import LOCALE_LAYOUT, S, current_locale
 from py2exe_gui.ui.tabs.base import BaseTab, browse_button, scrollable
 
@@ -75,7 +74,7 @@ def _ltr_line(placeholder: str = "") -> QLineEdit:
     """A field for a URL, a key or a version: always left-to-right."""
     line = QLineEdit()
     line.setPlaceholderText(bidi(placeholder))
-    line.setLayoutDirection(Qt.LeftToRight)
+    line.setLayoutDirection(Qt.LayoutDirection.LeftToRight)
     return line
 
 
@@ -83,8 +82,8 @@ def _code_view() -> QPlainTextEdit:
     view = QPlainTextEdit()
     view.setObjectName("codeView")
     view.setReadOnly(True)
-    view.setLayoutDirection(Qt.LeftToRight)
-    view.setLineWrapMode(QPlainTextEdit.NoWrap)
+    view.setLayoutDirection(Qt.LayoutDirection.LeftToRight)
+    view.setLineWrapMode(QPlainTextEdit.LineWrapMode.NoWrap)
     view.setMinimumHeight(150)
     return view
 
@@ -193,7 +192,7 @@ class RuntimeTab(BaseTab):
 
         self.key_status = QLabel()
         self.key_status.setWordWrap(True)
-        self.key_status.setTextInteractionFlags(Qt.TextSelectableByMouse)
+        self.key_status.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
         box.addWidget(self.key_status)
 
         buttons = QHBoxLayout()
@@ -256,7 +255,7 @@ class RuntimeTab(BaseTab):
 
         self.license_key_status = QLabel()
         self.license_key_status.setWordWrap(True)
-        self.license_key_status.setTextInteractionFlags(Qt.TextSelectableByMouse)
+        self.license_key_status.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
         box.addWidget(self.license_key_status)
 
         buttons = QHBoxLayout()
@@ -322,7 +321,7 @@ class RuntimeTab(BaseTab):
         self.publish_btn.setObjectName("successBtn")
         self.publish_btn.setAccessibleName(S.BTN_KIT_PUBLISH)
         self.publish_btn.clicked.connect(self.window_action("publish_update"))
-        box.addWidget(self.publish_btn, alignment=Qt.AlignLeading)
+        box.addWidget(self.publish_btn, alignment=Qt.AlignmentFlag.AlignLeading)
         return group
 
     def browse_publish_file(self):

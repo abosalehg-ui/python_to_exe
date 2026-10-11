@@ -216,6 +216,8 @@ class Ar:
 
     # About tab
     ABOUT_VERSION_FMT = "الإصدار {version}"
+    # The Qt binding and its version, e.g. "PySide6 6.7.2 (Qt 6.7.2)".
+    ABOUT_QT_FMT = "واجهة Qt: {binding}"
     ABOUT_DESC = (
         "أداة احترافية لتحويل تطبيقات بايثون إلى ملفات تنفيذية EXE<br>"
         "باستخدام PyInstaller مع واجهة رسومية سهلة الاستخدام"
@@ -2085,6 +2087,8 @@ class En:
 
     # About tab
     ABOUT_VERSION_FMT = "Version {version}"
+    # The Qt binding and its version, e.g. "PySide6 6.7.2 (Qt 6.7.2)".
+    ABOUT_QT_FMT = "Qt binding: {binding}"
     ABOUT_DESC = (
         "Professional tool for converting Python apps to .exe<br>"
         "using PyInstaller with an easy graphical interface"

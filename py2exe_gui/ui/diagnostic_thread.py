@@ -9,19 +9,18 @@ hands back everything it printed.
 import os
 import subprocess
 
-from PyQt5.QtCore import QThread, pyqtSignal
-
 from py2exe_gui.core.diagnostics import build_name
 from py2exe_gui.core.smoke_test import locate_built_executable, run_from_neutral_folder
+from py2exe_gui.qt import QThread, Signal
 from py2exe_gui.strings import S
 
 
 class DiagnosticThread(QThread):
     """Build a console copy of the app, run it, report its output."""
 
-    log_signal = pyqtSignal(str)
+    log_signal = Signal(str)
     #: (built_ok, exe_output, build_log)
-    finished_signal = pyqtSignal(bool, str, str)
+    finished_signal = Signal(bool, str, str)
 
     def __init__(self, command, config, timeout: float = 8.0, popen_kwargs=None):
         super().__init__()

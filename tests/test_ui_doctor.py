@@ -6,14 +6,16 @@ import sys
 
 import pytest
 
-pytest.importorskip("PyQt5", reason="PyQt5 not installed")
-
-from PyQt5.QtCore import Qt  # noqa: E402
-from PyQt5.QtGui import QColor, QImage  # noqa: E402
-from PyQt5.QtWidgets import QMessageBox  # noqa: E402
+pytest.importorskip("py2exe_gui.qt", reason="no Qt binding (PySide6/PyQt5) installed")
 
 from py2exe_gui.core import BuildConfig, Finding  # noqa: E402
 from py2exe_gui.core.icon_studio import ICO_SIZES, read_ico_file_sizes  # noqa: E402
+from py2exe_gui.qt import (  # noqa: E402
+    QColor,
+    QImage,
+    QMessageBox,  # noqa: E402
+    Qt,  # noqa: E402
+)
 from py2exe_gui.strings import En, set_locale  # noqa: E402
 from py2exe_gui.ui.main_window import SIMPLE_MODE_TABS  # noqa: E402
 from tests.conftest import MemoryKeyring  # noqa: E402
@@ -45,7 +47,7 @@ def list_codes(window):
     items = []
     lst = window.doctor_tab.findings_list
     for row in range(lst.count()):
-        finding = lst.item(row).data(Qt.UserRole)
+        finding = lst.item(row).data(Qt.ItemDataRole.UserRole)
         if finding is not None:
             items.append(finding.code)
     return items
@@ -105,7 +107,7 @@ def test_selecting_a_finding_shows_details_and_copy(window, tmp_path):
     assert tab.copy_btn.isEnabled()
 
     tab.copy_selected()
-    from PyQt5.QtWidgets import QApplication
+    from py2exe_gui.qt import QApplication
 
     assert "freeze_support()" in QApplication.clipboard().text()
 
@@ -131,7 +133,7 @@ def test_unticked_findings_are_not_applied(window, tmp_path):
     window.run_doctor()
     lst = window.doctor_tab.findings_list
     for row in range(lst.count()):
-        lst.item(row).setCheckState(Qt.Unchecked)
+        lst.item(row).setCheckState(Qt.CheckState.Unchecked)
     assert window.doctor_tab.checked_fixes() == []
 
 
@@ -139,7 +141,7 @@ def test_apply_with_nothing_selected_says_so(window, monkeypatch):
     shown = {}
     monkeypatch.setattr(
         QMessageBox, "information",
-        staticmethod(lambda *a, **k: shown.update(text=a[2]) or QMessageBox.Ok),
+        staticmethod(lambda *a, **k: shown.update(text=a[2]) or QMessageBox.StandardButton.Ok),
     )
     window.apply_doctor_fixes([])
     assert shown
@@ -191,7 +193,7 @@ def test_failed_build_message_mentions_the_doctor(window, tmp_path, monkeypatch)
     shown = {}
     monkeypatch.setattr(
         QMessageBox, "critical",
-        staticmethod(lambda *a, **k: shown.update(text=a[2]) or QMessageBox.Ok),
+        staticmethod(lambda *a, **k: shown.update(text=a[2]) or QMessageBox.StandardButton.Ok),
     )
     from py2exe_gui.strings import S
 
@@ -249,7 +251,7 @@ def test_diagnostic_run_needs_a_source(window, monkeypatch):
     warned = {}
     monkeypatch.setattr(
         QMessageBox, "warning",
-        staticmethod(lambda *a, **k: warned.update(ok=True) or QMessageBox.Ok),
+        staticmethod(lambda *a, **k: warned.update(ok=True) or QMessageBox.StandardButton.Ok),
     )
     window.start_diagnostic_run()
     assert warned.get("ok")
@@ -329,7 +331,7 @@ def test_icon_studio_writes_every_size_from_letters(qapp, tmp_path):
 def test_icon_studio_from_an_image(qapp, tmp_path):
     from py2exe_gui.ui.icon_studio_dialog import IconStudioDialog
 
-    image = QImage(300, 200, QImage.Format_ARGB32)
+    image = QImage(300, 200, QImage.Format.Format_ARGB32)
     image.fill(QColor("red"))
     png = str(tmp_path / "logo.png")
     assert image.save(png)
@@ -371,7 +373,7 @@ def test_open_icon_studio_sets_the_icon_field(window, tmp_path, monkeypatch):
         dialog.write_to(target)
         return True
 
-    monkeypatch.setattr("py2exe_gui.ui.icon_studio_dialog.IconStudioDialog.exec_", fake_exec)
+    monkeypatch.setattr("py2exe_gui.ui.icon_studio_dialog.IconStudioDialog.exec", fake_exec)
     window.open_icon_studio()
     assert window.main_tab.icon_input.text() == target
 

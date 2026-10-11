@@ -1,8 +1,9 @@
 """Application bootstrap.
 
 ``py2exe-gui`` with no arguments opens the window; ``py2exe-gui <command>``
-runs the command line (``py2exe_gui.cli``). PyQt5 is imported only on the GUI
-path, so the command line works where Qt is not installed.
+runs the command line (``py2exe_gui.cli``). Qt (``py2exe_gui.qt``: PySide6, or
+PyQt5 as the fallback) is imported only on the GUI path, so the command line
+works where no binding is installed.
 """
 
 import json
@@ -25,24 +26,21 @@ def _load_preferred_locale() -> str:
 
 
 def run_gui(open_path: str = "") -> int:
-    from PyQt5.QtCore import Qt
-    from PyQt5.QtGui import QFont
-    from PyQt5.QtWidgets import QApplication
+    from py2exe_gui.qt import QApplication, Qt, application_font, configure_high_dpi
 
     locale = _load_preferred_locale()
     set_locale(locale)
 
-    if hasattr(Qt, "AA_EnableHighDpiScaling"):
-        QApplication.setAttribute(Qt.AA_EnableHighDpiScaling, True)
-    if hasattr(Qt, "AA_UseHighDpiPixmaps"):
-        QApplication.setAttribute(Qt.AA_UseHighDpiPixmaps, True)
+    # Before the QApplication exists: Qt 5 needs the attributes, Qt 6 scales
+    # by default (see py2exe_gui.qt.configure_high_dpi).
+    configure_high_dpi()
 
     app = QApplication(sys.argv[:1])
-    direction = (
-        Qt.RightToLeft if LOCALE_LAYOUT.get(locale, "rtl") == "rtl" else Qt.LeftToRight
+    rtl = LOCALE_LAYOUT.get(locale, "rtl") == "rtl"
+    app.setLayoutDirection(
+        Qt.LayoutDirection.RightToLeft if rtl else Qt.LayoutDirection.LeftToRight
     )
-    app.setLayoutDirection(direction)
-    app.setFont(QFont("Segoe UI", 10))
+    app.setFont(application_font(10))
 
     # Import here so it picks up the locale already set above.
     from py2exe_gui.ui.main_window import MainWindow
@@ -55,7 +53,7 @@ def run_gui(open_path: str = "") -> int:
     if open_path:
         window.open_project_path(open_path)
 
-    return app.exec_()
+    return app.exec()
 
 
 def main(argv=None) -> int:

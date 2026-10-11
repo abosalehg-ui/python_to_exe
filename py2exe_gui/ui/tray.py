@@ -8,8 +8,7 @@ Everything here degrades to a no-op when the platform has no system tray
 (headless CI, a bare window manager), so callers never have to guard the calls.
 """
 
-from PyQt5.QtWidgets import QAction, QMenu, QSystemTrayIcon
-
+from py2exe_gui.qt import QAction, QMenu, QSystemTrayIcon
 from py2exe_gui.strings import S
 
 
@@ -36,7 +35,7 @@ class BuildTray:
         self.tray.setContextMenu(self._build_menu())
 
     def _build_menu(self) -> QMenu:
-        menu = QMenu(self.window)
+        self.menu = menu = QMenu(self.window)
         for label, slot in (
             (S.TRAY_SHOW, self._restore_window),
             (S.TRAY_CANCEL, self._cancel_build),
@@ -52,7 +51,7 @@ class BuildTray:
     # ── Actions ────────────────────────────────────────────────────────────
 
     def _on_activated(self, reason):
-        if reason in (QSystemTrayIcon.Trigger, QSystemTrayIcon.DoubleClick):
+        if reason in (QSystemTrayIcon.ActivationReason.Trigger, QSystemTrayIcon.ActivationReason.DoubleClick):
             self._restore_window()
 
     def _restore_window(self):
@@ -85,6 +84,6 @@ class BuildTray:
         if self.tray is None or not self.tray.isVisible():
             return
         icon = (
-            QSystemTrayIcon.Information if success else QSystemTrayIcon.Critical
+            QSystemTrayIcon.MessageIcon.Information if success else QSystemTrayIcon.MessageIcon.Critical
         )
         self.tray.showMessage(title, body, icon, msecs)

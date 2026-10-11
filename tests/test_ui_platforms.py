@@ -8,14 +8,13 @@ import sys
 
 import pytest
 
-pytest.importorskip("PyQt5", reason="PyQt5 not installed")
-
-from PyQt5.QtWidgets import QDialog, QMessageBox  # noqa: E402
+pytest.importorskip("py2exe_gui.qt", reason="no Qt binding (PySide6/PyQt5) installed")
 
 from py2exe_gui.core import packagers  # noqa: E402
 from py2exe_gui.core.ci_generator import DEFAULT_TOOL_REQUIREMENT, workflow_path  # noqa: E402
 from py2exe_gui.core.packagers import AppImagePackager  # noqa: E402
 from py2exe_gui.core.project_file import ProjectConfig, load_project, save_project  # noqa: E402
+from py2exe_gui.qt import QDialog, QMessageBox  # noqa: E402
 from py2exe_gui.strings import Ar, En, set_locale  # noqa: E402
 from py2exe_gui.ui.dialogs import CiPreviewDialog  # noqa: E402
 from tests.conftest import MemoryKeyring  # noqa: E402
@@ -60,7 +59,7 @@ def project_dir(tmp_path):
 
 def open_project(window, root, monkeypatch=None):
     if monkeypatch is not None:
-        answer(monkeypatch, "question", QMessageBox.Yes)
+        answer(monkeypatch, "question", QMessageBox.StandardButton.Yes)
     assert window.open_project_path(str(root / "p2e.toml"))
 
 
@@ -119,7 +118,7 @@ def test_empty_fields_fall_back_to_defaults(window):
 
 @pytest.mark.skipif(not sys.platform.startswith("linux"), reason="banner text is per host")
 def test_banner_names_the_macos_only_format_on_linux(window):
-    from PyQt5.QtWidgets import QLabel
+    from py2exe_gui.qt import QLabel
 
     texts = [w.text() for w in window.platforms_tab.findChildren(QLabel)
              if w.objectName() == "warningNotice"]
@@ -150,7 +149,7 @@ def test_preview_dialog_shows_the_file_and_the_secrets(qapp, window):
                              exists=True, secrets=["WINDOWS_CERT_BASE64"], parent=window)
     assert dialog.text_view.toPlainText() == "name: x\njobs: {}\n"
     assert dialog.windowTitle() == Ar.CI_DIALOG_TITLE
-    from PyQt5.QtWidgets import QLabel
+    from py2exe_gui.qt import QLabel
 
     texts = " ".join(plain(w.text()) for w in dialog.findChildren(QLabel))
     assert "p2e-release.yml" in texts and Ar.CI_DIALOG_OVERWRITE_NOTE in texts
@@ -161,14 +160,14 @@ def test_preview_dialog_shows_the_file_and_the_secrets(qapp, window):
 
 def test_generate_needs_a_saved_project(window, monkeypatch):
     shown = []
-    answer(monkeypatch, "warning", QMessageBox.Ok, shown)
+    answer(monkeypatch, "warning", QMessageBox.StandardButton.Ok, shown)
     window.generate_ci_workflow()
     assert shown == [Ar.MSG_CI_NEEDS_PROJECT]
 
 
 def test_cancelling_the_preview_writes_nothing(window, project_dir, monkeypatch):
     open_project(window, project_dir)
-    monkeypatch.setattr(CiPreviewDialog, "exec_", lambda self: QDialog.Rejected)
+    monkeypatch.setattr(CiPreviewDialog, "exec", lambda self: QDialog.DialogCode.Rejected)
     window.generate_ci_workflow()
     assert not os.path.exists(workflow_path(str(project_dir)))
     assert Ar.LOG_CI_CANCELLED in window.main_tab.log_output.toPlainText()
@@ -180,9 +179,9 @@ def test_accepting_the_preview_writes_the_workflow(window, project_dir, monkeypa
 
     def accept(self):
         seen["text"] = self.text_view.toPlainText()
-        return QDialog.Accepted
+        return QDialog.DialogCode.Accepted
 
-    monkeypatch.setattr(CiPreviewDialog, "exec_", accept)
+    monkeypatch.setattr(CiPreviewDialog, "exec", accept)
     window.platforms_tab.ci_python.setText("3.10")
     window.generate_ci_workflow()
     path = workflow_path(str(project_dir))
@@ -200,7 +199,7 @@ def test_output_outside_the_repository_blocks_generation(window, project_dir, tm
     open_project(window, project_dir)
     window.main_tab.output_dir.setText(str(tmp_path / "elsewhere"))
     shown = []
-    answer(monkeypatch, "warning", QMessageBox.Ok, shown)
+    answer(monkeypatch, "warning", QMessageBox.StandardButton.Ok, shown)
     window.generate_ci_workflow()
     assert len(shown) == 1 and Ar.FINDING_CI_OUTPUT_OUTSIDE_REPO_TITLE in shown[0]
     assert not os.path.exists(workflow_path(str(project_dir)))
@@ -212,7 +211,7 @@ def test_output_outside_the_repository_blocks_generation(window, project_dir, tm
 def test_build_packages_refuses_without_formats_or_build(window, project_dir, monkeypatch):
     open_project(window, project_dir)
     shown = []
-    answer(monkeypatch, "warning", QMessageBox.Ok, shown)
+    answer(monkeypatch, "warning", QMessageBox.StandardButton.Ok, shown)
     window.platforms_tab.format_checks["deb"].setChecked(False)
     window.build_packages()
     assert shown == [Ar.MSG_PACKAGES_NONE_SELECTED]
@@ -247,7 +246,7 @@ def test_declining_the_appimagetool_download_skips_the_appimage(qapp, window, pr
     window.platforms_tab.format_checks["deb"].setChecked(False)
     window.platforms_tab.format_checks["appimage"].setChecked(True)
     asked = []
-    answer(monkeypatch, "question", QMessageBox.No, asked)
+    answer(monkeypatch, "question", QMessageBox.StandardButton.No, asked)
     window.build_packages()
     assert len(asked) == 1 and "appimagetool" in asked[0] and str(tmp_path / "tools") in asked[0]
     assert window.package_thread is None

@@ -5,8 +5,9 @@ release is the window's job (through ``core.release.pipeline``), and the
 token never passes through here except on its way into the OS keyring.
 """
 
-from PyQt5.QtCore import Qt
-from PyQt5.QtWidgets import (
+from py2exe_gui.core.project_file import ReleaseAssets, ReleaseSettings, WingetSettings
+from py2exe_gui.core.release.pipeline import STEPS
+from py2exe_gui.qt import (
     QCheckBox,
     QFormLayout,
     QGridLayout,
@@ -18,19 +19,17 @@ from PyQt5.QtWidgets import (
     QListWidgetItem,
     QPlainTextEdit,
     QPushButton,
+    Qt,
     QVBoxLayout,
     QWidget,
 )
-
-from py2exe_gui.core.project_file import ReleaseAssets, ReleaseSettings, WingetSettings
-from py2exe_gui.core.release.pipeline import STEPS
 from py2exe_gui.strings import S
 from py2exe_gui.texts import STATUS_ICONS, reason_text, step_title
 from py2exe_gui.ui.tabs.base import BaseTab, scrollable
 from py2exe_gui.ui.tabs.runtime_tab import _ltr_line, _muted, bidi
 from py2exe_gui.ui.tabs.size_tab import ltr
 
-STEP_ROLE = Qt.UserRole
+STEP_ROLE = Qt.ItemDataRole.UserRole
 
 
 def _separator() -> str:
@@ -189,8 +188,8 @@ class ReleaseTab(BaseTab):
         form.addRow(S.RELEASE_TOKEN_LABEL, self.token_status)
         token_row = QHBoxLayout()
         self.token_input = QLineEdit()
-        self.token_input.setEchoMode(QLineEdit.Password)
-        self.token_input.setLayoutDirection(Qt.LeftToRight)
+        self.token_input.setEchoMode(QLineEdit.EchoMode.Password)
+        self.token_input.setLayoutDirection(Qt.LayoutDirection.LeftToRight)
         self.token_input.setPlaceholderText(S.RELEASE_TOKEN_PLACEHOLDER)
         self.token_input.setAccessibleName(S.RELEASE_TOKEN_LABEL)
         self.save_token_btn = QPushButton(S.BTN_SAVE_TOKEN)
@@ -281,7 +280,7 @@ class ReleaseTab(BaseTab):
         box.addLayout(row)
         self.result_label = QLabel()
         self.result_label.setWordWrap(True)
-        self.result_label.setTextInteractionFlags(Qt.TextSelectableByMouse)
+        self.result_label.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
         box.addWidget(self.result_label)
         return group
 

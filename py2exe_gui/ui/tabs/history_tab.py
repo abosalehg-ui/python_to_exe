@@ -1,13 +1,12 @@
 """Recent builds with restore and clear actions."""
 
-from PyQt5.QtWidgets import (
+from py2exe_gui.qt import (
     QGroupBox,
     QHBoxLayout,
     QListWidget,
     QPushButton,
     QVBoxLayout,
 )
-
 from py2exe_gui.strings import S
 from py2exe_gui.ui.tabs.base import BaseTab
 

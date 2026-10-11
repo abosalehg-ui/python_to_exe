@@ -6,14 +6,14 @@ installer step has no progress heuristics and reports a single output path.
 
 import subprocess
 
-from PyQt5.QtCore import QThread, pyqtSignal
+from py2exe_gui.qt import QThread, Signal
 
 
 class InstallerThread(QThread):
     """Runs the Inno Setup compiler without blocking the UI thread."""
 
-    log_signal = pyqtSignal(str)
-    finished_signal = pyqtSignal(bool, str)
+    log_signal = Signal(str)
+    finished_signal = Signal(bool, str)
 
     def __init__(self, command, work_dir, expected_output=""):
         super().__init__()

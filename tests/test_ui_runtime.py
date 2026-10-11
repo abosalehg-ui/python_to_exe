@@ -7,9 +7,7 @@ import sys
 
 import pytest
 
-pytest.importorskip("PyQt5", reason="PyQt5 not installed")
-
-from PyQt5.QtWidgets import QFileDialog, QMessageBox  # noqa: E402
+pytest.importorskip("py2exe_gui.qt", reason="no Qt binding (PySide6/PyQt5) installed")
 
 from py2exe_gui.core import BuildConfig  # noqa: E402
 from py2exe_gui.core.config import RUNTIME_SERVICES, RuntimeKitConfig  # noqa: E402
@@ -19,6 +17,7 @@ from py2exe_gui.core.update_signing import (  # noqa: E402
     read_key_file,
     write_key_file,
 )
+from py2exe_gui.qt import QFileDialog, QMessageBox  # noqa: E402
 from py2exe_gui.strings import Ar, En, S, set_locale  # noqa: E402
 from py2exe_gui.ui.main_window import SIMPLE_MODE_TABS  # noqa: E402
 from tests.conftest import MemoryKeyring  # noqa: E402
@@ -192,10 +191,10 @@ def test_replacing_a_key_needs_a_yes_and_keeps_the_old_one(window, monkeypatch):
     window.generate_signing_key()
     first = read_key_file(key_file())
     asked = []
-    answer(monkeypatch, "question", QMessageBox.No, asked)
+    answer(monkeypatch, "question", QMessageBox.StandardButton.No, asked)
     window.generate_signing_key()
     assert read_key_file(key_file()) == first and asked
-    answer(monkeypatch, "question", QMessageBox.Yes)
+    answer(monkeypatch, "question", QMessageBox.StandardButton.Yes)
     window.generate_signing_key()
     assert read_key_file(key_file()) != first
     backups = [n for n in os.listdir(os.path.dirname(key_file())) if ".replaced-" in n]
@@ -219,7 +218,7 @@ def test_export_warns_and_refuses_the_project_folder(window, tmp_path, monkeypat
                         staticmethod(lambda *a, **k: (saved_to[-1], "")))
 
     warnings = []
-    answer(monkeypatch, "warning", QMessageBox.No, warnings)
+    answer(monkeypatch, "warning", QMessageBox.StandardButton.No, warnings)
     saved_to.append(str(tmp_path / "backup.json"))
     window.export_signing_key()
     assert warnings and not (tmp_path / "backup.json").exists()
@@ -228,7 +227,7 @@ def test_export_warns_and_refuses_the_project_folder(window, tmp_path, monkeypat
 
     def warning(*args, **_kwargs):
         refused.append(args[2])
-        return QMessageBox.Yes
+        return QMessageBox.StandardButton.Yes
 
     monkeypatch.setattr(QMessageBox, "warning", staticmethod(warning))
     saved_to.append(str(tmp_path / "proj" / "keys" / "backup.json"))
@@ -255,7 +254,7 @@ def test_import_key(window, tmp_path, monkeypatch):
     assert read_key_file(key_file()) == other
     # Importing a different key over it asks first.
     asked = []
-    answer(monkeypatch, "question", QMessageBox.No, asked)
+    answer(monkeypatch, "question", QMessageBox.StandardButton.No, asked)
     third = new_signing_key()
     write_key_file(str(path), third, overwrite=True)
     window.import_signing_key()
@@ -268,7 +267,7 @@ def test_import_rejects_a_broken_file(window, tmp_path, monkeypatch):
     monkeypatch.setattr(QFileDialog, "getOpenFileName",
                         staticmethod(lambda *a, **k: (str(path), "")))
     warned = []
-    answer(monkeypatch, "warning", QMessageBox.Ok, warned)
+    answer(monkeypatch, "warning", QMessageBox.StandardButton.Ok, warned)
     window.import_signing_key()
     assert warned and not os.path.exists(key_file())
 
@@ -278,7 +277,7 @@ def test_import_rejects_a_broken_file(window, tmp_path, monkeypatch):
 
 def test_publish_without_a_key(window, monkeypatch):
     warned = []
-    answer(monkeypatch, "warning", QMessageBox.Ok, warned)
+    answer(monkeypatch, "warning", QMessageBox.StandardButton.Ok, warned)
     window.publish_update()
     assert warned == [S.ERR_KIT_NO_KEY]
 
@@ -296,7 +295,7 @@ def test_publish_writes_signed_files(window, tmp_path, monkeypatch):
     tab.publish_url.setText("https://example.com/Tool.exe")
     tab.publish_notes.setPlainText("Notes")
     shown = []
-    answer(monkeypatch, "information", QMessageBox.Ok, shown)
+    answer(monkeypatch, "information", QMessageBox.StandardButton.Ok, shown)
     window.publish_update()
     manifest = (tmp_path / "dist" / "update.json").read_bytes()
     signature = (tmp_path / "dist" / "update.json.sig").read_bytes()
@@ -306,7 +305,7 @@ def test_publish_writes_signed_files(window, tmp_path, monkeypatch):
 
     tab.publish_url.setText("http://example.com/Tool.exe")
     warned = []
-    answer(monkeypatch, "warning", QMessageBox.Ok, warned)
+    answer(monkeypatch, "warning", QMessageBox.StandardButton.Ok, warned)
     window.publish_update()
     assert warned and "https://" in warned[0]
 
@@ -319,7 +318,7 @@ def test_foreign_update_key_asks_before_applying(window, monkeypatch):
         updater=True, update_url="https://attacker.example/u.json", update_public_key="ee" * 32,
     ))
     asked = []
-    answer(monkeypatch, "question", QMessageBox.No, asked)
+    answer(monkeypatch, "question", QMessageBox.StandardButton.No, asked)
     assert window._confirm_untrusted_config(config) is False
     assert "attacker.example" in asked[0] and "eeee eeee" in asked[0]
 
@@ -340,7 +339,7 @@ def test_runtime_hook_in_extra_args_still_asks(window, monkeypatch):
     config = BuildConfig(extra_args="--runtime-hook evil.py",
                          runtime_kit=RuntimeKitConfig(log_redirect=True))
     asked = []
-    answer(monkeypatch, "question", QMessageBox.No, asked)
+    answer(monkeypatch, "question", QMessageBox.StandardButton.No, asked)
     assert window._confirm_untrusted_config(config) is False
     assert "--runtime-hook" in asked[0]
 
@@ -405,7 +404,7 @@ def test_invalid_kit_blocks_the_build(window, tmp_path, no_build, monkeypatch):
     enable(window, "updater")
     window.runtime_tab.update_url.setText("http://insecure.example/u.json")
     warned = []
-    answer(monkeypatch, "warning", QMessageBox.Ok, warned)
+    answer(monkeypatch, "warning", QMessageBox.StandardButton.Ok, warned)
     window.start_conversion()
     assert FakeThread.last is None
     assert S.FINDING_KIT_UPDATE_URL_INSECURE_TITLE in warned[0]
@@ -420,7 +419,7 @@ def test_preview_command_lists_the_kit_options(window, tmp_path, monkeypatch):
         def __init__(self, cmd, parent=None):
             seen.append(cmd)
 
-        def exec_(self):
+        def exec(self):
             pass
 
     monkeypatch.setattr("py2exe_gui.ui.main_window.CommandPreviewDialog", Dialog)

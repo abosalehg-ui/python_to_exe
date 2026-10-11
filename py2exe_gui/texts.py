@@ -1,6 +1,6 @@
 """Locale text for things the core reports as codes — Qt-free.
 
-Shared by the command line (which must never import PyQt5) and the GUI, so a
+Shared by the command line (which must never import Qt) and the GUI, so a
 release step or a Runtime Kit message reads the same in both.
 """
 
