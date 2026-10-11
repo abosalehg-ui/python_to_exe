@@ -7,23 +7,21 @@ gain from a batch is not parallelism, it is not having to sit through N trips
 through the form.
 """
 
-import subprocess
 import time
 
 from py2exe_gui.core.batch_runner import CANCELLED, FAILED, RUNNING, SUCCESS, job_config
-from py2exe_gui.core.build_runner import popen_options
 from py2exe_gui.core.engines import engine_for
-from py2exe_gui.qt import QThread, Signal
+from py2exe_gui.qt import Signal
 from py2exe_gui.strings import S
+from py2exe_gui.ui import streaming_thread
+from py2exe_gui.ui.streaming_thread import StreamingProcessThread
 
 
-class BatchThread(QThread):
+class BatchThread(StreamingProcessThread):
     """Executes ``jobs`` in order, emitting progress for each one."""
 
-    log_signal = Signal(str)
     # (index, total, status) — lets the tab repaint one row without a rebuild.
     job_signal = Signal(int, int, str)
-    progress_signal = Signal(int)
     finished_signal = Signal(bool)
 
     def __init__(self, jobs, base_config, python_for=None, options_for=None):
@@ -36,8 +34,6 @@ class BatchThread(QThread):
         # Writes the Runtime Kit for a job's config and returns
         # (options, error): each job is a different app with its own name.
         self.options_for = options_for
-        self.process = None
-        self.is_cancelled = False
 
     def run(self):
         total = len(self.jobs)
@@ -109,41 +105,11 @@ class BatchThread(QThread):
             self.log_signal.emit(error)
             return False
 
-        try:
-            self.process = subprocess.Popen(
-                command,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.STDOUT,
-                text=True,
-                bufsize=1,
-                universal_newlines=True,
-                cwd=config.output_dir or None,
-                **popen_options(engine.name, engine.build_env(python or "")),
-            )
-        except (OSError, ValueError) as e:
-            job.message = str(e)
-            self.log_signal.emit(S.CONV_ERROR.format(error=str(e)))
-            return False
-
-        try:
-            for line in self.process.stdout:
-                if self.is_cancelled:
-                    self.process.terminate()
-                    return False
-                self.log_signal.emit(line.rstrip())
-            self.process.wait()
-        except (OSError, ValueError) as e:
-            job.message = str(e)
-            self.log_signal.emit(S.CONV_ERROR.format(error=str(e)))
-            return False
-        finally:
-            returncode = self.process.returncode if self.process else 1
-            self.process = None
-
-        return returncode == 0
-
-    def cancel(self):
-        """Stop after (or during) the current job; the rest are marked cancelled."""
-        self.is_cancelled = True
-        if self.process:
-            self.process.terminate()
+        code = self.stream(command, config.output_dir or "", engine=engine.name,
+                           env=engine.build_env(python or ""))
+        if self.error:
+            job.message = self.error
+            self.log_signal.emit(S.CONV_ERROR.format(error=self.error))
+        elif code != streaming_thread.OK:
+            job.message = code
+        return code == streaming_thread.OK

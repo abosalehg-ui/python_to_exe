@@ -6,8 +6,9 @@ release step or a Runtime Kit message reads the same in both.
 
 from typing import Dict
 
+from py2exe_gui.bidi import is_rtl, isolate  # noqa: F401 - is_rtl re-exported
 from py2exe_gui.core.runtime_kit import TEXT_KEYS
-from py2exe_gui.strings import LOCALE_LAYOUT, S, current_locale
+from py2exe_gui.strings import S
 
 _RUNTIME_TEXT_NAMES = {
     "crash_title": "KIT_RT_CRASH_TITLE",
@@ -28,10 +29,6 @@ def runtime_texts() -> Dict[str, str]:
     """What the built app says (crash dialog, second copy, update prompt),
     in the language the developer is using now."""
     return {key: getattr(S, _RUNTIME_TEXT_NAMES[key]) for key in TEXT_KEYS}
-
-
-def is_rtl() -> bool:
-    return LOCALE_LAYOUT.get(current_locale(), "ltr") == "rtl"
 
 
 def _format(template: str, params: Dict[str, str]) -> str:
@@ -79,12 +76,8 @@ def project_error_text(error) -> str:
 
 # ── Compare mode (2.0) ──────────────────────────────────────────────────
 
-_LRI, _PDI = "⁦", "⁩"
-
-
-def _iso(text: str, isolate: bool) -> str:
-    """Keep "0.124 s" in reading order inside right-to-left text."""
-    return f"{_LRI}{text}{_PDI}" if isolate else text
+# Keep "0.124 s" in reading order inside right-to-left text.
+_iso = isolate
 
 
 def seconds_text(seconds: float) -> str:

@@ -21,7 +21,7 @@ from py2exe_gui.qt import (
 )
 from py2exe_gui.strings import S
 from py2exe_gui.ui.log_panel import LogPanel
-from py2exe_gui.ui.tabs.base import BaseTab, browse_button, icon_button, scrolled_layout
+from py2exe_gui.ui.tabs.base import BaseTab, browse_button, icon_button, labelled, scrolled_layout
 
 # The sizes Windows actually pulls out of a multi-resolution .ico. Showing all
 # four is how a PNG renamed to .ico gives itself away: it has only one.
@@ -38,6 +38,7 @@ class MainTab(BaseTab):
         source_layout = QHBoxLayout(source_group)
         self.source_input = QLineEdit()
         self.source_input.setPlaceholderText(S.SOURCE_PLACEHOLDER)
+        self.source_input.setAccessibleName(S.GROUP_SOURCE)
         self.source_input.textChanged.connect(self.on_source_changed)
         self.source_btn = browse_button(S.DIALOG_CHOOSE_PY, self.browse_source)
         source_layout.addWidget(self.source_input, stretch=1)
@@ -57,22 +58,22 @@ class MainTab(BaseTab):
         output_group = QGroupBox(S.GROUP_OUTPUT)
         output_layout = QGridLayout(output_group)
 
-        output_layout.addWidget(QLabel(S.OUTPUT_NAME_LABEL), 0, 0)
         self.output_name = QLineEdit()
         self.output_name.setPlaceholderText(S.OUTPUT_NAME_PLACEHOLDER)
+        output_layout.addWidget(labelled(S.OUTPUT_NAME_LABEL, self.output_name), 0, 0)
         output_layout.addWidget(self.output_name, 0, 1)
 
-        output_layout.addWidget(QLabel(S.OUTPUT_DIR_LABEL), 1, 0)
         self.output_dir = QLineEdit()
         self.output_dir.setPlaceholderText(S.OUTPUT_DIR_PLACEHOLDER)
         self.output_dir_btn = browse_button(S.DIALOG_CHOOSE_OUT_DIR, self.browse_output_dir,
                                             folder=True)
+        output_layout.addWidget(labelled(S.OUTPUT_DIR_LABEL, self.output_dir), 1, 0)
         output_layout.addWidget(self.output_dir, 1, 1)
         output_layout.addWidget(self.output_dir_btn, 1, 2)
 
-        output_layout.addWidget(QLabel(S.ICON_LABEL), 2, 0)
         self.icon_input = QLineEdit()
         self.icon_input.setPlaceholderText(S.ICON_PLACEHOLDER)
+        output_layout.addWidget(labelled(S.ICON_LABEL, self.icon_input), 2, 0)
         self.icon_input.textChanged.connect(self.refresh_icon_preview)
         self.icon_btn = icon_button("image", S.DIALOG_CHOOSE_ICON, self.browse_icon)
         self.studio_btn = icon_button("icon_studio", S.ICON_STUDIO_TITLE,

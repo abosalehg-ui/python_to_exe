@@ -160,26 +160,32 @@ def configure_high_dpi() -> None:
         app.setHighDpiScaleFactorRoundingPolicy(policy.PassThrough)
 
 
-#: Families tried in order for the application font. "Segoe UI" is the
-#: Windows system font and covers Arabic; the others are the usual Linux and
-#: macOS fonts with Arabic glyphs, so the UI never falls back to boxes. Qt's
-#: own fontconfig fallback still applies for anything missing from them all.
-FONT_FAMILIES = (
-    "Segoe UI",
-    "Noto Sans Arabic",
-    "Noto Naskh Arabic",
-    "Noto Sans",
-    "DejaVu Sans",
-    "Geeza Pro",
-    "Arial",
-)
+def font_families(locale: str = "ar") -> tuple:
+    """Families tried in order for the application font.
+
+    One source: ``styles.UI_FONT_STACKS``, the same table the stylesheet
+    renders, so the QFont the widgets inherit and the CSS never disagree.
+    "Segoe UI" is the Windows system font and covers Arabic; the others are
+    the usual Linux and macOS fonts with Arabic glyphs, so the UI never falls
+    back to boxes. Qt's own fontconfig fallback still applies for anything
+    missing from them all. Imported lazily: ``styles`` has no Qt, but keeping
+    this module free of application imports at load time is worth it.
+    """
+    from py2exe_gui.styles import font_stack
+
+    return tuple(font_stack(locale))
 
 
-def application_font(point_size: int = 10):
+#: The Arabic-first stack, kept as a constant for callers that only need a name.
+FONT_FAMILIES = font_families("ar")
+
+
+def application_font(point_size: int = 10, locale: str = "ar"):
     """The default UI font, with Arabic-capable fallbacks (Qt 5.13+ and Qt 6)."""
-    font = QtGui.QFont(FONT_FAMILIES[0], point_size)
+    families = font_families(locale)
+    font = QtGui.QFont(families[0], point_size)
     if hasattr(font, "setFamilies"):
-        font.setFamilies(list(FONT_FAMILIES))
+        font.setFamilies(list(families))
     return font
 
 
@@ -203,6 +209,7 @@ __all__ = [
     "Slot",
     "application_font",
     "binding_order",
+    "font_families",
     "configure_high_dpi",
     "describe",
 ]

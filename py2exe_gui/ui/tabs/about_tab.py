@@ -1,28 +1,23 @@
 """Application information."""
 
+from py2exe_gui.bidi import ltr
 from py2exe_gui.constants import APP_NAME, APP_VERSION, COPYRIGHT, DEVELOPER, EMAIL
 from py2exe_gui.qt import (
     QFrame,
     QLabel,
-    QScrollArea,
     Qt,
-    QVBoxLayout,
-    QWidget,
 )
 from py2exe_gui.qt import describe as qt_describe
 from py2exe_gui.strings import S
-from py2exe_gui.ui.tabs.base import BaseTab
-from py2exe_gui.ui.tabs.size_tab import ltr
+from py2exe_gui.ui.tabs.base import BaseTab, scrolled_layout
 
 
 class AboutTab(BaseTab):
     """About page built from themed widgets rather than an HTML blob."""
 
     def _build(self):
-        inner = QWidget()
-        layout = QVBoxLayout(inner)
+        layout = scrolled_layout(self, spacing=8)
         layout.setAlignment(Qt.AlignmentFlag.AlignTop)
-        layout.setSpacing(8)
 
         def add_label(text, object_name, *, bold=False):
             label = QLabel(text)
@@ -67,11 +62,3 @@ class AboutTab(BaseTab):
         features.setAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignTop)
         layout.addWidget(features)
         layout.addStretch()
-
-        # Field-dense: keep it usable on a short screen.
-        scroll = QScrollArea()
-        scroll.setWidgetResizable(True)
-        scroll.setWidget(inner)
-        outer = QVBoxLayout(self)
-        outer.setContentsMargins(0, 0, 0, 0)
-        outer.addWidget(scroll)

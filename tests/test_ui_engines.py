@@ -22,7 +22,7 @@ DATA = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data", "nuitka"
 def no_build(window, monkeypatch):  # noqa: F811
     monkeypatch.setattr("py2exe_gui.ui.main_window.ConversionThread", FakeThread)
     monkeypatch.setattr("py2exe_gui.ui.main_window.DiagnosticThread", FakeThread)
-    monkeypatch.setattr(window, "_ensure_engine", lambda engine, python="": True)
+    monkeypatch.setattr(window, "_ensure_engine", lambda engine, python="", **_kw: True)
     monkeypatch.setattr(window.tray, "show", lambda: None)
     FakeThread.last = None
 
@@ -89,7 +89,7 @@ def test_a_nuitka_build_runs_nuitka(window, tmp_path, no_build):  # noqa: F811
     assert "--assume-yes-for-downloads" not in cmd
     kwargs = FakeThread.last.kwargs
     assert kwargs["popen_kwargs"]["stdin"] == subprocess.DEVNULL
-    assert kwargs["stages"][1].key == "nuitka_python"
+    assert kwargs["engine"] == "nuitka"  # the thread tracks Nuitka's stages
     assert S.LOG_ENGINE_BUILD.format(engine="Nuitka") in window.main_tab.log_text()
 
 

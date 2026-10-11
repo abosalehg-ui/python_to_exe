@@ -8,6 +8,7 @@ problems from ``core/licensing.py`` are rendered through ``strings``.
 import datetime
 from typing import Callable, Optional
 
+from py2exe_gui.bidi import bidi, code_run, ltr
 from py2exe_gui.core.licensing import LicenseRequest, parse_features, validate_request
 from py2exe_gui.qt import (
     QApplication,
@@ -27,8 +28,6 @@ from py2exe_gui.qt import (
 )
 from py2exe_gui.strings import S
 from py2exe_gui.ui.dialogs import _inherited_direction
-from py2exe_gui.ui.tabs.runtime_tab import bidi, code_run
-from py2exe_gui.ui.tabs.size_tab import ltr
 
 #: ``issue(request) -> key text``; raises ``ValueError`` for a bad request.
 Issuer = Callable[[LicenseRequest], str]

@@ -5,8 +5,7 @@ files, managing the key and writing update manifests are the window's (and
 the core's) job.
 """
 
-import re
-
+from py2exe_gui.bidi import bidi, code_run, is_rtl
 from py2exe_gui.core.config import RUNTIME_SERVICES, RuntimeKitConfig
 from py2exe_gui.qt import (
     QCheckBox,
@@ -22,54 +21,12 @@ from py2exe_gui.qt import (
     QVBoxLayout,
     QWidget,
 )
-from py2exe_gui.strings import LOCALE_LAYOUT, S, current_locale
-from py2exe_gui.ui.tabs.base import BaseTab, browse_button, scrollable
+from py2exe_gui.strings import S
+from py2exe_gui.ui.tabs.base import BaseTab, browse_button, scrolled_layout
+from py2exe_gui.ui.tabs.base import muted_label as _muted
 
 # Indent of a service's explanation under its checkbox, in pixels.
 _DESC_INDENT = 26
-_RLM, _LRM = "\u200f", "\u200e"
-# A run of code or a file name inside a sentence: starts with a letter, "_",
-# "/" or "(", ends on a letter, digit or ")" — never on sentence punctuation.
-_CODE_RUN = re.compile(r"[A-Za-z_/(][\x20-\x7a|~]*[A-Za-z0-9_)]|[A-Za-z_]")
-_PLACEHOLDER = re.compile(r"(\{\w+\})")
-
-
-def code_run(text: str) -> str:
-    """Keep a run of code, a key or a path in left-to-right order in RTL text.
-
-    Bracketed by left-to-right marks rather than the LRI/PDI isolates of
-    ``size_tab.ltr()``: rendered offscreen, Qt 5.15 still moved the brackets
-    of ``print()`` to the wrong end inside an isolate, while the marks (the
-    form ``strings.py`` already uses around ``--runtime-hook``) held.
-    """
-    return f"{_LRM}{text}{_LRM}"
-
-
-def bidi(text: str) -> str:
-    """Make mixed Arabic/code text read correctly in a right-to-left UI.
-
-    Each run of code (``print()``, ``/SILENT``, ``update.json``) goes through
-    ``code_run``, otherwise its brackets and slashes migrate to the wrong end
-    ("()print"). A leading right-to-left mark keeps a sentence that starts
-    with a symbol such as "ℹ️" (a left-to-right character) from being laid out
-    as a left-to-right paragraph.
-    """
-    if not text or LOCALE_LAYOUT.get(current_locale(), "ltr") != "rtl":
-        return text
-    # "{placeholders}" are left intact for a later .format().
-    parts = _PLACEHOLDER.split(text)
-    for index in range(0, len(parts), 2):
-        parts[index] = _CODE_RUN.sub(lambda m: code_run(m.group(0)), parts[index])
-    return _RLM + "".join(parts)
-
-
-def _muted(text: str = "") -> QLabel:
-    label = QLabel(bidi(text))
-    label.setObjectName("aboutMuted")
-    label.setWordWrap(True)
-    return label
-
-
 def _ltr_line(placeholder: str = "") -> QLineEdit:
     """A field for a URL, a key or a version: always left-to-right."""
     line = QLineEdit()
@@ -92,15 +49,7 @@ class RuntimeTab(BaseTab):
     """Which ``p2e_runtime`` services the EXE gets, and the updater's key."""
 
     def _build(self):
-        outer = QVBoxLayout(self)
-        outer.setContentsMargins(0, 0, 0, 0)
-        content = QWidget()
-        layout = QVBoxLayout(content)
-        # Room above each group box: its title sits in the margin and would be
-        # clipped by whatever is above it.
-        layout.setContentsMargins(6, 14, 6, 6)
-        layout.setSpacing(14)
-        outer.addWidget(scrollable(content))
+        layout = scrolled_layout(self, spacing=14)
 
         layout.addWidget(_muted(S.KIT_HINT))
         layout.addWidget(self._build_services_group())
@@ -216,8 +165,7 @@ class RuntimeTab(BaseTab):
         if public_hex:
             # The fingerprint's groups would come out in reverse order inside
             # Arabic text without the marks; the path likewise.
-            rtl = LOCALE_LAYOUT.get(current_locale(), "ltr") == "rtl"
-            wrap = code_run if rtl else str
+            wrap = code_run if is_rtl() else str
             self.key_status.setText(bidi(S.KIT_KEY_STATUS_FMT).format(
                 fingerprint=wrap(fingerprint(public_hex)), path=wrap(path)
             ))
@@ -281,8 +229,7 @@ class RuntimeTab(BaseTab):
         from py2exe_gui.core.update_signing import fingerprint
 
         if public_hex:
-            rtl = LOCALE_LAYOUT.get(current_locale(), "ltr") == "rtl"
-            wrap = code_run if rtl else str
+            wrap = code_run if is_rtl() else str
             self.license_key_status.setText(bidi(S.KIT_LICENSE_KEY_STATUS_FMT).format(
                 fingerprint=wrap(fingerprint(public_hex)), path=wrap(path)
             ))

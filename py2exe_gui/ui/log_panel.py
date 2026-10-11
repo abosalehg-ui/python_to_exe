@@ -82,7 +82,8 @@ class LogPanel(QWidget):
         self.log_search.setPlaceholderText(S.LOG_SEARCH_PLACEHOLDER)
         self.log_search.setAccessibleName(S.LOG_SEARCH_PLACEHOLDER)
         self.log_search.setClearButtonEnabled(True)
-        self.log_search.setMaximumWidth(220)
+        # In ems, not pixels, so the field keeps up with the font scale.
+        self.log_search.setMaximumWidth(self.log_search.fontMetrics().horizontalAdvance("M") * 18)
         self.log_search.returnPressed.connect(self._search_log_next)
         # Debounced: searching on every keystroke made the cursor jump around.
         self._log_search_timer = QTimer(self)

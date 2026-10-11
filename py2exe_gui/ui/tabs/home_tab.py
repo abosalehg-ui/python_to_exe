@@ -9,6 +9,7 @@ started here is the same build as the Convert button's.
 
 import os
 
+from py2exe_gui.bidi import ltr
 from py2exe_gui.core.size_analyzer import format_size
 from py2exe_gui.core.workspace import (
     STATUS_MISSING,
@@ -20,7 +21,6 @@ from py2exe_gui.qt import (
     QColor,
     QFrame,
     QHBoxLayout,
-    QLabel,
     QPainter,
     QPen,
     QPushButton,
@@ -29,32 +29,14 @@ from py2exe_gui.qt import (
     QWidget,
 )
 from py2exe_gui.strings import S
-from py2exe_gui.texts import is_rtl
-from py2exe_gui.ui.tabs.base import BaseTab, scrollable
-from py2exe_gui.ui.tabs.size_tab import ltr, size_text
+from py2exe_gui.styles import DEFAULT_LOG_THEME, PALETTES
+from py2exe_gui.ui.tabs.base import BaseTab, scrolled_layout
+from py2exe_gui.ui.tabs.base import text_label as _label
+from py2exe_gui.ui.tabs.size_tab import size_text
 
 #: Theme tokens the sparkline paints with, when the window gives none.
-DEFAULT_COLORS = {"accent": "#89b4fa", "muted": "#a6adc8", "success": "#a6e3a1"}
+DEFAULT_COLORS = {key: PALETTES[DEFAULT_LOG_THEME][key] for key in ("accent", "muted", "success")}
 SPARKLINE_SIZE = (160, 40)
-
-
-def _rlm(text: str) -> str:
-    """Pin a line that starts with a symbol ("✅", "📏") to right-to-left.
-
-    Qt 5 takes a paragraph's direction from its first strong character and
-    ignores isolates, so "✅ آخر بناء … 7.3 MB" would otherwise be laid out
-    as a left-to-right paragraph with the Arabic reading backwards.
-    """
-    return "‏" + text if is_rtl() else text
-
-
-def _label(text: str, object_name: str = "", wrap: bool = True) -> QLabel:
-    label = QLabel(_rlm(text))
-    if object_name:
-        label.setObjectName(object_name)
-    label.setWordWrap(wrap)
-    label.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
-    return label
 
 
 class SizeSparkline(QWidget):
@@ -150,8 +132,10 @@ class ProjectCard(QFrame):
                                       "successBtn")
         self.release_btn = self._button(S.BTN_HOME_RELEASE, "release_project", tab, buttons)
         buttons.addStretch(1)
+        # Flat, not "dangerBtn": removing a card from the list deletes nothing,
+        # and a red button next to Build read as if it would.
         self.forget_btn = self._button(S.BTN_HOME_FORGET, "forget_project", tab, buttons,
-                                       "dangerBtn")
+                                       "flatBtn")
         for button in (self.open_btn, self.build_btn, self.release_btn):
             # A file that is gone or refused has nothing to open or build:
             # the buttons go, not just grey out, and only "remove" stays.
@@ -249,13 +233,7 @@ class HomeTab(BaseTab):
     """The list of recent projects, one card each."""
 
     def _build(self):
-        outer = QVBoxLayout(self)
-        outer.setContentsMargins(0, 0, 0, 0)
-        content = QWidget()
-        layout = QVBoxLayout(content)
-        layout.setContentsMargins(6, 14, 6, 6)
-        layout.setSpacing(12)
-        outer.addWidget(scrollable(content))
+        layout = scrolled_layout(self, spacing=12)
 
         layout.addWidget(_label(S.HOME_HINT, "aboutMuted"))
 

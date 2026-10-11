@@ -27,6 +27,7 @@ from py2exe_gui.qt import (
     QtCore,
     QTransform,
 )
+from py2exe_gui.styles import DEFAULT_LOG_THEME, PALETTES
 
 ICON_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "icons")
 
@@ -138,8 +139,10 @@ DIRECTIONAL = frozenset({
 #: larger ones serve high-DPI screens).
 SIZES = (16, 20, 24, 32, 48, 64)
 
-DEFAULT_COLOR = "#cdd6f4"
-DEFAULT_DISABLED = "#a6adc8"
+# The dark theme's text colours: what an icon is drawn in before the window
+# recolours it for the active theme (``MainWindow._apply_icons``).
+DEFAULT_COLOR = PALETTES[DEFAULT_LOG_THEME]["text"]
+DEFAULT_DISABLED = PALETTES[DEFAULT_LOG_THEME]["disabled_text"]
 
 _cache: Dict[tuple, QIcon] = {}
 _svg_cache: Dict[str, str] = {}

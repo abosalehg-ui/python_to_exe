@@ -44,8 +44,14 @@ def format_html(
     level: Optional[LogLevel] = None,
     theme: str = DEFAULT_LOG_THEME,
 ) -> str:
-    """Wrap ``line`` in a coloured <span> for QTextEdit.append()."""
+    """Wrap ``line`` in a coloured block for QTextEdit.append().
+
+    ``dir="auto"`` lets each line take the direction of its own first strong
+    character: in the Arabic UI an English PyInstaller line is laid out left
+    to right and an Arabic status line right to left, instead of every line
+    inheriting the widget's direction and reading backwards half the time.
+    """
     lvl = level or classify_line(line)
     color = level_color(lvl, theme)
     safe = escape(line).replace(" ", "&nbsp;") if line.startswith(" ") else escape(line)
-    return f'<span style="color: {color};">{safe}</span>'
+    return f'<div dir="auto"><span style="color: {color};">{safe}</span></div>'

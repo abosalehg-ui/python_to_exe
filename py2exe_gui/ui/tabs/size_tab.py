@@ -7,6 +7,7 @@ isolated environment is the biggest lever for taking things out of it.
 import os
 import sys
 
+from py2exe_gui.bidi import ltr
 from py2exe_gui.core.size_analyzer import format_size, group_label_key
 from py2exe_gui.qt import (
     QButtonGroup,
@@ -27,22 +28,13 @@ from py2exe_gui.qt import (
     QTreeWidget,
     QTreeWidgetItem,
     QVBoxLayout,
-    QWidget,
 )
 from py2exe_gui.strings import S
 from py2exe_gui.ui.finding_text import finding_detail, finding_label
-from py2exe_gui.ui.tabs.base import BaseTab, browse_button, scrollable
+from py2exe_gui.ui.tabs.base import BaseTab, browse_button, scrolled_layout
+from py2exe_gui.ui.tabs.base import muted_label as _muted
 
 FINDING_ROLE = Qt.ItemDataRole.UserRole
-_LRI, _PDI = "\u2066", "\u2069"
-
-
-def ltr(text: str) -> str:
-    """Keep "41.6 MB" or "+12.5%" in reading order inside right-to-left text.
-
-    Without the isolate, an RTL paragraph flips them to "MB 41.6".
-    """
-    return f"{_LRI}{text}{_PDI}"
 
 
 def size_text(size: int) -> str:
@@ -51,25 +43,11 @@ def size_text(size: int) -> str:
 BREAKDOWN_ROWS = 15
 
 
-def _muted(text: str = "") -> QLabel:
-    label = QLabel(text)
-    label.setObjectName("aboutMuted")
-    label.setWordWrap(True)
-    return label
-
-
 class SizeTab(BaseTab):
     """Where the EXE's weight comes from, and how to lose some."""
 
     def _build(self):
-        outer = QVBoxLayout(self)
-        outer.setContentsMargins(0, 0, 0, 0)
-        content = QWidget()
-        layout = QVBoxLayout(content)
-        # Room above the first group box: its title sits in the margin and
-        # would be clipped by the top edge of the scroll area.
-        layout.setContentsMargins(6, 14, 6, 6)
-        outer.addWidget(scrollable(content))
+        layout = scrolled_layout(self)
 
         layout.addWidget(self._build_env_group())
         layout.addWidget(self._build_size_group())

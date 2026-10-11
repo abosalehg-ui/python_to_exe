@@ -1,5 +1,6 @@
 """Reusable dialogs for the main window."""
 
+from py2exe_gui.bidi import ltr
 from py2exe_gui.qt import (
     QAbstractItemView,
     QApplication,
@@ -70,6 +71,7 @@ class CommandPreviewDialog(QDialog):
         layout.addWidget(QLabel(S.DIALOG_PREVIEW_HINT))
 
         self.text_view = QTextEdit()
+        self.text_view.setObjectName("codeView")  # a command line: monospace
         self.text_view.setReadOnly(True)
         self.text_view.setLayoutDirection(Qt.LayoutDirection.LeftToRight)
         self.text_view.setPlainText(self._command_text)
@@ -175,7 +177,7 @@ class ReleaseConfirmDialog(QDialog):
         self.setLayoutDirection(_inherited_direction(parent))
 
         layout = QVBoxLayout(self)
-        heading = QLabel(S.RELEASE_CONFIRM_HEADING.format(version=_ltr(version)))
+        heading = QLabel(S.RELEASE_CONFIRM_HEADING.format(version=ltr(version)))
         heading.setWordWrap(True)
         heading.setObjectName("aboutHeading")
         layout.addWidget(heading)
@@ -212,7 +214,7 @@ class ReleaseConfirmDialog(QDialog):
         for title, items in sections:
             if items:
                 # Paths, commands and URLs read left to right inside RTL text.
-                blocks.append("\n".join([title] + [f"  • {_ltr(item)}" for item in items]))
+                blocks.append("\n".join([title] + [f"  • {ltr(item)}" for item in items]))
         return "\n\n".join(blocks) or S.RELEASE_CONFIRM_NOTHING
 
 
@@ -232,7 +234,7 @@ class CiPreviewDialog(QDialog):
         self._text = text
 
         layout = QVBoxLayout(self)
-        heading = QLabel(S.CI_DIALOG_HEADING.format(path=_ltr(path)))
+        heading = QLabel(S.CI_DIALOG_HEADING.format(path=ltr(path)))
         heading.setWordWrap(True)
         heading.setObjectName("aboutHeading")
         heading.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
@@ -244,6 +246,7 @@ class CiPreviewDialog(QDialog):
             layout.addWidget(warning)
 
         self.text_view = QTextEdit()
+        self.text_view.setObjectName("codeView")  # YAML: monospace
         self.text_view.setReadOnly(True)
         self.text_view.setLayoutDirection(Qt.LayoutDirection.LeftToRight)
         self.text_view.setLineWrapMode(QTextEdit.LineWrapMode.NoWrap)
@@ -251,7 +254,7 @@ class CiPreviewDialog(QDialog):
         self.text_view.setAccessibleName(S.CI_DIALOG_TITLE)
         layout.addWidget(self.text_view, 1)
 
-        secrets_note = QLabel(S.CI_DIALOG_SECRETS.format(names=_ltr(", ".join(secrets)))
+        secrets_note = QLabel(S.CI_DIALOG_SECRETS.format(names=ltr(", ".join(secrets)))
                               if secrets else S.CI_DIALOG_NO_SECRETS)
         secrets_note.setWordWrap(True)
         layout.addWidget(secrets_note)
@@ -273,6 +276,3 @@ class CiPreviewDialog(QDialog):
         QApplication.clipboard().setText(self._text)
         self.setWindowTitle(f"{S.CI_DIALOG_TITLE} — {S.MSG_COPIED}")
 
-
-def _ltr(text: str) -> str:
-    return f"⁦{text}⁩"

@@ -16,6 +16,7 @@ import time
 import webbrowser
 from dataclasses import replace
 
+from py2exe_gui.bidi import ltr
 from py2exe_gui.constants import (
     APP_NAME,
     APP_VERSION,
@@ -70,6 +71,7 @@ from py2exe_gui.core.build_runner import popen_options
 from py2exe_gui.core.compare import COMPARE_DIR
 from py2exe_gui.core.diagnostics import build_name, build_root
 from py2exe_gui.core.engines import engine_for, engine_names, get_engine
+from py2exe_gui.core.engines.base import describe_error
 from py2exe_gui.core.fixes import (
     ORIGIN_BUILD,
     ORIGIN_RUNTIME,
@@ -89,6 +91,7 @@ from py2exe_gui.core.project_file import (
     project_path_for_script,
     save_project,
     sections_in,
+    split_untrusted_flags,
     untrusted_flags,
 )
 from py2exe_gui.core.project_scan import project_imports
@@ -173,7 +176,6 @@ from py2exe_gui.qt import (
     QUrl,
     QVBoxLayout,
     QWidget,
-    application_font,
 )
 from py2exe_gui.strings import (
     LOCALE_LAYOUT,
@@ -192,6 +194,7 @@ from py2exe_gui.styles import (
 )
 from py2exe_gui.templates import TEMPLATES, template_name
 from py2exe_gui.texts import notes_titles, project_error_text, runtime_texts
+from py2exe_gui.ui import streaming_thread
 from py2exe_gui.ui.batch_thread import BatchThread
 from py2exe_gui.ui.build_page import BuildPage
 from py2exe_gui.ui.compare_thread import CompareThread
@@ -204,7 +207,7 @@ from py2exe_gui.ui.dialogs import (
     ReleaseConfirmDialog,
     ShortcutsDialog,
 )
-from py2exe_gui.ui.env_thread import EnvThread
+from py2exe_gui.ui.env_thread import CommandThread, EnvThread, TaskThread
 from py2exe_gui.ui.finding_text import finding_detail, finding_title, fix_label, service_label
 from py2exe_gui.ui.icon_studio_dialog import IconStudioDialog
 from py2exe_gui.ui.installer_thread import InstallerThread
@@ -231,8 +234,9 @@ from py2exe_gui.ui.tabs import (
     TemplatesTab,
     VersionInfoTab,
 )
+from py2exe_gui.ui.tabs.base import em_width
 from py2exe_gui.ui.tabs.settings_tab import THEME_LABEL_KEYS
-from py2exe_gui.ui.tabs.size_tab import ltr, size_text
+from py2exe_gui.ui.tabs.size_tab import size_text
 from py2exe_gui.ui.tray import BuildTray
 from py2exe_gui.ui.widgets import DropOverlay, NoticeBar
 
@@ -283,6 +287,9 @@ class MainWindow(QMainWindow):
         self.compare_thread = None
         self.diagnostic_thread = None
         self.env_thread = None
+        # One-off commands (pip installs, pip freeze) and the update check.
+        self.command_thread = None
+        self.task_thread = None
         self.settings = {}
         self.current_theme = "dark"
         self.font_scale = DEFAULT_FONT_SCALE
@@ -415,10 +422,10 @@ class MainWindow(QMainWindow):
             if name:
                 button.setIcon(self._icon(name, button.property("iconRole") or "text"))
         self.log_panel.set_chevrons(self._icon("chevron_down"), self._icon("chevron_up"))
-        side = "chevron_left" if self.layoutDirection() == Qt.LayoutDirection.RightToLeft \
-            else "chevron_right"
+        # Always "chevron_right": it is in icons.DIRECTIONAL, so _icon() already
+        # mirrors it under RTL. Asking for chevron_left there mirrored twice.
         for section in self.build_page.sections.values():
-            section.set_chevrons(self._icon("chevron_down"), self._icon(side))
+            section.set_chevrons(self._icon("chevron_down"), self._icon("chevron_right"))
         for action, name in getattr(self, "_menu_icons", []):
             action.setIcon(self._icon(name))
         self.notice_bar.set_icons(
@@ -751,10 +758,10 @@ class MainWindow(QMainWindow):
             button.setMinimumHeight(36)
             button.setAccessibleName(text)
             if primary:
-                font = application_font(11)
-                font.setBold(True)
-                button.setFont(font)
-                button.setMinimumWidth(160)
+                # Sized by the stylesheet (QPushButton[primary="true"]) so
+                # Ctrl+= scales it with the rest of the window.
+                button.setProperty("primary", "true")
+                button.setMinimumWidth(em_width(button, 14))
             button.clicked.connect(handler)
             row.addWidget(button)
             return button
@@ -782,7 +789,7 @@ class MainWindow(QMainWindow):
         self.progress_bar.setValue(0)
         self.progress_bar.setFormat(S.PROGRESS_READY)
         self.progress_bar.setTextVisible(False)
-        self.progress_bar.setFixedWidth(180)
+        self.progress_bar.setFixedWidth(em_width(self.progress_bar, 16))
         self.progress_bar.setFixedHeight(10)
         self.progress_bar.setAccessibleName(S.PROGRESS_READY)
         self.progress_bar.setVisible(False)
@@ -791,12 +798,77 @@ class MainWindow(QMainWindow):
         return bar
 
     def _refresh_progress_label(self, *_args):
-        """Mirror the bar's format (stage + percentage) into the label."""
+        """Mirror the bar's format (stage + percentage) into the label.
+
+        The percentage is rendered here rather than by the bar: Qt's "%p%"
+        inside a right-to-left paragraph came out as "%42". The number is
+        isolated so it reads "42%" in both directions.
+        """
         if hasattr(self, "progress_label"):
-            text = self.progress_bar.text()
+            text = self.progress_text()
             self.progress_label.setText(text)
             self.progress_label.setVisible(self.progress_bar.isVisibleTo(self))
             self.progress_bar.setAccessibleName(text)
+
+    def progress_text(self) -> str:
+        """The bar's format with ``%p%`` replaced by an isolated percentage."""
+        bar = self.progress_bar
+        text = bar.format()
+        if "%p%" not in text:
+            return text
+        span = bar.maximum() - bar.minimum()
+        if span <= 0:  # busy (0, 0): no percentage to show
+            return text.replace("%p%", "").rstrip(" —-–")
+        percent = round((bar.value() - bar.minimum()) * 100 / span)
+        return text.replace("%p%", ltr(f"{percent}%"))
+
+    # ── Busy state ─────────────────────────────────────────────────────────
+
+    def _set_busy(self, text: str):
+        """Show an indeterminate bar labelled ``text`` while a task runs.
+
+        The environment, the diagnostic run and the comparison used to set
+        the bar's range to (0, 0) and nothing else; the bar was hidden, so
+        nothing moved on screen for minutes.
+        """
+        self.progress_bar.setRange(0, 0)
+        self.progress_bar.setFormat(text)
+        self.progress_bar.setVisible(True)
+        self.progress_label.setVisible(True)
+        self._refresh_progress_label()
+        self.set_status(text)
+
+    def _clear_busy(self):
+        """Back to the idle bar: hidden, determinate, "ready"."""
+        self.progress_bar.setRange(0, 100)
+        self.progress_bar.setValue(0)
+        self.progress_bar.setFormat(S.PROGRESS_READY)
+        self.progress_bar.setVisible(False)
+        self.progress_label.setVisible(False)
+        self._refresh_progress_label()
+        self.set_status(S.STATUS_READY)
+
+    def thread_error_text(self, code: str, tool: str = "", thread=None) -> str:
+        """A worker's outcome code in the active locale.
+
+        Threads report ``streaming_thread`` codes, never sentences; ``tool``
+        names the program for the sentence and ``thread`` supplies the exit
+        code or the OS error it kept.
+        """
+        tool = tool or "?"
+        if code == streaming_thread.CANCELLED:
+            return S.THREAD_ERR_CANCELLED
+        if code == streaming_thread.NOT_FOUND:
+            return S.THREAD_ERR_NOT_FOUND_FMT.format(tool=tool)
+        if code == streaming_thread.TIMED_OUT:
+            return S.THREAD_ERR_TIMED_OUT_FMT.format(tool=tool)
+        if code == streaming_thread.ERROR:
+            return S.THREAD_ERR_ERROR_FMT.format(
+                tool=tool, error=getattr(thread, "error", "") or "?")
+        if code == streaming_thread.FAILED:
+            return S.THREAD_ERR_FAILED_FMT.format(
+                tool=tool, code=getattr(thread, "returncode", None))
+        return code
 
     # ── Status bar ─────────────────────────────────────────────────────────
 
@@ -994,7 +1066,7 @@ class MainWindow(QMainWindow):
         code into every EXE the build produces. The user needs to see that
         before it silently becomes part of a signed binary.
         """
-        flags = untrusted_flags(config)
+        flags, outside = split_untrusted_flags(untrusted_flags(config))
         if flags:
             shown = config.extra_args
             if config.upx and config.upx_dir.strip():
@@ -1006,6 +1078,18 @@ class MainWindow(QMainWindow):
                     flags="\n".join(f"  • {f}" for f in flags),
                     args=shown,
                 ),
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                QMessageBox.StandardButton.No,
+            )
+            if reply != QMessageBox.StandardButton.Yes:
+                return False
+        if outside:
+            # Paths outside the project copy this machine's files into the EXE.
+            reply = QMessageBox.question(
+                self,
+                S.MSG_CONFIRM,
+                S.MSG_UNTRUSTED_EXTRA_FILES_CONFIRM.format(
+                    files="\n".join(f"  • {f}" for f in outside)),
                 QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
                 QMessageBox.StandardButton.No,
             )
@@ -1223,12 +1307,13 @@ class MainWindow(QMainWindow):
             return
         python = self.build_python(config)
         for name in engine_names():
-            if not self._ensure_engine(get_engine(name), python):
+            if not self._ensure_engine(get_engine(name), python,
+                                       then=lambda: self.start_compare(allow_downloads)):
                 return
         self.size_tab.show_compare([], None)
         self.size_tab.compare_btn.setEnabled(False)
         self.convert_btn.setEnabled(False)
-        self.progress_bar.setRange(0, 0)  # busy: one bar for several builds
+        self._set_busy(S.BUSY_COMPARE)  # one bar for several builds
         self.compare_thread = CompareThread(
             project, python, runs=self.size_tab.compare_runs.value(),
             timeout=float(self.size_tab.compare_timeout.value()),
@@ -1242,13 +1327,11 @@ class MainWindow(QMainWindow):
     def _on_compare_phase(self, engine: str, phase: str):
         template = getattr(S, f"COMPARE_PHASE_{phase.upper()}", "{engine}")
         text = template.format(engine=get_engine(engine).display_name)
-        self.progress_bar.setFormat(text)
+        self._set_busy(text)
         self._append_log(text)
 
     def _on_compare_finished(self, rows, recommendation):
-        self.progress_bar.setRange(0, 100)
-        self.progress_bar.setValue(0)
-        self.progress_bar.setFormat(S.PROGRESS_READY)
+        self._clear_busy()
         self.size_tab.compare_btn.setEnabled(True)
         self.convert_btn.setEnabled(True)
         self._compare_view = (rows, recommendation)
@@ -1263,14 +1346,20 @@ class MainWindow(QMainWindow):
             self._allow_downloads_once = False  # the consent goes to this comparison
             self.start_compare(allow_downloads=True)
 
+    #: Every worker the window may start. Each one spawns a child process or
+    #: writes files; a build "in progress" is any of them running.
+    _THREAD_ATTRS = (
+        "conversion_thread", "batch_thread", "diagnostic_thread", "env_thread",
+        "release_thread", "compare_thread", "package_thread", "installer_thread",
+        "post_build_thread", "command_thread", "task_thread",
+    )
+
+    def _running_threads(self):
+        return [t for t in (getattr(self, name, None) for name in self._THREAD_ATTRS)
+                if t is not None and t.isRunning()]
+
     def _build_in_progress(self) -> bool:
-        for thread in (
-            self.conversion_thread, self.batch_thread, self.diagnostic_thread, self.env_thread,
-            self.release_thread, self.compare_thread, self.package_thread,
-        ):
-            if thread and thread.isRunning():
-                return True
-        return False
+        return bool(self._running_threads())
 
     # ─── Preferences ────────────────────────────────────────────────────
 
@@ -1310,10 +1399,17 @@ class MainWindow(QMainWindow):
         self._append_log(S.LOG_NUITKA_DOWNLOAD_ALLOWED)
         return True
 
-    def _ensure_engine(self, engine, python: str = "") -> bool:
-        """The build engine is installed in ``python``, or installed with consent."""
+    def _ensure_engine(self, engine, python: str = "", then=None) -> bool:
+        """The build engine is installed in ``python``, or installed with consent.
+
+        Returns True when it is already there. Otherwise the person is asked
+        (on the UI thread), pip runs on a worker, and ``then`` — the action
+        that needed the engine, typically the build — is called from the
+        worker's finished slot once the install succeeded; the caller returns
+        right away on False.
+        """
         if engine.name == "pyinstaller":
-            return self._ensure_pyinstaller(python)
+            return self._ensure_pyinstaller(python, then=then)
         python = python or sys.executable
         if engine.is_available(python):
             return True
@@ -1329,22 +1425,20 @@ class MainWindow(QMainWindow):
             return False
         self._append_log(S.LOG_INSTALL_ENGINE.format(engine=engine.display_name))
         self._append_log(quote_command(install_cmd))
-        try:
-            subprocess.run(install_cmd, capture_output=True, check=True, timeout=1200)
-        except (OSError, subprocess.SubprocessError) as e:
-            QMessageBox.critical(self, S.MSG_ERROR, S.ERR_INSTALL_ENGINE_FAIL.format(
-                engine=engine.display_name, error=str(e)))
-            return False
-        self._append_log(S.LOG_INSTALL_ENGINE_OK.format(engine=engine.display_name))
-        return True
+        self._install_tool(
+            install_cmd, engine.display_name, timeout=1200, then=then,
+            log_ok=S.LOG_INSTALL_ENGINE_OK.format(engine=engine.display_name),
+        )
+        return False
 
-    def _ensure_pyinstaller(self, python: str = "") -> bool:
+    def _ensure_pyinstaller(self, python: str = "", then=None) -> bool:
         """Check for PyInstaller, offering to install it with explicit consent.
 
         The previous version ran ``pip install pyinstaller`` silently on the
         first build: an unattended network install, unpinned, from whatever
         index the environment happened to point at. ``python`` is the build
         interpreter (an isolated environment's), defaulting to this one.
+        See ``_ensure_engine`` for ``then``.
         """
         try:
             subprocess.run(
@@ -1370,15 +1464,44 @@ class MainWindow(QMainWindow):
 
         self._append_log(S.LOG_INSTALL_PYINSTALLER)
         self._append_log(" ".join(install_cmd))
-        try:
-            subprocess.run(install_cmd, capture_output=True, check=True, timeout=600)
-        except (OSError, subprocess.SubprocessError) as e:
-            QMessageBox.critical(
-                self, S.MSG_ERROR, S.ERR_INSTALL_PYINSTALLER_FAIL.format(error=str(e))
-            )
-            return False
-        self._append_log(S.LOG_INSTALL_PYINSTALLER_OK)
-        return True
+        self._install_tool(install_cmd, "PyInstaller", timeout=600, then=then,
+                           log_ok=S.LOG_INSTALL_PYINSTALLER_OK)
+        return False
+
+    def _install_tool(self, install_cmd, tool: str, timeout: float, then, log_ok: str):
+        """Run a consented pip install on a worker, then continue with ``then``.
+
+        The window shows the busy bar and keeps the Build button disabled
+        until pip returns; the dialog on failure is one sentence, the pip
+        output goes to the log.
+        """
+        if self._build_in_progress():
+            QMessageBox.warning(self, S.MSG_WARNING, S.MSG_DIAG_BUSY)
+            return
+        self._set_busy(S.BUSY_INSTALLING_FMT.format(tool=tool))
+        self.convert_btn.setEnabled(False)
+        self.command_thread = CommandThread(install_cmd, timeout=timeout)
+        self.command_thread.finished_signal.connect(
+            lambda rc, output: self._on_tool_installed(rc, output, tool, then, log_ok)
+        )
+        self.command_thread.start()
+
+    def _on_tool_installed(self, returncode: int, output: str, tool: str, then, log_ok: str):
+        self._clear_busy()
+        self.convert_btn.setEnabled(True)
+        for line in (output or "").splitlines():
+            if line.strip():
+                self._append_log(line.rstrip())
+        if returncode != 0:
+            code = getattr(self.command_thread, "code", streaming_thread.FAILED)
+            self._append_log(S.ERR_INSTALL_ENGINE_FAIL.format(
+                engine=tool, error=self.thread_error_text(code, "pip", self.command_thread)))
+            QMessageBox.critical(self, S.MSG_ERROR, S.MSG_INSTALL_FAILED_FMT.format(tool=tool))
+            self._cleanup_temp_files()
+            return
+        self._append_log(log_ok)
+        if then is not None:
+            then()
 
     def start_conversion(self):
         config = self._current_config()
@@ -1406,7 +1529,7 @@ class MainWindow(QMainWindow):
                                           extra_options=native)
         if error:
             self._cleanup_temp_files()
-            QMessageBox.warning(self, S.MSG_WARNING, error)
+            QMessageBox.warning(self, S.MSG_WARNING, describe_error(error))
             return
         kit_options, kit_error = self._runtime_kit_options(config)
         if kit_error:
@@ -1431,7 +1554,9 @@ class MainWindow(QMainWindow):
                 self.create_build_env(then_build=True)
             return
 
-        if not self._ensure_engine(engine, python):
+        if not self._ensure_engine(engine, python, then=self.start_conversion):
+            # Either declined, or pip is running on a worker and will call
+            # start_conversion again once the engine is there.
             self._cleanup_temp_files()
             return
         if python != sys.executable:
@@ -1442,7 +1567,8 @@ class MainWindow(QMainWindow):
             engine.prepare_output(config)
         except OSError as e:
             self._cleanup_temp_files()
-            QMessageBox.critical(self, S.MSG_ERROR, str(e))
+            self._append_log(S.LOG_OUTPUT_DIR_FAILED.format(error=str(e)))
+            QMessageBox.critical(self, S.MSG_ERROR, S.MSG_OUTPUT_DIR_FAILED)
             return
         self._build_command = list(cmd)
 
@@ -1473,7 +1599,7 @@ class MainWindow(QMainWindow):
         self.set_status(S.STATUS_BUILDING)
 
         self.conversion_thread = ConversionThread(
-            cmd, work_dir, stages=engine.stages,
+            cmd, work_dir, engine=engine.name,
             popen_kwargs=popen_options(engine.name, engine.build_env(python)),
         )
         self.conversion_thread.log_signal.connect(self._append_log)
@@ -1518,7 +1644,12 @@ class MainWindow(QMainWindow):
         self.cancel_btn.setEnabled(active)
         self.cancel_btn.setVisible(active)
 
-    def on_conversion_finished(self, success, message):
+    def on_conversion_finished(self, success, message, status: str = ""):
+        """``status`` is the thread's outcome code (``streaming_thread``);
+        a cancelled build is told apart by it, never by its message text."""
+        if not status:
+            status = streaming_thread.OK if success else streaming_thread.FAILED
+        cancelled = status == streaming_thread.CANCELLED
         self._set_building(False)
         duration = max(0.0, time.monotonic() - self._build_start_time)
         snapshot = self._build_config_snapshot
@@ -1550,7 +1681,7 @@ class MainWindow(QMainWindow):
             self.refresh_home()
 
         diagnosed = []
-        if snapshot and message != S.CONV_CANCELLED:
+        if snapshot and not cancelled:
             diagnosed = self._diagnose_build(BuildConfig.from_dict(snapshot))
             if not success and diagnosed:
                 message += S.MSG_DOCTOR_FAILED_HINT.format(count=len(diagnosed))
@@ -1590,14 +1721,13 @@ class MainWindow(QMainWindow):
         else:
             self.progress_bar.setFormat(S.PROGRESS_FAILED)
             self._refresh_progress_label()
-            self.set_status(S.STATUS_CANCELLED if message == S.CONV_CANCELLED
-                            else S.STATUS_FAILED)
+            self.set_status(S.STATUS_CANCELLED if cancelled else S.STATUS_FAILED)
             declined = [f for f in diagnosed if f.code == "nuitka_download_declined"]
             if declined:
                 # The engine stopped to ask for a download; only a person says yes.
                 if self.ask_download_consent(declined[0].params.get("tool", "")):
                     self.start_conversion()
-            elif message != S.CONV_CANCELLED:
+            elif not cancelled:
                 QMessageBox.critical(self, S.MSG_ERROR, message)
 
     def preview_command(self):
@@ -1611,7 +1741,7 @@ class MainWindow(QMainWindow):
             extra_options=native + kit,
         )
         if error:
-            QMessageBox.warning(self, S.MSG_WARNING, error)
+            QMessageBox.warning(self, S.MSG_WARNING, describe_error(error))
             return
         CommandPreviewDialog(cmd, parent=self).exec()
 
@@ -1733,9 +1863,26 @@ class MainWindow(QMainWindow):
             self.check_for_updates(interactive=False)
 
     def check_for_updates(self, interactive: bool = True):
-        """Look for a newer release. Reports only — nothing is downloaded."""
+        """Look for a newer release. Reports only — nothing is downloaded.
+
+        The network call runs on a worker: a slow or absent connection used
+        to freeze the window for the whole timeout.
+        """
+        if self.task_thread is not None and self.task_thread.isRunning():
+            return
         self._append_log(S.LOG_UPDATE_CHECKING)
-        info = check_for_update(APP_VERSION)
+        self.set_status(S.BUSY_UPDATE_CHECK)
+        self.task_thread = TaskThread(lambda: check_for_update(APP_VERSION))
+        self.task_thread.finished_signal.connect(
+            lambda info, error: self._on_update_checked(info, error, interactive)
+        )
+        self.task_thread.start()
+
+    def _on_update_checked(self, info, error: str, interactive: bool):
+        self.set_status(S.STATUS_READY)
+        if error:
+            self._append_log(error)
+            info = None
         if info is None:
             self._append_log(S.LOG_UPDATE_NONE.format(version=APP_VERSION))
             if interactive:
@@ -2114,15 +2261,20 @@ class MainWindow(QMainWindow):
                 diag, python_executable=python, extra_options=kit_options
             )
         if error:
-            QMessageBox.warning(self, S.MSG_WARNING, error)
+            QMessageBox.warning(self, S.MSG_WARNING, describe_error(error))
             return
-        if not self._ensure_engine(engine, python):
+        if not self._ensure_engine(engine, python, then=self.start_diagnostic_run):
             return
-        engine.prepare_output(diag)
+        try:
+            engine.prepare_output(diag)
+        except OSError as e:
+            self._append_log(S.LOG_OUTPUT_DIR_FAILED.format(error=str(e)))
+            QMessageBox.critical(self, S.MSG_ERROR, S.MSG_OUTPUT_DIR_FAILED)
+            return
 
         self.convert_btn.setEnabled(False)
         self.doctor_tab.diagnose_btn.setEnabled(False)
-        self.progress_bar.setRange(0, 0)  # busy: no stage tracking here
+        self._set_busy(S.BUSY_DIAGNOSTIC)  # no stage tracking here
 
         timeout = max(8.0, float(self.deploy_tab.smoke_timeout.value()))
         self.diagnostic_thread = DiagnosticThread(
@@ -2138,9 +2290,7 @@ class MainWindow(QMainWindow):
         self.diagnostic_thread.start()
 
     def _on_diagnostic_finished(self, config, built: bool, output: str, build_log: str):
-        self.progress_bar.setRange(0, 100)
-        self.progress_bar.setValue(0)
-        self.progress_bar.setFormat(S.PROGRESS_READY)
+        self._clear_busy()
         self.convert_btn.setEnabled(True)
         self.doctor_tab.diagnose_btn.setEnabled(True)
 
@@ -2242,7 +2392,7 @@ class MainWindow(QMainWindow):
 
         self.size_tab.set_env_busy()
         self.convert_btn.setEnabled(False)
-        self.progress_bar.setRange(0, 0)
+        self._set_busy(S.BUSY_ENV)
         self.env_thread = EnvThread(plan, base_python=base)
         self.env_thread.log_signal.connect(self._append_log)
         self.env_thread.finished_signal.connect(
@@ -2254,9 +2404,8 @@ class MainWindow(QMainWindow):
         self.create_build_env(recreate=True)
 
     def _on_env_finished(self, plan, ok: bool, failed, error: str, then_build: bool):
-        self.progress_bar.setRange(0, 100)
-        self.progress_bar.setValue(0)
-        self.progress_bar.setFormat(S.PROGRESS_READY)
+        """``error`` is the thread's outcome code ('' when it succeeded)."""
+        self._clear_busy()
         self.convert_btn.setEnabled(True)
         # The environment changed: what it can import must be asked again.
         self._checkers.pop(plan.python, None)
@@ -2266,8 +2415,12 @@ class MainWindow(QMainWindow):
             else:
                 self._append_log(S.LOG_ENV_DONE)
         else:
-            self._append_log(S.LOG_ENV_FAILED.format(error=error))
-            QMessageBox.critical(self, S.MSG_ERROR, S.LOG_ENV_FAILED.format(error=error))
+            # The pip output is already in the log line by line; the dialog
+            # says what happened in one sentence and points there.
+            detail = self.thread_error_text(error, "pip", self.env_thread)
+            self._append_log(S.LOG_ENV_FAILED.format(error=detail))
+            if error != streaming_thread.CANCELLED:
+                QMessageBox.critical(self, S.MSG_ERROR, S.MSG_ENV_FAILED)
         self.run_doctor()
         if ok and then_build:
             self.start_conversion()
@@ -2298,23 +2451,32 @@ class MainWindow(QMainWindow):
         env_dir = self._env_dir(source) if source else ""
         if not env_dir or not env_exists(env_dir):
             return
-        try:
-            result = subprocess.run(
-                freeze_command(env_python(env_dir), find_uv()),
-                capture_output=True, text=True, timeout=120,
-            )
-        except (OSError, subprocess.SubprocessError) as e:
-            self._append_log(S.LOG_ENV_LOCK_FAILED.format(error=str(e)))
+        if self._build_in_progress():
+            QMessageBox.warning(self, S.MSG_WARNING, S.MSG_DIAG_BUSY)
             return
-        if result.returncode != 0:
-            self._append_log(
-                S.LOG_ENV_LOCK_FAILED.format(error=(result.stderr or "").strip()[:300])
-            )
+        # ``pip freeze`` on a worker: it imports every distribution's metadata
+        # and took seconds on a large environment, with the window frozen.
+        self._set_busy(S.BUSY_FREEZING)
+        self.command_thread = CommandThread(freeze_command(env_python(env_dir), find_uv()),
+                                            timeout=120)
+        self.command_thread.finished_signal.connect(
+            lambda rc, output: self._on_env_frozen(source, rc, output)
+        )
+        self.command_thread.start()
+
+    def _on_env_frozen(self, source: str, returncode: int, output: str):
+        self._clear_busy()
+        if returncode != 0:
+            code = getattr(self.command_thread, "code", streaming_thread.FAILED)
+            self._append_log(S.LOG_ENV_LOCK_FAILED.format(
+                error=self.thread_error_text(code, "pip freeze", self.command_thread)))
+            for line in (output or "").strip().splitlines()[-5:]:
+                self._append_log(line)
             return
         path = lock_file_path(source)
         try:
             with open(path, "w", encoding="utf-8") as f:
-                f.write(format_lock(result.stdout))
+                f.write(format_lock(output))
         except OSError as e:
             self._append_log(S.LOG_ENV_LOCK_FAILED.format(error=str(e)))
             return
@@ -2700,7 +2862,8 @@ class MainWindow(QMainWindow):
             with open(path, "w", encoding="utf-8") as f:
                 f.write(generate_wsb(host, exe))
         except OSError as e:
-            QMessageBox.critical(self, S.MSG_ERROR, str(e))
+            self._append_log(S.LOG_SANDBOX_FAILED.format(error=str(e)))
+            QMessageBox.critical(self, S.MSG_ERROR, S.MSG_SANDBOX_FILE_FAILED)
             return
         self._append_log(S.LOG_SANDBOX_WRITTEN.format(path=path))
         os.startfile(path)  # Windows only: guarded by sandbox_available() above
@@ -2917,16 +3080,16 @@ class MainWindow(QMainWindow):
         self.installer_thread.start()
 
     def _on_installer_finished(self, success: bool, message: str, interactive: bool):
+        """``message`` is the installer's path on success, an outcome code otherwise."""
         if success:
             self._append_log(S.LOG_INSTALLER_OK.format(path=message))
             if interactive:
                 self.notify(S.MSG_INSTALLER_OK.format(path=message), "success", 0)
         else:
-            self._append_log(S.LOG_INSTALLER_FAIL.format(error=message))
-            if interactive:
-                QMessageBox.critical(
-                    self, S.MSG_ERROR, S.LOG_INSTALLER_FAIL.format(error=message)
-                )
+            error = self.thread_error_text(message, "ISCC.exe", self.installer_thread)
+            self._append_log(S.LOG_INSTALLER_FAIL.format(error=error))
+            if interactive and message != streaming_thread.CANCELLED:
+                QMessageBox.critical(self, S.MSG_ERROR, S.LOG_INSTALLER_FAIL.format(error=error))
 
     # ─── Project file (p2e.toml) ────────────────────────────────────────
 
@@ -3756,17 +3919,13 @@ class MainWindow(QMainWindow):
             if reply != QMessageBox.StandardButton.Yes:
                 event.ignore()
                 return
-            # Both threads spawn a child process; leaving either running
-            # orphans a PyInstaller run after the window is gone.
-            for thread in (
-                self.conversion_thread, self.batch_thread, self.diagnostic_thread,
-                self.env_thread, self.compare_thread,
-            ):
-                if thread and thread.isRunning():
-                    thread.cancel()
-                    thread.wait()
-            if self.release_thread and self.release_thread.isRunning():
-                self.release_thread.wait()
+            # Every worker spawns a child process or writes files; leaving
+            # one running orphans a PyInstaller run after the window is gone.
+            for thread in self._running_threads():
+                cancel = getattr(thread, "cancel", None)
+                if cancel is not None:
+                    cancel()
+                thread.wait()
 
         self._cleanup_temp_files()
         self.tray.hide()

@@ -7,7 +7,6 @@ from py2exe_gui.qt import (
     QGridLayout,
     QGroupBox,
     QHBoxLayout,
-    QLabel,
     QLineEdit,
     QListWidget,
     QPushButton,
@@ -15,7 +14,7 @@ from py2exe_gui.qt import (
 )
 from py2exe_gui.strings import S
 from py2exe_gui.ui.dialogs import AddImportDialog
-from py2exe_gui.ui.tabs.base import BaseTab, browse_button, scrolled_layout
+from py2exe_gui.ui.tabs.base import BaseTab, browse_button, labelled, scrolled_layout
 
 
 class AdvancedTab(BaseTab):
@@ -67,14 +66,14 @@ class AdvancedTab(BaseTab):
 
         extra_group = QGroupBox(S.GROUP_EXTRA_OPTS)
         extra_layout = QGridLayout(extra_group)
-        extra_layout.addWidget(QLabel(S.OPT_LEVEL_LABEL), 0, 0)
         self.optimize_combo = QComboBox()
         self.optimize_combo.addItems(S.OPT_LEVELS)
+        extra_layout.addWidget(labelled(S.OPT_LEVEL_LABEL, self.optimize_combo), 0, 0)
         extra_layout.addWidget(self.optimize_combo, 0, 1)
 
-        extra_layout.addWidget(QLabel(S.UPX_DIR_LABEL), 1, 0)
         self.upx_dir = QLineEdit()
         self.upx_dir.setPlaceholderText(S.UPX_DIR_PLACEHOLDER)
+        extra_layout.addWidget(labelled(S.UPX_DIR_LABEL, self.upx_dir), 1, 0)
         upx_dir_btn = browse_button(S.UPX_DIR_LABEL, self.browse_upx_dir, folder=True)
         extra_layout.addWidget(self.upx_dir, 1, 1)
         extra_layout.addWidget(upx_dir_btn, 1, 2)
@@ -88,6 +87,7 @@ class AdvancedTab(BaseTab):
         cmd_layout = QVBoxLayout(cmd_group)
         self.extra_args = QLineEdit()
         self.extra_args.setPlaceholderText(S.EXTRA_ARGS_PLACEHOLDER)
+        self.extra_args.setAccessibleName(S.GROUP_EXTRA_ARGS)
         cmd_layout.addWidget(self.extra_args)
         layout.addWidget(cmd_group)
 

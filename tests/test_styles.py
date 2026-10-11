@@ -12,10 +12,15 @@ from py2exe_gui.styles import (
     LOG_COLORS,
     MAX_FONT_SCALE,
     MIN_FONT_SCALE,
+    MONO_FONT_STACK,
     PALETTES,
     THEMES,
+    UI_FONT_STACKS,
+    base_point_size,
     clamp_scale,
     detect_system_theme,
+    font_family_css,
+    mono_family_css,
     render_theme,
     resolve_theme,
     theme_names,
@@ -122,7 +127,22 @@ def test_arabic_locale_gets_an_arabic_capable_stack():
 
 
 def test_default_locale_stack_has_no_arabic_specific_face():
-    assert "Noto Naskh Arabic" not in render_theme("dark", locale="en")
+    assert "Noto Naskh Arabic" not in font_family_css("en")
+    # The sheet still names it, once: as the Arabic fallback of the log font.
+    assert render_theme("dark", locale="en").count("Noto Naskh Arabic") == mono_family_css_count()
+
+
+def mono_family_css_count():
+    return render_theme("dark", locale="en").count(mono_family_css())
+
+
+def test_log_font_stack_has_an_arabic_capable_monospace_after_the_latin_ones():
+    """An Arabic log line must not fall back to a proportional font."""
+    names = list(MONO_FONT_STACK)
+    latin = [names.index(n) for n in ("Cascadia Mono", "Consolas")]
+    arabic = [i for i, n in enumerate(names) if "Arabic" in n or n == "Kawkab Mono"]
+    assert arabic and max(latin) < min(arabic)
+    assert mono_family_css().endswith(", monospace")
 
 
 # ── Theme resolution ───────────────────────────────────────────────────────
@@ -194,3 +214,108 @@ def test_unknown_platform_falls_back_to_the_shipped_default():
 
 def test_detection_never_raises_on_the_real_host():
     assert detect_system_theme() in PALETTES
+
+
+# ── Accessibility: field borders and the focus ring ────────────────────────
+
+
+def _relative_luminance(hex_color: str) -> float:
+    channels = [int(hex_color.lstrip("#")[i : i + 2], 16) / 255 for i in (0, 2, 4)]
+    linear = [c / 12.92 if c <= 0.03928 else ((c + 0.055) / 1.055) ** 2.4 for c in channels]
+    return 0.2126 * linear[0] + 0.7152 * linear[1] + 0.0722 * linear[2]
+
+
+def contrast(a: str, b: str) -> float:
+    la, lb = _relative_luminance(a), _relative_luminance(b)
+    return (max(la, lb) + 0.05) / (min(la, lb) + 0.05)
+
+
+@pytest.mark.parametrize("name", sorted(PALETTES))
+def test_input_border_is_visible_against_the_field(name):
+    """WCAG 1.4.11: a control's boundary needs 3:1 against what it sits on."""
+    palette = PALETTES[name]
+    ratio = contrast(palette["input_border"], palette["input_bg"])
+    assert ratio >= 3.0, f"{name}: input_border/input_bg is only {ratio:.2f}:1"
+
+
+def test_light_theme_fields_are_distinct_from_the_window():
+    """A field the same colour as the window has only its 1px edge to show."""
+    assert PALETTES["light"]["input_bg"] != PALETTES["light"]["window_bg"]
+
+
+def test_checkbox_focus_draws_a_ring_on_the_indicator():
+    sheet = render_theme("dark")
+    rule = sheet.split("QCheckBox:focus::indicator")[1].split("}")[0]
+    assert "border: 2px solid" in rule and PALETTES["dark"]["focus_ring"] in rule
+
+
+# ── Group box title: Qt mirrors subcontrol-position itself ─────────────────
+
+
+@pytest.mark.parametrize("locale", ["ar", "en"])
+def test_group_title_is_not_mirrored_by_hand(locale):
+    """``top right`` under RTL flipped the title back to the left."""
+    sheet = render_theme("dark", locale=locale)
+    assert "subcontrol-position: top left;" in sheet
+    assert "subcontrol-position: top right;" not in sheet
+
+
+def test_group_title_lands_on_the_right_under_rtl(qapp):
+    from py2exe_gui.qt import QGroupBox, QStyle, QStyleOptionGroupBox, Qt, QWidget
+
+    host = QWidget()
+    host.setStyleSheet(render_theme("dark", locale="ar"))
+    box = QGroupBox("عنوان", host)
+    box.setLayoutDirection(Qt.LayoutDirection.RightToLeft)
+    box.resize(400, 120)
+    host.show()
+    qapp.processEvents()
+    option = QStyleOptionGroupBox()
+    option.initFrom(box)
+    option.rect = box.rect()
+    option.text = box.title()
+    option.subControls = QStyle.SubControl.SC_GroupBoxLabel | QStyle.SubControl.SC_GroupBoxFrame
+    label = box.style().subControlRect(
+        QStyle.ComplexControl.CC_GroupBox, option, QStyle.SubControl.SC_GroupBoxLabel, box
+    )
+    assert label.center().x() > box.width() / 2, label
+    host.close()
+
+
+# ── Font sizes outside the stylesheet ──────────────────────────────────────
+
+
+def test_base_point_size_scales_like_the_sheet():
+    assert base_point_size("primary") == 11
+    assert base_point_size("score") == 16
+    assert base_point_size("primary", 2.0) == 22
+    assert base_point_size("log", MIN_FONT_SCALE) >= 6
+
+
+def test_primary_button_and_score_are_sized_by_the_sheet():
+    sheet = render_theme("dark", scale=2.0)
+    assert 'QPushButton#successBtn[primary="true"]' in sheet
+    assert "QLabel#doctorScore" in sheet
+    assert "font-size: 22pt;" in sheet and "font-size: 32pt;" in sheet
+
+
+def test_qt_font_families_come_from_the_style_table(qapp):
+    """One source for the UI font: qt.application_font reads UI_FONT_STACKS."""
+    from py2exe_gui import qt
+
+    assert qt.FONT_FAMILIES == UI_FONT_STACKS["ar"]
+    assert qt.font_families("en") == UI_FONT_STACKS["default"]
+    font = qt.application_font(10, "en")
+    if hasattr(font, "families"):
+        assert list(font.families()) == list(UI_FONT_STACKS["default"])
+
+
+# ── The monospace rule stays on the log ────────────────────────────────────
+
+
+def test_monospace_is_scoped_to_log_and_code_views():
+    sheet = render_theme("dark")
+    prose = sheet.split("\nQTextEdit {")[1].split("}")[0]
+    assert "font-family" not in prose
+    log = sheet.split("QTextEdit#logOutput, QPlainTextEdit#logOutput {")[1].split("}")[0]
+    assert mono_family_css() in log
