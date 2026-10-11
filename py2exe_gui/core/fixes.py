@@ -10,12 +10,12 @@ UI resolves the code to translated text (``S.FINDING_<CODE>_TITLE``), the same
 way ``build_stages`` hands back stage keys rather than labels.
 """
 
-import os
 from dataclasses import dataclass, field, replace
-from typing import Dict, Iterable, List, Sequence, Tuple
+from typing import Dict, Iterable, List, Optional, Sequence, Tuple
 
 from py2exe_gui.core.builder import split_extra_args
 from py2exe_gui.core.config import RUNTIME_SERVICES, BuildConfig
+from py2exe_gui.core.fsutil import same_path as _same_path
 
 SEVERITY_ERROR = "error"
 SEVERITY_WARNING = "warning"
@@ -37,7 +37,7 @@ FIX_ADD_DATA = "add_data"
 FIX_FLAG = "flag"
 FIX_CONSOLE = "console"
 FIX_SET_SOURCE = "set_source"
-# 1.5: turn on a Runtime Kit service (value: its name in RUNTIME_SERVICES),
+# Turn on a Runtime Kit service (value: its name in RUNTIME_SERVICES),
 # e.g. log redirection instead of bringing the console back.
 FIX_RUNTIME = "runtime"
 FIX_KINDS = (
@@ -59,23 +59,23 @@ FINDING_CODES = (
     "missing_data_file", "template_not_found", "streams_none", "dll_load_failed",
     "multiple_qt_bindings_build", "add_data_missing", "icon_wrong_format",
     "file_locked", "runtime_unhandled", "warn_missing_module",
-    # 1.4: size lab and build environment
+    # size lab and build environment
     "size_exclude_candidate", "env_not_created",
-    # 1.5: Runtime Kit
+    # Runtime Kit
     "kit_imported_not_enabled", "kit_update_url_missing", "kit_update_url_insecure",
     "kit_update_key_missing", "kit_update_key_invalid", "kit_update_version_invalid",
     "kit_support_url_invalid", "kit_update_needs_installer", "kit_source_missing",
-    # 2.0: engines (core/engines)
+    # engines (core/engines)
     "engine_feature_unsupported", "nuitka_missing", "nuitka_python_unsupported",
     "nuitka_python_experimental", "nuitka_no_compiler", "nuitka_no_compiler_macos",
     "nuitka_no_compiler_windows", "nuitka_tool_missing", "nuitka_compiler_failed",
     "nuitka_plugin_needed", "nuitka_plugin_for_package", "nuitka_download_declined",
-    # 2.0: packagers (core/packagers) and the CI generator (core/ci_generator)
+    # packagers (core/packagers) and the CI generator (core/ci_generator)
     "package_wrong_platform", "package_no_build", "package_tool_missing",
     "appimagetool_missing", "appimagetool_download_failed", "package_version_missing",
     "package_icon_placeholder", "package_icon_icns", "package_maintainer_missing",
     "package_failed", "ci_output_outside_repo", "ci_not_git", "ci_signing_not_configured",
-    # 2.0: offline licensing (core/licensing, runtime_kit)
+    # offline licensing (core/licensing, runtime_kit)
     "kit_license_key_missing", "kit_license_key_invalid", "kit_license_client_side",
 )
 
@@ -120,7 +120,7 @@ class Finding:
     # Another way to resolve it, offered instead of ``fixes`` (never applied
     # together with them): log redirection instead of the console, say.
     alternatives: Tuple[Fix, ...] = ()
-    # 2.0: fixes the build's engine has no equivalent for (``localize_finding``).
+    # Fixes the build's engine has no equivalent for (``localize_finding``).
     # Shown, never applied.
     unsupported: Tuple[Fix, ...] = field(default=(), hash=False, compare=False)
 
@@ -167,7 +167,11 @@ def dedupe_findings(findings: Iterable[Finding]) -> List[Finding]:
 
 def has_flag(extra_args: str, flag: str, argument: str) -> bool:
     """True when ``--flag argument`` (or ``--flag=argument``) is already set."""
-    tokens = split_extra_args(extra_args or "")
+    return tokens_have_flag(split_extra_args(extra_args or ""), flag, argument)
+
+
+def tokens_have_flag(tokens: Sequence[str], flag: str, argument: str) -> bool:
+    """``has_flag`` on arguments already split, so a loop tokenizes once."""
     for i, token in enumerate(tokens):
         if token == f"{flag}={argument}":
             return True
@@ -239,11 +243,14 @@ def _flag_text(engine: str, flag: str, argument: str) -> str:
     return f"{flag} {argument}"
 
 
-def fix_is_applied(config: BuildConfig, fix: Fix) -> bool:
+def fix_is_applied(config: BuildConfig, fix: Fix,
+                   tokens: Optional[Sequence[str]] = None) -> bool:
     """Whether ``config`` already contains what ``fix`` would add.
 
     The fix is first put in the terms of the config's engine; one that engine
-    has no equivalent for can never be applied.
+    has no equivalent for can never be applied. ``tokens`` is
+    ``config.extra_args`` already split, for a caller checking many fixes
+    against one config (``apply_fixes``); without it the args are split here.
     """
     engine = getattr(config, "engine", "pyinstaller")
     if engine != "pyinstaller":
@@ -251,14 +258,16 @@ def fix_is_applied(config: BuildConfig, fix: Fix) -> bool:
         if not translated:
             return False
         if translated != (fix,):
-            return all(fix_is_applied(config, t) for t in translated)
+            return all(fix_is_applied(config, t, tokens) for t in translated)
     if fix.kind == FIX_HIDDEN_IMPORT:
         return fix.value in config.hidden_imports
     if fix.kind == FIX_ADD_DATA:
         return any(_same_path(fix.value, p) for p in config.extra_files)
     if fix.kind == FIX_FLAG:
         flag, _, argument = fix.value.partition(" ")
-        return has_flag(config.extra_args, flag, argument)
+        if tokens is None:
+            tokens = split_extra_args(config.extra_args or "")
+        return tokens_have_flag(tokens, flag, argument)
     if fix.kind == FIX_CONSOLE:
         return not config.windowed and not config.noconsole
     if fix.kind == FIX_SET_SOURCE:
@@ -292,6 +301,9 @@ def apply_fixes(
     hidden = list(config.hidden_imports)
     extra_files = list(config.extra_files)
     extra_args = config.extra_args or ""
+    # Split once: every fix is checked against the args, and shlex on a long
+    # argument string for each of them added up in the doctor's "fix all".
+    tokens = split_extra_args(extra_args)
     windowed, noconsole = config.windowed, config.noconsole
     source = config.source
     kit = replace(config.runtime_kit)
@@ -308,7 +320,7 @@ def apply_fixes(
             source=source,
             runtime_kit=kit,
         )
-        if fix_is_applied(current, fix):
+        if fix_is_applied(current, fix, tokens):
             continue
         if fix.kind == FIX_HIDDEN_IMPORT:
             hidden.append(fix.value)
@@ -316,7 +328,9 @@ def apply_fixes(
             extra_files.append(fix.value)
         elif fix.kind == FIX_FLAG:
             flag, _, argument = fix.value.partition(" ")
-            extra_args = f"{extra_args} {_flag_text(engine, flag, argument)}".strip()
+            text = _flag_text(engine, flag, argument)
+            extra_args = f"{extra_args} {text}".strip()
+            tokens = tokens + split_extra_args(text)
         elif fix.kind == FIX_CONSOLE:
             windowed = noconsole = False
         elif fix.kind == FIX_SET_SOURCE:
@@ -336,12 +350,6 @@ def apply_fixes(
         runtime_kit=kit,
     )
     return new_config, applied
-
-
-def _same_path(a: str, b: str) -> bool:
-    if not a or not b:
-        return False
-    return os.path.normcase(os.path.abspath(a)) == os.path.normcase(os.path.abspath(b))
 
 
 # Code the user pastes into their own script. Language-neutral on purpose:

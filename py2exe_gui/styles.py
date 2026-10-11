@@ -66,11 +66,21 @@ DEFAULT_LOG_THEME = "dark"
 # ── Fonts ──────────────────────────────────────────────────────────────────
 # Segoe UI has thin Arabic coverage and falls back mid-run, which makes mixed
 # Arabic/Latin lines sit at inconsistent heights. Arabic-first locales lead
-# with faces that actually ship Arabic glyphs.
+# with faces that actually ship Arabic glyphs. ``qt.application_font`` reads
+# the same table, so the QFont the widgets inherit and the stylesheet agree.
 UI_FONT_STACKS = {
-    "ar": ("Segoe UI", "Tahoma", "Dubai", "Noto Naskh Arabic", "Arial"),
-    "default": ("Segoe UI", "Arial", "Helvetica"),
+    "ar": ("Segoe UI", "Tahoma", "Dubai", "Noto Naskh Arabic", "Noto Sans Arabic",
+           "Geeza Pro", "Arial"),
+    "default": ("Segoe UI", "Arial", "Helvetica", "Noto Sans", "DejaVu Sans"),
 }
+
+# The log and code views. Latin monospace faces first; the Arabic-capable
+# ones after them so an Arabic log line is drawn in a face with the glyphs
+# instead of falling back to the system's proportional Arabic font.
+MONO_FONT_STACK = (
+    "Cascadia Mono", "Consolas", "Kawkab Mono", "Noto Sans Mono", "DejaVu Sans Mono",
+    "Noto Naskh Arabic",
+)
 
 # Font scale bounds for the zoom shortcuts. Below 0.7 labels start clipping
 # inside fixed-height controls; above 2.0 the tab bar no longer fits.
@@ -86,8 +96,11 @@ _BASE_SIZES = {
     "small": 9,
     "group": 10,
     "about_body": 10,
+    # The primary action button (Build / Cancel) and the doctor's score.
+    "primary": 11,
     "about_sub": 11,
     "about_head": 16,
+    "score": 16,
     "title": 18,
 }
 
@@ -100,6 +113,20 @@ def font_stack(locale: str = "default") -> tuple:
 def font_family_css(locale: str = "default") -> str:
     """The same stack rendered as a CSS ``font-family`` value."""
     return ", ".join(f"'{name}'" for name in font_stack(locale)) + ", sans-serif"
+
+
+def mono_family_css() -> str:
+    """``MONO_FONT_STACK`` as a CSS ``font-family`` value."""
+    return ", ".join(f"'{name}'" for name in MONO_FONT_STACK) + ", monospace"
+
+
+def base_point_size(name: str, scale: float = DEFAULT_FONT_SCALE) -> int:
+    """The point size of ``name`` (a ``_BASE_SIZES`` key) at ``scale``.
+
+    For widgets that set a ``QFont`` directly rather than through the
+    stylesheet; the same rounding and 6pt floor as the sheet.
+    """
+    return max(6, round(_BASE_SIZES[name] * clamp_scale(scale)))
 
 
 def clamp_scale(scale: float) -> float:
@@ -126,7 +153,9 @@ PALETTES: Dict[str, Dict[str, str]] = {
         "surface": "#313244",
         "input_bg": "#45475a",
         "border": "#45475a",
-        "input_border": "#585b70",
+        # Lifted from #585b70 (1.3:1 against the field): a field's edge has
+        # to clear 3:1 (WCAG 1.4.11) to be found by eye. Catppuccin overlay2.
+        "input_border": "#9399b2",
         "text": "#cdd6f4",
         # Lightened from #6c7086: the status bar sat at 3.59:1 against its own
         # background, and the About tab's muted text at 4.45:1.
@@ -155,9 +184,11 @@ PALETTES: Dict[str, Dict[str, str]] = {
     "light": {
         "window_bg": "#eff1f5",
         "surface": "#e6e9ef",
-        "input_bg": "#eff1f5",
+        # White, not the window colour: a field that matches its background
+        # has nothing but its 1px edge to say "type here".
+        "input_bg": "#ffffff",
         "border": "#ccd0da",
-        "input_border": "#ccd0da",
+        "input_border": "#8c8fa1",
         "text": "#4c4f69",
         # The light palette was the weakest of the two on contrast: light text
         # on mid-tone Catppuccin Latte accents left the primary Build button at
@@ -190,7 +221,8 @@ PALETTES: Dict[str, Dict[str, str]] = {
         "surface": "#3b4252",
         "input_bg": "#434c5e",
         "border": "#4c566a",
-        "input_border": "#4c566a",
+        # 3.1:1 against the field (Nord's own #4c566a was 1.2:1).
+        "input_border": "#8f9bb3",
         "text": "#eceff4",
         "muted": "#aeb8ca",
         "accent": "#88c0d0",
@@ -280,6 +312,8 @@ QGroupBox {{
 }}
 QGroupBox::title {{
     subcontrol-origin: margin;
+    /* "left" in both directions: Qt mirrors subcontrol-position under a
+       right-to-left layout, so "right" here flipped it back to the left. */
     subcontrol-position: top {title_side};
     {title_side}: 8px;
     top: 0px;
@@ -388,12 +422,19 @@ QComboBox QAbstractItemView {{
     selection-color: {on_accent};
     outline: 0;
 }}
+/* Prose text views (doctor detail, template descriptions, previews) keep
+   the UI font; only the log and code views are monospace. */
 QTextEdit {{
-    background-color: {log_bg};
-    border: 1px solid {border};
+    background-color: {input_bg};
+    border: 1px solid {input_border};
     border-radius: 8px;
     padding: 8px;
-    font-family: 'Cascadia Mono', 'Consolas', 'Noto Sans Mono', 'DejaVu Sans Mono', monospace;
+    color: {text};
+}}
+QTextEdit#logOutput, QPlainTextEdit#logOutput {{
+    background-color: {log_bg};
+    border: 1px solid {border};
+    font-family: {mono_family};
     font-size: {pt_log};
     color: {log_text};
 }}
@@ -405,10 +446,10 @@ QPlainTextEdit {{
     padding: 6px;
     color: {text};
 }}
-QPlainTextEdit#codeView {{
+QPlainTextEdit#codeView, QTextEdit#codeView {{
     background-color: {log_bg};
     border: 1px solid {border};
-    font-family: 'Cascadia Mono', 'Consolas', 'Noto Sans Mono', 'DejaVu Sans Mono', monospace;
+    font-family: {mono_family};
     font-size: {pt_log};
     color: {log_text};
 }}
@@ -472,6 +513,11 @@ QCheckBox::indicator:hover, QRadioButton::indicator:hover {{
 }}
 QCheckBox:focus, QRadioButton:focus {{
     color: {accent};
+}}
+/* Keyboard users could not tell which box had focus: the text tint alone
+   is invisible on a long form. Same ring as the buttons. */
+QCheckBox:focus::indicator, QRadioButton:focus::indicator {{
+    border: 2px solid {focus_ring};
 }}
 QProgressBar {{
     border: 1px solid {border};
@@ -760,11 +806,11 @@ QToolButton#logToggle:focus {{
     border: 1px solid {focus_ring};
 }}
 QLabel#logLastLine {{
-    font-family: 'Cascadia Mono', 'Consolas', 'Noto Sans Mono', 'DejaVu Sans Mono', monospace;
+    font-family: {mono_family};
     font-size: {pt_log};
     color: {muted};
 }}
-QTextEdit#logOutput {{
+QWidget#logPanel QTextEdit#logOutput {{
     border: none;
     border-radius: 0;
 }}
@@ -796,6 +842,17 @@ QLabel#noticeText {{
 QLabel#progressLabel {{
     font-size: {pt_small};
     color: {muted};
+}}
+/* The one primary action, and the doctor's readiness score: sized here so
+   the zoom shortcuts scale them with everything else. */
+QPushButton#successBtn[primary="true"], QPushButton#dangerBtn[primary="true"],
+QPushButton#primaryBtn[primary="true"] {{
+    font-size: {pt_primary};
+    font-weight: bold;
+}}
+QLabel#doctorScore {{
+    font-size: {pt_score};
+    font-weight: bold;
 }}
 /* The drag-and-drop overlay: a dashed frame over the whole content. */
 QWidget#dropOverlay {{
@@ -867,8 +924,12 @@ def render_theme(
     factor = clamp_scale(scale)
     values = dict(palette)
     values["font_family"] = font_family_css(locale)
+    values["mono_family"] = mono_family_css()
     rtl = _is_rtl(locale)
-    values["title_side"] = "right" if rtl else "left"
+    # Not mirrored by hand: Qt mirrors ``subcontrol-position`` under RTL, and
+    # "right" here used to flip the title back to the left ("double
+    # mirroring"). The key stays so the template reads the same.
+    values["title_side"] = "left"
     values["nav_border_side"] = "left" if rtl else "right"
     # "r, g, b" for the tinted notices (rgba() needs decimal channels).
     for key in ("accent", "warning", "danger", "success", "window_bg"):

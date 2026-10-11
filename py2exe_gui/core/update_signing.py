@@ -25,7 +25,16 @@ from dataclasses import dataclass
 from typing import Dict, Optional, Tuple
 
 from p2e_runtime import _ed25519
-from p2e_runtime.updates import UpdateError, check_url, parse_manifest, parse_version
+from p2e_runtime.updates import (
+    UpdateError,
+    check_url,
+    format_stamp,
+    parse_manifest,
+    parse_stamp,
+    parse_version,
+    utc_now,
+)
+from py2exe_gui.core.fsutil import sha256_of
 
 KEY_FORMAT = "p2e-ed25519-private-key-v1"
 KEY_FILE_NAME = "update_signing_key.json"
@@ -198,13 +207,8 @@ class PublishedUpdate:
 
 
 def file_digest(path: str) -> Tuple[str, int]:
-    digest = hashlib.sha256()
-    size = 0
-    with open(path, "rb") as f:
-        for chunk in iter(lambda: f.read(1024 * 1024), b""):
-            digest.update(chunk)
-            size += len(chunk)
-    return digest.hexdigest(), size
+    """SHA-256 and size of ``path`` (the two fields a manifest records)."""
+    return sha256_of(path), os.path.getsize(path)
 
 
 def manifest_bytes(manifest: Dict[str, object]) -> bytes:
@@ -213,14 +217,27 @@ def manifest_bytes(manifest: Dict[str, object]) -> bytes:
 
 
 def build_manifest(file_path: str, version: str, url: str, notes: str = "",
-                   min_version: str = "", app_name: str = "") -> Dict[str, object]:
-    """Describe ``file_path`` as an update. Raises ``ValueError`` on bad input."""
+                   min_version: str = "", app_name: str = "", issued: str = "",
+                   expires: str = "") -> Dict[str, object]:
+    """Describe ``file_path`` as an update. Raises ``ValueError`` on bad input.
+
+    ``issued`` defaults to now (UTC): the runtime refuses a manifest older
+    than the last one it accepted, so every manifest must carry it.
+    ``expires`` is optional and must be later than ``issued``.
+    """
+    issued = (issued or format_stamp(utc_now())).strip()
+    expires = (expires or "").strip()
     try:
         parse_version(version)
         if min_version:
             parse_version(min_version)
         check_url(url)
+        when = parse_stamp(issued, "issued")
+        if expires and parse_stamp(expires, "expires") <= when:
+            raise ValueError("'expires' must be later than 'issued'")
     except UpdateError as e:
+        if e.code == "bad_manifest":
+            raise ValueError(e.detail) from e
         raise ValueError(f"the download URL must start with https:// ({e.detail})") from e
     if not os.path.isfile(file_path):
         raise ValueError(f"no such file: {file_path}")
@@ -237,20 +254,25 @@ def build_manifest(file_path: str, version: str, url: str, notes: str = "",
         "size": size,
         "notes": notes,
         "min_version": min_version.strip(),
+        "issued": issued,
     })
+    if expires:
+        manifest["expires"] = expires
     return manifest
 
 
 def publish_update(file_path: str, version: str, url: str, key: SigningKey, notes: str = "",
                    min_version: str = "", app_name: str = "",
-                   output_dir: Optional[str] = None) -> PublishedUpdate:
+                   output_dir: Optional[str] = None, issued: str = "",
+                   expires: str = "") -> PublishedUpdate:
     """Write ``update.json`` and ``update.json.sig`` beside ``file_path``.
 
     Nothing is uploaded: the developer puts both files (and the new build)
     on their server. The signature is checked with the runtime's own
     verifier before anything is written.
     """
-    manifest = build_manifest(file_path, version, url, notes, min_version, app_name)
+    manifest = build_manifest(file_path, version, url, notes, min_version, app_name,
+                              issued=issued, expires=expires)
     data = manifest_bytes(manifest)
     signature = sign(key.seed, data)
     if not _ed25519.verify(bytes.fromhex(key.public_hex), data, signature):

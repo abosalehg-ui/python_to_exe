@@ -46,6 +46,7 @@ from py2exe_gui.core.fixes import (
     Finding,
     flag_fix,
 )
+from py2exe_gui.core.platform_support import resolve as resolve_platform
 from py2exe_gui.core.version_info import VersionInfo, parse_version_tuple
 
 NAME = "nuitka"
@@ -143,7 +144,7 @@ BUNDLE_PREFIX = re.compile(r"^.*?(?:[\\/][^\\/]+\.dist|[\\/]onefile_\d+_\d+_\w+)
 
 
 def _is_windows(platform: Optional[str]) -> bool:
-    return (platform if platform is not None else sys.platform).startswith("win")
+    return resolve_platform(platform).startswith("win")
 
 
 def _numeric_version(version: str) -> str:
@@ -187,8 +188,9 @@ class NuitkaEngine(Engine):
     def requirements(self, platform: Optional[str] = None) -> Tuple[str, ...]:
         # patchelf is on PyPI as a wheel carrying the binary; a real Linux
         # build failed without it.
-        plat = platform if platform is not None else sys.platform
-        return (REQUIREMENT, "patchelf") if plat.startswith("linux") else (REQUIREMENT,)
+        if resolve_platform(platform).startswith("linux"):
+            return (REQUIREMENT, "patchelf")
+        return (REQUIREMENT,)
 
     def version_env(self) -> Dict[str, str]:
         # ``--version`` checks for a newer release online unless told not to.
@@ -277,7 +279,7 @@ class NuitkaEngine(Engine):
         Kit's hook) are left out: ``unsupported_features`` reports them.
         """
         if not config.source or not os.path.isfile(config.source):
-            return None, "اختر ملف المصدر أولاً!"
+            return None, base.ERROR_SOURCE_MISSING
 
         windows = _is_windows(platform)
         root = self._root(config)

@@ -41,6 +41,26 @@ FEATURE_RUNTIME_KIT = "runtime_kit"
 FEATURE_SIZE_REPORT = "size_report"
 FEATURE_WARN_FILE = "warn_file"
 
+#: ``build_command`` error codes. Like findings, the engines return a code
+#: and the caller turns it into text (``describe_error``), so the core
+#: carries no language of its own.
+ERROR_SOURCE_MISSING = "source_missing"
+ERROR_CODES: Tuple[str, ...] = (ERROR_SOURCE_MISSING,)
+
+
+def describe_error(code: Optional[str]) -> str:
+    """The user-facing text for a ``build_command`` error code.
+
+    Unknown codes (or a message that is already text) come back as they are,
+    so a caller can pass whatever ``build_command`` returned.
+    """
+    if not code:
+        return ""
+    from py2exe_gui.strings import S
+
+    texts = {ERROR_SOURCE_MISSING: S.ERR_NO_SOURCE}
+    return texts.get(code, code)
+
 #: Every feature key, in the order a comparison table lists them.
 FEATURES: Tuple[str, ...] = (
     FEATURE_ONEFILE, FEATURE_ONEDIR, FEATURE_WINDOWED, FEATURE_ICON,

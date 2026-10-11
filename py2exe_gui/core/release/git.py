@@ -20,7 +20,21 @@ _FIELD, _RECORD = "\x1f", "\x1e"
 
 
 class GitError(Exception):
-    """A git command failed, or git is not installed."""
+    """A git command failed, or git is not installed. The message never holds
+    a credential embedded in a remote URL (``scrub_remote_credentials``)."""
+
+
+_URL_CREDENTIALS = re.compile(r"(?<=://)[^/@\s]+@")
+
+
+def scrub_remote_credentials(text: str) -> str:
+    """``https://user:token@host/...`` → ``https://***@host/...``.
+
+    git prints the remote URL, credentials included, in many of its error
+    messages ("fatal: unable to access 'https://x:ghp_...@github.com/...'"),
+    and the release pipeline shows those messages to the user and in logs.
+    """
+    return _URL_CREDENTIALS.sub("***@", text or "")
 
 
 @dataclass(frozen=True)
@@ -44,9 +58,10 @@ def run_git(args: List[str], cwd: str, runner: Optional[Runner] = None, timeout:
     except FileNotFoundError as e:
         raise GitError("git is not installed") from e
     except (OSError, subprocess.SubprocessError) as e:
-        raise GitError(str(e)) from e
+        raise GitError(scrub_remote_credentials(str(e))) from e
     if result.returncode != 0:
-        raise GitError((result.stderr or result.stdout or "").strip() or f"git {args[0]} failed")
+        message = (result.stderr or result.stdout or "").strip() or f"git {args[0]} failed"
+        raise GitError(scrub_remote_credentials(message))
     return result.stdout
 
 
@@ -93,8 +108,9 @@ def commits_since(cwd: str, tag: str = "", runner: Optional[Runner] = None) -> L
 def tag_commit(cwd: str, tag: str, runner: Optional[Runner] = None) -> str:
     """The commit ``tag`` points to, or '' when the tag does not exist."""
     try:
-        return run_git(["rev-parse", "-q", "--verify", f"refs/tags/{tag}^{{commit}}"],
-                       cwd, runner).strip()
+        # ``--end-of-options`` (git 2.24+): a tag name can never be read as an option.
+        return run_git(["rev-parse", "-q", "--verify", "--end-of-options",
+                        f"refs/tags/{tag}^{{commit}}"], cwd, runner).strip()
     except GitError:
         return ""
 
@@ -123,7 +139,7 @@ def commit_paths(cwd: str, paths: List[str], message: str,
 
 def create_tag(cwd: str, tag: str, message: str, runner: Optional[Runner] = None) -> str:
     """Create the annotated tag ``tag`` at HEAD. Returns the commit it points to."""
-    run_git(["tag", "-a", tag, "-m", message], cwd, runner)
+    run_git(["tag", "-a", "-m", message, "--end-of-options", tag], cwd, runner)
     return tag_commit(cwd, tag, runner)
 
 

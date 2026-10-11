@@ -1,90 +1,58 @@
 """Background thread that runs the build engine and streams output to the UI."""
 
-import subprocess
 from datetime import datetime
+from typing import Dict, Optional
 
-from py2exe_gui.core.build_stages import BuildStageTracker
-from py2exe_gui.qt import QThread, Signal
+from py2exe_gui.qt import Signal
 from py2exe_gui.strings import S
+from py2exe_gui.ui.streaming_thread import CANCELLED, OK, StreamingProcessThread
 
 
-class ConversionThread(QThread):
+class ConversionThread(StreamingProcessThread):
     """خيط منفصل لعملية التحويل."""
 
-    log_signal = Signal(str)
-    progress_signal = Signal(int)
-    # Stage key from build_stages, so the window can label the progress bar.
-    stage_signal = Signal(str)
-    finished_signal = Signal(bool, str)
+    #: (succeeded, message for the notice, outcome code — see streaming_thread)
+    finished_signal = Signal(bool, str, str)
 
-    def __init__(self, command, output_dir, stages=None, popen_kwargs=None):
+    def __init__(self, command, output_dir, engine: str = "pyinstaller",
+                 popen_kwargs: Optional[Dict] = None):
         super().__init__()
         self.command = command
         self.output_dir = output_dir
-        self.process = None
-        self.is_cancelled = False
-        # The engine's phases (PyInstaller's by default) and how to start it
-        # (Nuitka: stdin closed, the build interpreter's folder on PATH).
-        self.stages = BuildStageTracker(stages)
+        # The engine's phases label the progress bar; ``popen_kwargs`` is
+        # what ``build_runner.popen_options`` returned for it (the build
+        # interpreter's environment; stdin policy is re-derived from the name).
+        self.engine = engine
         self.popen_kwargs = dict(popen_kwargs or {})
 
     def run(self):
-        try:
+        self.log_signal.emit("═" * 60)
+        self.log_signal.emit(
+            S.CONV_START.format(time=datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
+        )
+        self.log_signal.emit("═" * 60)
+        self.log_signal.emit(S.CONV_COMMAND.format(cmd=" ".join(self.command)))
+        self.log_signal.emit("─" * 60)
+
+        # Progress follows the phase the engine announces rather than counting
+        # how many lines it happened to print. See build_stages.
+        code = self.stream(self.command, self.output_dir, engine=self.engine,
+                           env=self.popen_kwargs.get("env"), track_stages=True)
+
+        if code == CANCELLED:
+            self.finished_signal.emit(False, S.CONV_CANCELLED, code)
+            return
+        if code == OK:
+            self.progress_signal.emit(100)
+            self.log_signal.emit("\n" + "═" * 60)
+            self.log_signal.emit(S.CONV_SUCCESS)
             self.log_signal.emit("═" * 60)
-            self.log_signal.emit(
-                S.CONV_START.format(time=datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
-            )
-            self.log_signal.emit("═" * 60)
-            self.log_signal.emit(S.CONV_COMMAND.format(cmd=" ".join(self.command)))
-            self.log_signal.emit("─" * 60)
-
-            self.process = subprocess.Popen(
-                self.command,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.STDOUT,
-                text=True,
-                bufsize=1,
-                universal_newlines=True,
-                cwd=self.output_dir,
-                **self.popen_kwargs,
-            )
-
-            # Progress now follows the phase PyInstaller announces rather than
-            # counting how many lines it happened to print. See build_stages.
-            last_stage = self.stages.stage
-            for line in self.process.stdout:
-                if self.is_cancelled:
-                    self.process.terminate()
-                    self.finished_signal.emit(False, S.CONV_CANCELLED)
-                    return
-
-                self.log_signal.emit(line.strip())
-
-                if self.stages.feed(line):
-                    self.progress_signal.emit(self.stages.percent)
-                    if self.stages.stage != last_stage:
-                        last_stage = self.stages.stage
-                        self.stage_signal.emit(last_stage)
-
-            self.process.wait()
-
-            if self.process.returncode == 0:
-                self.progress_signal.emit(100)
-                self.log_signal.emit("\n" + "═" * 60)
-                self.log_signal.emit(S.CONV_SUCCESS)
-                self.log_signal.emit("═" * 60)
-                self.finished_signal.emit(True, S.CONV_SUCCESS)
-            else:
-                self.log_signal.emit("\n" + "═" * 60)
-                self.log_signal.emit(S.CONV_FAILED)
-                self.log_signal.emit("═" * 60)
-                self.finished_signal.emit(False, S.CONV_FAILED_MSG)
-
-        except Exception as e:
-            self.log_signal.emit(S.CONV_ERROR.format(error=str(e)))
-            self.finished_signal.emit(False, str(e))
-
-    def cancel(self):
-        self.is_cancelled = True
-        if self.process:
-            self.process.terminate()
+            self.finished_signal.emit(True, S.CONV_SUCCESS, code)
+            return
+        if self.error:
+            # The engine could not be started at all (missing interpreter…).
+            self.log_signal.emit(S.CONV_ERROR.format(error=self.error))
+        self.log_signal.emit("\n" + "═" * 60)
+        self.log_signal.emit(S.CONV_FAILED)
+        self.log_signal.emit("═" * 60)
+        self.finished_signal.emit(False, S.CONV_FAILED_MSG, code)

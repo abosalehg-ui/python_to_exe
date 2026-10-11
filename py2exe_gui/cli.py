@@ -255,18 +255,21 @@ def _load(args, console: Console):
 
 def _review_untrusted(project, console: Console) -> None:
     """The dangerous-settings confirmation, as for a shared JSON file."""
-    from py2exe_gui.core.project_file import untrusted_flags
+    from py2exe_gui.core.project_file import split_untrusted_flags, untrusted_flags
     from py2exe_gui.core.runtime_kit import untrusted_risks
     from py2exe_gui.core.update_signing import read_public_key
     from py2exe_gui.strings import S
 
     lines = []
-    flags = untrusted_flags(project.build)
+    flags, files = split_untrusted_flags(untrusted_flags(project.build))
     if flags:
         lines.append(S.MSG_DANGEROUS_ARGS_CONFIRM.format(
             flags="\n".join(f"  • {f}" for f in flags),
             args=project.build.extra_args or project.build.upx_dir,
         ))
+    if files:
+        lines.append(S.MSG_UNTRUSTED_EXTRA_FILES_CONFIRM.format(
+            files="\n".join(f"  • {f}" for f in files)))
     risks = untrusted_risks(project.build.runtime_kit, read_public_key(_signing_key_path()))
     for risk in risks:
         lines.append(getattr(S, f"KIT_RISK_{risk.code.upper()}").format(**risk.params))
@@ -707,8 +710,13 @@ def cmd_env(args, console: Console) -> int:
     if not env_exists(env_dir):
         raise CliExit(EXIT_FAILED, S.CLI_ENV_NONE.format(path=env_dir))
     if args.action == "lock":
-        result = subprocess.run(freeze_command(env_python(env_dir), find_uv()),
-                                capture_output=True, text=True, timeout=120)
+        try:
+            result = subprocess.run(freeze_command(env_python(env_dir), find_uv()),
+                                    capture_output=True, text=True, timeout=120)
+        except (OSError, subprocess.SubprocessError) as e:
+            # A missing or hung interpreter is a tool problem, not a traceback.
+            raise CliExit(EXIT_TOOL,
+                          S.LOG_ENV_LOCK_FAILED.format(error=str(e)[:300])) from None
         if result.returncode != 0:
             raise CliExit(EXIT_FAILED, S.LOG_ENV_LOCK_FAILED.format(
                 error=(result.stderr or "").strip()[:300]))
@@ -749,6 +757,30 @@ def _print_plan(results, console: Console) -> None:
             console.print(title)
             for item in items:
                 console.print(f"  • {item}")
+
+
+def _confirm_foreign_api(api_url: str, console: Console) -> None:
+    """A release to an API host other than api.github.com sends the stored
+    token there. ``--yes`` is not enough for that: a person must answer, in
+    a terminal, unless the token came from ``GITHUB_TOKEN`` (the caller
+    chose both the host and the token, as a CI job does)."""
+    import urllib.parse
+
+    from py2exe_gui.core.release import credentials
+    from py2exe_gui.strings import S
+
+    host = (urllib.parse.urlsplit(api_url or "").hostname or "").lower()
+    if host == "api.github.com":
+        return
+    token = credentials.find_token()
+    if token and token.source == "env":
+        return
+    console.print(S.CLI_RELEASE_FOREIGN_API_CONFIRM.format(host=host or api_url))
+    if not console.interactive:
+        raise CliExit(EXIT_CONSENT, S.CLI_CONSENT_NEEDED)
+    answer = console._ask(S.CLI_CONSENT_PROMPT).strip().lower()
+    if answer not in ("y", "yes", "ن", "نعم"):
+        raise CliExit(EXIT_CONSENT, S.CLI_DECLINED)
 
 
 def cmd_release(args, console: Console) -> int:
@@ -807,6 +839,9 @@ def cmd_release(args, console: Console) -> int:
         fresh = load_project(loaded.path).project
         return ReleaseContext(fresh, options(dry_run), project_path=loaded.path, python=python,
                               log=console.print, texts=runtime_texts(), rtl=is_rtl())
+
+    if not args.dry_run and not args.no_publish:
+        _confirm_foreign_api(args.api_url, console)
 
     console.print(S.CLI_RELEASE_PLAN.format(version=version))
     plan = run_release(context(dry_run=True))

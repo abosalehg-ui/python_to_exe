@@ -17,6 +17,7 @@ from py2exe_gui.qt import (
 from py2exe_gui.strings import En, S, set_locale  # noqa: E402
 from tests.conftest import MemoryKeyring  # noqa: E402
 from tests.test_size_analyzer import make_build  # noqa: E402
+from tests.test_ui_main_window import SyncCommandThread  # noqa: E402
 
 pytestmark = pytest.mark.gui
 
@@ -215,9 +216,22 @@ def test_env_failure_is_reported(window, tmp_path, monkeypatch):
     answer(monkeypatch, "critical", QMessageBox.StandardButton.Ok, shown)
     started = []
     monkeypatch.setattr(window, "start_conversion", lambda: started.append(True))
-    window._on_env_finished(type("P", (), {"python": "x"})(), False, [], "boom", True)
-    assert "boom" in shown[0]
+    window.env_thread = type("T", (), {"returncode": 7, "error": "", "isRunning": lambda s: False})()
+    window._on_env_finished(type("P", (), {"python": "x"})(), False, [], "failed", True)
+    # The dialog is one sentence; the exit code and pip output are in the log.
+    assert shown[0] == S.MSG_ENV_FAILED
+    assert S.THREAD_ERR_FAILED_FMT.format(tool="pip", code=7) in window.main_tab.log_text()
     assert started == []
+    assert not window.progress_bar.isVisibleTo(window)
+
+
+def test_cancelled_env_shows_no_dialog(window, tmp_path, monkeypatch):
+    window.main_tab.source_input.setText(make_source(tmp_path))
+    shown = []
+    answer(monkeypatch, "critical", QMessageBox.StandardButton.Ok, shown)
+    window._on_env_finished(type("P", (), {"python": "x"})(), False, [], "cancelled", False)
+    assert shown == []
+    assert S.THREAD_ERR_CANCELLED in window.main_tab.log_text()
 
 
 def test_partial_install_names_the_failures(window, tmp_path):
@@ -240,11 +254,14 @@ def test_save_lock(window, tmp_path, monkeypatch):
     fake_env(window, source)
     window.main_tab.source_input.setText(source)
     freeze = "PyYAML==6.0.1\npyinstaller==6.22.3\n"
+    # pip freeze runs on a CommandThread now; the thread's subprocess is faked.
+    monkeypatch.setattr("py2exe_gui.ui.main_window.CommandThread", SyncCommandThread)
     monkeypatch.setattr(
-        "py2exe_gui.ui.main_window.subprocess.run",
-        lambda cmd, **_k: subprocess.CompletedProcess(cmd, 0, stdout=freeze, stderr=""),
+        "py2exe_gui.ui.env_thread.CommandThread.runner",
+        staticmethod(lambda cmd, **_k: subprocess.CompletedProcess(cmd, 0, stdout=freeze, stderr="")),
     )
     window.save_env_lock()
+    assert not window.progress_bar.isVisibleTo(window)
     lock = os.path.join(os.path.dirname(source), "p2e-build.lock")
     content = open(lock).read()
     assert "PyYAML==6.0.1" in content and "pyinstaller" not in content

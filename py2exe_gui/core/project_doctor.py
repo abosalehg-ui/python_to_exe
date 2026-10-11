@@ -241,6 +241,12 @@ def _check_missing_packages(third_party, is_installed, knowledge_path) -> List[F
 def _check_knowledge(
     third_party, config, project_dir, windowed, is_installed, knowledge_path
 ) -> List[Finding]:
+    """What the knowledge base knows about each imported package.
+
+    Packages that need ``--collect-data``, carry a data folder, print to the
+    console, are huge, or are a second Qt binding: each entry becomes a
+    finding with the ready-made fix, skipped when the config already has it.
+    """
     knowledge = load_knowledge(knowledge_path)
     findings: List[Finding] = []
 
@@ -349,6 +355,13 @@ def _relative_data_target(literal: str, project_dir: str, source: str) -> str:
 
 
 def _check_data_files(tree, code, config, project_dir, source) -> List[Finding]:
+    """Files the code opens by a relative path that the build will not bundle.
+
+    A string literal naming something that exists next to the script
+    (``"data/config.json"``) is a data file; if no ``extra_files`` entry
+    covers it the EXE will not find it, and if it is read relative to the
+    working directory it fails from a shortcut even when bundled.
+    """
     targets = {}
     for literal in _string_literals(tree):
         top = _relative_data_target(literal, project_dir, source)
@@ -511,6 +524,11 @@ def _check_entry_point(tree, source, project_dir) -> List[Finding]:
 
 
 def _check_icon(config) -> List[Finding]:
+    """Whether the icon file is a real ``.ico`` with more than one size.
+
+    PyInstaller accepts a PNG renamed to ``.ico`` only to fail at the end of
+    the build, and a single-size icon looks blurred in the taskbar.
+    """
     icon = config.icon
     if not icon or not os.path.isfile(icon):
         return []

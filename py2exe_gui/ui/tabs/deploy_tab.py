@@ -14,7 +14,13 @@ from py2exe_gui.qt import (
     QVBoxLayout,
 )
 from py2exe_gui.strings import S
-from py2exe_gui.ui.tabs.base import BaseTab, browse_button, platform_notice, scrolled_layout
+from py2exe_gui.ui.tabs.base import (
+    BaseTab,
+    browse_button,
+    labelled,
+    platform_notice,
+    scrolled_layout,
+)
 
 
 class DeployTab(BaseTab):
@@ -32,9 +38,9 @@ class DeployTab(BaseTab):
         # ── Splash ──
         splash_group = QGroupBox(S.GROUP_SPLASH)
         splash_layout = QHBoxLayout(splash_group)
-        splash_layout.addWidget(QLabel(S.SPLASH_LABEL))
         self.splash_input = QLineEdit()
         self.splash_input.setPlaceholderText(S.SPLASH_PLACEHOLDER)
+        splash_layout.addWidget(labelled(S.SPLASH_LABEL, self.splash_input))
         splash_btn = browse_button(S.DIALOG_CHOOSE_SPLASH, self.browse_splash_image)
         splash_layout.addWidget(self.splash_input, stretch=4)
         splash_layout.addWidget(splash_btn, stretch=1)
@@ -79,6 +85,33 @@ class DeployTab(BaseTab):
         self.signing_enable = QCheckBox(S.SIGNING_ENABLE)
         signing_layout.addWidget(self.signing_enable, 1, 0, 1, 3)
 
+        # Widgets are created in their visual order (rows 2 → 7): Qt's default
+        # tab order is creation order, and the store-mode row used to be
+        # created before the certificate rows, so Tab jumped from "enable" to
+        # the bottom of the group and back up.
+        self.signing_cert = QLineEdit()
+        self.signing_cert.setPlaceholderText(S.SIGNING_CERT_PLACEHOLDER)
+        signing_layout.addWidget(labelled(S.SIGNING_CERT_LABEL, self.signing_cert), 2, 0)
+        signing_layout.addWidget(self.signing_cert, 2, 1)
+        cert_btn = browse_button(S.DIALOG_CHOOSE_CERT, self.browse_signing_cert)
+        signing_layout.addWidget(cert_btn, 2, 2)
+
+        self.signing_password = QLineEdit()
+        self.signing_password.setEchoMode(QLineEdit.EchoMode.Password)
+        self.signing_password.setPlaceholderText(S.SIGNING_PASSWORD_PLACEHOLDER)
+        signing_layout.addWidget(labelled(S.SIGNING_PASSWORD_LABEL, self.signing_password), 3, 0)
+        signing_layout.addWidget(self.signing_password, 3, 1, 1, 2)
+
+        self.signing_timestamp = QLineEdit("http://timestamp.digicert.com")
+        signing_layout.addWidget(labelled(S.SIGNING_TIMESTAMP_LABEL, self.signing_timestamp),
+                                 4, 0)
+        signing_layout.addWidget(self.signing_timestamp, 4, 1, 1, 2)
+
+        self.signing_description = QLineEdit()
+        self.signing_description.setPlaceholderText(S.SIGNING_DESC_PLACEHOLDER)
+        signing_layout.addWidget(labelled(S.SIGNING_DESC_LABEL, self.signing_description), 5, 0)
+        signing_layout.addWidget(self.signing_description, 5, 1, 1, 2)
+
         # Store mode keeps the certificate password off the command line,
         # where any process running as the same user could read it.
         self.signing_use_store = QCheckBox(S.SIGNING_USE_STORE)
@@ -86,33 +119,11 @@ class DeployTab(BaseTab):
         self.signing_use_store.toggled.connect(self._on_signing_mode_changed)
         signing_layout.addWidget(self.signing_use_store, 6, 0, 1, 3)
 
-        self.signing_subject_label = QLabel(S.SIGNING_SUBJECT_LABEL)
         self.signing_subject = QLineEdit()
         self.signing_subject.setPlaceholderText(S.SIGNING_SUBJECT_PLACEHOLDER)
+        self.signing_subject_label = labelled(S.SIGNING_SUBJECT_LABEL, self.signing_subject)
         signing_layout.addWidget(self.signing_subject_label, 7, 0)
         signing_layout.addWidget(self.signing_subject, 7, 1, 1, 2)
-
-        signing_layout.addWidget(QLabel(S.SIGNING_CERT_LABEL), 2, 0)
-        self.signing_cert = QLineEdit()
-        self.signing_cert.setPlaceholderText(S.SIGNING_CERT_PLACEHOLDER)
-        cert_btn = browse_button(S.DIALOG_CHOOSE_CERT, self.browse_signing_cert)
-        signing_layout.addWidget(self.signing_cert, 2, 1)
-        signing_layout.addWidget(cert_btn, 2, 2)
-
-        signing_layout.addWidget(QLabel(S.SIGNING_PASSWORD_LABEL), 3, 0)
-        self.signing_password = QLineEdit()
-        self.signing_password.setEchoMode(QLineEdit.EchoMode.Password)
-        self.signing_password.setPlaceholderText(S.SIGNING_PASSWORD_PLACEHOLDER)
-        signing_layout.addWidget(self.signing_password, 3, 1, 1, 2)
-
-        signing_layout.addWidget(QLabel(S.SIGNING_TIMESTAMP_LABEL), 4, 0)
-        self.signing_timestamp = QLineEdit("http://timestamp.digicert.com")
-        signing_layout.addWidget(self.signing_timestamp, 4, 1, 1, 2)
-
-        signing_layout.addWidget(QLabel(S.SIGNING_DESC_LABEL), 5, 0)
-        self.signing_description = QLineEdit()
-        self.signing_description.setPlaceholderText(S.SIGNING_DESC_PLACEHOLDER)
-        signing_layout.addWidget(self.signing_description, 5, 1, 1, 2)
 
         layout.addWidget(signing_group)
 
@@ -121,10 +132,10 @@ class DeployTab(BaseTab):
         smoke_layout = QGridLayout(smoke_group)
         self.smoke_enable = QCheckBox(S.SMOKE_ENABLE)
         smoke_layout.addWidget(self.smoke_enable, 0, 0, 1, 2)
-        smoke_layout.addWidget(QLabel(S.SMOKE_TIMEOUT_LABEL), 1, 0)
         self.smoke_timeout = QSpinBox()
         self.smoke_timeout.setRange(1, 60)
         self.smoke_timeout.setValue(5)
+        smoke_layout.addWidget(labelled(S.SMOKE_TIMEOUT_LABEL, self.smoke_timeout), 1, 0)
         smoke_layout.addWidget(self.smoke_timeout, 1, 1)
         layout.addWidget(smoke_group)
 

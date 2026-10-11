@@ -95,6 +95,18 @@ def windows_version(version: str) -> str:
     return f"{v.major}.{v.minor}.{v.patch}.0"
 
 
+#: What a tag prefix may be made of. It is handed to ``git tag`` and used in
+#: ``refs/tags/<prefix><version>``, release URLs and the workflow file, so it
+#: must stay a plain name: no spaces, quotes or shell characters, and never
+#: a leading ``-`` that git could read as an option.
+TAG_PREFIX_RE = re.compile(r"^[A-Za-z0-9._/-]*$")
+
+
+def is_valid_tag_prefix(prefix: str) -> bool:
+    # fullmatch: ``$`` alone would still accept a trailing newline.
+    return bool(TAG_PREFIX_RE.fullmatch(prefix or "")) and not (prefix or "").startswith("-")
+
+
 def tag_for(version: str, prefix: str = "v") -> str:
     return f"{prefix}{normalize(version)}"
 

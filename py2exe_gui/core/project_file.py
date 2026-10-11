@@ -32,6 +32,7 @@ from py2exe_gui.core import toml_writer
 from py2exe_gui.core.builder import find_dangerous_args
 from py2exe_gui.core.code_signer import SigningConfig
 from py2exe_gui.core.config import DEFAULT_ENGINE, KNOWN_ENGINES, BuildConfig, RuntimeKitConfig
+from py2exe_gui.core.dictfields import section_from_dict, type_ok
 from py2exe_gui.core.installer import InstallerConfig
 from py2exe_gui.core.manifest_generator import ManifestConfig
 from py2exe_gui.core.version_info import VersionInfo
@@ -282,48 +283,10 @@ def _section_to_dict(obj: Any) -> dict:
     return out
 
 
-def _type_ok(default: Any, value: Any) -> bool:
-    if isinstance(default, bool):
-        return isinstance(value, bool)
-    if isinstance(default, int):
-        return isinstance(value, int) and not isinstance(value, bool)
-    if isinstance(default, str):
-        return isinstance(value, str)
-    if isinstance(default, list):
-        return isinstance(value, list) and all(isinstance(v, str) for v in value)
-    return False
-
-
-def _section_from_dict(defaults: Any, data: dict, where: str, warnings: List[str],
-                       skip: Tuple[str, ...] = ()) -> Any:
-    """A copy of ``defaults`` with the values of ``data`` that have the right type.
-
-    Lenient on missing keys (defaults stay), strict on types (a wrong type is
-    dropped and reported), unknown keys reported.
-    """
-    known = {f.name for f in fields(defaults)}
-    values = {}
-    for f in fields(defaults):
-        if f.name in skip or f.name not in data:
-            continue
-        default = getattr(defaults, f.name)
-        value = data[f.name]
-        if hasattr(default, "__dataclass_fields__"):
-            if isinstance(value, dict):
-                values[f.name] = _section_from_dict(default, value, f"{where}.{f.name}", warnings)
-            else:
-                warnings.append(f"{where}.{f.name}: expected a table")
-        elif _type_ok(default, value):
-            values[f.name] = list(value) if isinstance(value, list) else value
-        else:
-            warnings.append(f"{where}.{f.name}: wrong type ({type(value).__name__}), ignored")
-    for key in data:
-        if key not in known:
-            warnings.append(f"{where}.{key}: unknown setting, ignored")
-    result = type(defaults)(**{f.name: getattr(defaults, f.name) for f in fields(defaults)})
-    for name, value in values.items():
-        setattr(result, name, value)
-    return result
+# The generic typed-dataclass loader lives in core/dictfields.py (a leaf), so
+# the JSON settings path and this TOML path reject the same wrong types.
+_type_ok = type_ok
+_section_from_dict = section_from_dict
 
 
 # ── Paths ─────────────────────────────────────────────────────────────────
@@ -435,16 +398,56 @@ def check_untrusted_content(data: Any, path: str = "") -> None:
         raise ProjectFileError("secret_value", path)
 
 
+#: Marker prefix for an ``extra_files`` entry that reaches outside the project.
+EXTRA_FILES_MARKER = "extra_files:"
+
+
 def untrusted_flags(build: BuildConfig) -> List[str]:
-    """Settings in a shared file that would make the build run its code.
+    """Settings in a shared file that would make the build run its code, or
+    bundle something the author of the file did not ship with it.
 
     The flags inside ``extra_args``, plus ``upx_dir``: UPX is an executable,
-    and that field chooses the folder it is run from.
+    and that field chooses the folder it is run from. Then one
+    ``extra_files:<path>`` marker per ``extra_files`` entry that is absolute
+    or resolves outside the project folder (the folder of ``build.source``):
+    such an entry copies whatever is at that path on *this* machine — a key
+    file, ``~/.ssh`` — into the program, which a shared file must not be
+    able to do unnoticed.
     """
     flags = find_dangerous_args(build.extra_args)
     if build.upx and build.upx_dir.strip() and "--upx-dir" not in flags:
         flags.append("--upx-dir")
+    flags += [EXTRA_FILES_MARKER + path for path in extra_files_outside_project(build)]
     return flags
+
+
+def split_untrusted_flags(flags: List[str]) -> Tuple[List[str], List[str]]:
+    """``untrusted_flags`` output as ``(code_running_flags, outside_paths)``."""
+    plain = [f for f in flags if not f.startswith(EXTRA_FILES_MARKER)]
+    files = [f[len(EXTRA_FILES_MARKER):] for f in flags if f.startswith(EXTRA_FILES_MARKER)]
+    return plain, files
+
+
+def extra_files_outside_project(build: BuildConfig) -> List[str]:
+    """The ``extra_files`` entries that do not live under the project folder."""
+    source = (build.source or "").strip()
+    root = os.path.realpath(os.path.dirname(os.path.abspath(source))) if source else ""
+    outside = []
+    for entry in build.extra_files:
+        entry = (entry or "").strip()
+        if not entry:
+            continue
+        if not root:
+            # No project folder to measure against: only an absolute path can
+            # be judged, and it points somewhere the file's author chose.
+            if os.path.isabs(entry) or os.path.splitdrive(entry)[0]:
+                outside.append(entry)
+            continue
+        target = os.path.realpath(entry if os.path.isabs(entry) else os.path.join(root, entry))
+        if os.path.normcase(target) != os.path.normcase(root) and not os.path.normcase(
+                target).startswith(os.path.normcase(root) + os.sep):
+            outside.append(entry)
+    return outside
 
 
 # ── Schema versions ───────────────────────────────────────────────────────

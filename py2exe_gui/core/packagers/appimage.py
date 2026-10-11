@@ -21,13 +21,13 @@ has no reason to go online. It is run with ``APPIMAGE_EXTRACT_AND_RUN=1`` so
 it works where FUSE is unavailable (containers, CI runners).
 """
 
-import hashlib
 import os
 import shutil
-import urllib.request
 from typing import Callable, List, Optional, Tuple
 
+from p2e_runtime.updates import build_opener
 from py2exe_gui.core.fixes import SEVERITY_ERROR, Finding
+from py2exe_gui.core.fsutil import sha256_of  # noqa: F401 - the public name callers import
 from py2exe_gui.core.packagers.base import (
     Log,
     Packager,
@@ -53,8 +53,11 @@ RUNTIME_URL = ("https://github.com/AppImage/type2-runtime/releases/download/"
                "continuous/runtime-{arch}")
 APPIMAGETOOL_ARCHES = ("x86_64", "aarch64")
 #: SHA-256 of the files as downloaded when this code was written (2026-10-10,
-#: appimagetool "continuous build (git version 854e19e), build 313"). A newer
-#: continuous build will differ: the digest is reported, never used to refuse.
+#: appimagetool "continuous build (git version 854e19e), build 313"). A
+#: download whose digest differs from the recorded one is **deleted and
+#: refused** unless the caller passed ``allow_unverified=True`` after asking
+#: the user: a newer continuous build is the likely cause, but so is a
+#: replaced release asset, and the two cannot be told apart from here.
 KNOWN_DIGESTS = {
     "x86_64": "95cbe7cce9717fce90c484e34052ee7c7f1d7635b33c12525b4776826a7d29b6",
 }
@@ -62,6 +65,16 @@ KNOWN_RUNTIME_DIGESTS = {
     "x86_64": "156f4bdbde9c52d01814600013e0a273f0118dc2de98975f3c8c63427ec79074",
 }
 _READ_CHUNK = 1024 * 1024
+
+
+def safe_urlopen(url: str, timeout: float):
+    """Open ``url`` with the runtime's hardened opener: HTTPS only, certificate
+    verification, and a redirect to ``http://`` is refused instead of followed.
+
+    The default ``urllib.request.urlopen`` would happily follow such a
+    downgrade for an executable this tool then runs.
+    """
+    return build_opener().open(url, timeout=timeout)
 
 
 def appimage_arch(machine: str) -> str:
@@ -125,54 +138,74 @@ def find_appimagetool(env: Optional[dict] = None, tools_dir: str = "",
     return ""
 
 
-def sha256_of(path: str) -> str:
-    digest = hashlib.sha256()
-    with open(path, "rb") as f:
-        for chunk in iter(lambda: f.read(_READ_CHUNK), b""):
-            digest.update(chunk)
-    return digest.hexdigest()
-
-
-def _fetch(url: str, target: str, log: Log, urlopen: Callable, timeout: float) -> str:
+def _fetch(url: str, target: str, log: Log, urlopen: Callable, timeout: float,
+           known: Optional[str] = None, allow_unverified: bool = False) -> str:
     """Download ``url`` to ``target`` through a temporary name (a cut download
-    leaves nothing that looks like a tool); returns the SHA-256."""
+    leaves nothing that looks like a tool); returns the SHA-256.
+
+    With a ``known`` digest, a file that does not match is removed and
+    ``ValueError`` is raised, unless ``allow_unverified``: an executable this
+    tool will run must never be kept on disk by accident.
+    """
+    if not url.lower().startswith("https://"):
+        raise ValueError(f"appimagetool: refusing a non-HTTPS download: {url}")
     os.makedirs(os.path.dirname(target) or ".", exist_ok=True)
     temp = target + ".part"
     log(f"GET {url}")
-    with urlopen(url, timeout=timeout) as response, open(temp, "wb") as f:
-        shutil.copyfileobj(response, f)
-    digest = sha256_of(temp)
+    try:
+        with urlopen(url, timeout=timeout) as response, open(temp, "wb") as f:
+            shutil.copyfileobj(response, f)
+        digest = sha256_of(temp)
+        if known is not None and digest != known and not allow_unverified:
+            raise ValueError(
+                f"appimagetool: sha256 mismatch for {os.path.basename(target)}: "
+                f"got {digest}, expected {known}"
+            )
+    except BaseException:
+        _remove_quietly(temp)
+        raise
     os.chmod(temp, 0o755)
     os.replace(temp, target)
     log(f"sha256 {digest} ({os.path.getsize(target)} bytes) {os.path.basename(target)}")
+    if known is not None and digest != known:
+        log(f"{os.path.basename(target)}: sha256 differs from the one recorded when this "
+            f"version was written ({known[:12]}…); kept because the user accepted it")
     return digest
 
 
+def _remove_quietly(path: str) -> None:
+    try:
+        os.remove(path)
+    except OSError:
+        pass
+
+
 def download_appimagetool(tools_dir: str, log: Log = lambda _m: None,
-                          machine: str = "", urlopen: Callable = urllib.request.urlopen,
+                          machine: str = "", urlopen: Callable = safe_urlopen,
                           timeout: float = 120, env: Optional[dict] = None,
+                          allow_unverified: bool = False,
                           ) -> Tuple[str, str, Optional[bool]]:
     """Fetch what is missing of ``appimagetool`` and its runtime into
     ``tools_dir``. Only ever called after the user said yes.
 
     Returns ``(tool_path, sha256, matches_known)`` for the tool, where
     ``matches_known`` is None when no digest is recorded for this
-    architecture (or the tool was already there).
+    architecture (or the tool was already there). When a digest is recorded
+    and the download differs, the file is deleted and ``ValueError`` raised,
+    unless ``allow_unverified`` (the user accepted an unverified build).
     """
     digest, matches = "", None
+    arch = appimage_arch(machine)
     tool = find_appimagetool(env, tools_dir, machine)
     if not tool:
         tool = appimagetool_target(tools_dir, machine)
-        digest = _fetch(appimagetool_url(machine), tool, log, urlopen, timeout)
-        known = KNOWN_DIGESTS.get(appimage_arch(machine))
+        known = KNOWN_DIGESTS.get(arch)
+        digest = _fetch(appimagetool_url(machine), tool, log, urlopen, timeout, known,
+                        allow_unverified)
         matches = None if known is None else digest == known
     if not find_runtime(env, tools_dir, machine):
-        got = _fetch(runtime_url(machine), runtime_target(tools_dir, machine), log, urlopen,
-                     timeout)
-        known = KNOWN_RUNTIME_DIGESTS.get(appimage_arch(machine))
-        if known is not None and got != known:
-            log(f"runtime: sha256 differs from the one recorded when this version was "
-                f"written ({known[:12]}…): a newer continuous build")
+        _fetch(runtime_url(machine), runtime_target(tools_dir, machine), log, urlopen, timeout,
+               KNOWN_RUNTIME_DIGESTS.get(arch), allow_unverified)
     return tool, digest, matches
 
 

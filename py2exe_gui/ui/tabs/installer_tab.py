@@ -11,20 +11,24 @@ from py2exe_gui.qt import (
     QLabel,
     QLineEdit,
     QPushButton,
-    QScrollArea,
     QVBoxLayout,
     QWidget,
 )
-from py2exe_gui.strings import S
-from py2exe_gui.ui.tabs.base import BaseTab, browse_button, platform_notice
+from py2exe_gui.strings import LOCALE_NATIVE_NAMES, S
+from py2exe_gui.ui.tabs.base import (
+    BaseTab,
+    browse_button,
+    labelled,
+    platform_notice,
+    scrolled_layout,
+)
 
 
 class InstallerTab(BaseTab):
     """Turns the built application into a distributable Setup.exe."""
 
     def _build(self):
-        inner = QWidget()
-        layout = QVBoxLayout(inner)
+        layout = scrolled_layout(self)
 
         # ISCC.exe produces a Windows Setup.exe and only runs on Windows.
         notice = platform_notice(INSTALLER)
@@ -65,7 +69,7 @@ class InstallerTab(BaseTab):
                 (S.INST_APPID_LABEL, self.inst_app_id),
             ]
         ):
-            identity_grid.addWidget(QLabel(label), row, 0)
+            identity_grid.addWidget(labelled(label, widget), row, 0)
             identity_grid.addWidget(widget, row, 1)
         layout.addWidget(identity)
 
@@ -92,7 +96,7 @@ class InstallerTab(BaseTab):
             (S.INST_SETUP_ICON_LABEL, self.inst_setup_icon, self.browse_installer_icon),
         ]
         for row, (label, widget, handler) in enumerate(browse_rows):
-            output_grid.addWidget(QLabel(label), row, 0)
+            output_grid.addWidget(labelled(label, widget), row, 0)
             output_grid.addWidget(widget, row, 1)
             if handler is not None:
                 btn = browse_button(label, handler, folder=widget is self.inst_out_dir)
@@ -103,22 +107,22 @@ class InstallerTab(BaseTab):
         options = QGroupBox(S.GROUP_INSTALLER_OPTIONS)
         options_grid = QGridLayout(options)
 
-        options_grid.addWidget(QLabel(S.INST_PRIVILEGES_LABEL), 0, 0)
         self.inst_privileges = QComboBox()
         self.inst_privileges.addItem(S.INST_PRIV_ADMIN, "admin")
         self.inst_privileges.addItem(S.INST_PRIV_LOWEST, "lowest")
+        options_grid.addWidget(labelled(S.INST_PRIVILEGES_LABEL, self.inst_privileges), 0, 0)
         options_grid.addWidget(self.inst_privileges, 0, 1)
 
-        options_grid.addWidget(QLabel(S.INST_ARCH_LABEL), 1, 0)
         self.inst_arch = QComboBox()
         self.inst_arch.addItem(S.INST_ARCH_X64, "x64")
         self.inst_arch.addItem(S.INST_ARCH_X86, "x86")
         self.inst_arch.addItem(S.INST_ARCH_ANY, "any")
+        options_grid.addWidget(labelled(S.INST_ARCH_LABEL, self.inst_arch), 1, 0)
         options_grid.addWidget(self.inst_arch, 1, 1)
 
-        options_grid.addWidget(QLabel(S.INST_COMPRESSION_LABEL), 2, 0)
         self.inst_compression = QComboBox()
         self.inst_compression.addItems(list(COMPRESSION_CHOICES))
+        options_grid.addWidget(labelled(S.INST_COMPRESSION_LABEL, self.inst_compression), 2, 0)
         options_grid.addWidget(self.inst_compression, 2, 1)
 
         options_grid.addWidget(QLabel(S.INST_LANGUAGES_LABEL), 3, 0)
@@ -128,7 +132,9 @@ class InstallerTab(BaseTab):
         self.inst_languages = {}
         codes = ["ar"] + list(LANGUAGE_LABELS)
         for i, code in enumerate(codes):
-            label = "العربية" if code == "ar" else LANGUAGE_LABELS[code]
+            # Each language in its own name: the native-name table is the one
+            # place that spells them, so no literal here.
+            label = LOCALE_NATIVE_NAMES.get(code) or LANGUAGE_LABELS[code]
             checkbox = QCheckBox(label)
             if code == "en":
                 checkbox.setChecked(True)
@@ -136,17 +142,17 @@ class InstallerTab(BaseTab):
             lang_layout.addWidget(checkbox, i // 4, i % 4)
         options_grid.addWidget(lang_box, 3, 1, 1, 2)
 
-        options_grid.addWidget(QLabel(S.INST_ARABIC_ISL_LABEL), 4, 0)
         self.inst_arabic_isl = QLineEdit()
         self.inst_arabic_isl.setPlaceholderText(S.INST_ARABIC_ISL_PLACEHOLDER)
         self.inst_arabic_isl.setToolTip(S.INST_ARABIC_ISL_TIP)
+        options_grid.addWidget(labelled(S.INST_ARABIC_ISL_LABEL, self.inst_arabic_isl), 4, 0)
         isl_btn = browse_button(S.INST_ARABIC_ISL_LABEL, self.browse_arabic_isl)
         options_grid.addWidget(self.inst_arabic_isl, 4, 1)
         options_grid.addWidget(isl_btn, 4, 2)
 
-        options_grid.addWidget(QLabel(S.INST_ASSOC_LABEL), 5, 0)
         self.inst_assoc = QLineEdit()
         self.inst_assoc.setPlaceholderText(S.INST_ASSOC_PLACEHOLDER)
+        options_grid.addWidget(labelled(S.INST_ASSOC_LABEL, self.inst_assoc), 5, 0)
         options_grid.addWidget(self.inst_assoc, 5, 1)
 
         self.inst_desktop_icon = QCheckBox(S.INST_DESKTOP_ICON)
@@ -174,8 +180,8 @@ class InstallerTab(BaseTab):
         # ── Toolchain ──
         toolchain = QGroupBox(S.GROUP_INSTALLER_TOOLCHAIN)
         toolchain_layout = QGridLayout(toolchain)
-        toolchain_layout.addWidget(QLabel(S.INST_ISCC_LABEL), 0, 0)
         self.inst_iscc_path = QLineEdit()
+        toolchain_layout.addWidget(labelled(S.INST_ISCC_LABEL, self.inst_iscc_path), 0, 0)
         self.inst_iscc_path.setPlaceholderText(S.INST_ISCC_PLACEHOLDER)
         toolchain_layout.addWidget(self.inst_iscc_path, 0, 1)
         iscc_btn = browse_button(S.INST_ISCC_LABEL, self.browse_iscc_path)
@@ -196,15 +202,6 @@ class InstallerTab(BaseTab):
         layout.addWidget(toolchain)
 
         layout.addStretch()
-
-        # Field-dense: keep it usable on a short screen.
-        scroll = QScrollArea()
-        scroll.setWidgetResizable(True)
-        scroll.setWidget(inner)
-        outer = QVBoxLayout(self)
-        outer.setContentsMargins(0, 0, 0, 0)
-        outer.addWidget(scroll)
-
 
     # ── Browsing ───────────────────────────────────────────────────────────
 

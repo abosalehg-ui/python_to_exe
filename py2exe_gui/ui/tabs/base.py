@@ -7,6 +7,7 @@ window keeps orchestration (threads, the build pipeline, shortcuts).
 """
 
 from py2exe_gui import icons
+from py2exe_gui.bidi import bidi, rlm
 from py2exe_gui.core.platform_support import (
     LINUX,
     MACOS,
@@ -75,6 +76,49 @@ def icon_button(icon_name: str, label: str, handler, size: int = ICON_BUTTON_SIZ
 def browse_button(label: str, handler, folder: bool = False) -> QPushButton:
     """The "choose a file/folder" button next to a path field."""
     return icon_button("browse_folder" if folder else "browse_file", label, handler)
+
+
+def em_width(widget: QWidget, ems: int) -> int:
+    """``ems`` times the width of "M" in ``widget``'s font, in pixels.
+
+    For widths that used to be fixed pixel counts: a 180px bar is a third of
+    the action bar at 9pt and a sliver at 18pt after Ctrl+=.
+    """
+    return widget.fontMetrics().horizontalAdvance("M") * ems
+
+
+def labelled(label_text: str, widget: QWidget) -> QLabel:
+    """The label of a form field, wired to the field it names.
+
+    ``setBuddy`` gives the label's mnemonic focus to the field and lets a
+    screen reader read the label as the field's name; ``setAccessibleName``
+    covers the readers that do not follow buddies. A field without either is
+    announced as "edit text", which says nothing about what to type.
+    """
+    label = QLabel(label_text)
+    label.setBuddy(widget)
+    if not widget.accessibleName():
+        widget.setAccessibleName(label_text.replace("&", ""))
+    return label
+
+
+def muted_label(text: str = "") -> QLabel:
+    """A wrapped, muted explanation (``aboutMuted``), bidi-fixed for RTL."""
+    label = QLabel(bidi(text))
+    label.setObjectName("aboutMuted")
+    label.setWordWrap(True)
+    return label
+
+
+def text_label(text: str, object_name: str = "", wrap: bool = True) -> QLabel:
+    """A selectable label whose direction follows the UI even when the text
+    starts with a symbol or a number (see :func:`py2exe_gui.bidi.rlm`)."""
+    label = QLabel(rlm(text))
+    if object_name:
+        label.setObjectName(object_name)
+    label.setWordWrap(wrap)
+    label.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
+    return label
 
 
 class BaseTab(QWidget):
@@ -169,17 +213,20 @@ def vbox(parent: QWidget) -> QVBoxLayout:
     return layout
 
 
-def scrolled_layout(tab: QWidget) -> QVBoxLayout:
+def scrolled_layout(tab: QWidget, spacing: int = -1) -> QVBoxLayout:
     """The layout a tab adds its groups to, inside a scroll area.
 
     Every tab goes through here. Eight of fifteen tabs used to lay their
     groups straight onto the widget, and when the window was shorter than
     their content (the default 1080x800 window, any 1366x768 laptop) Qt
     squeezed the fields to a couple of pixels instead of scrolling.
+    ``spacing`` (pixels between groups) is left to the style when negative.
     """
     if getattr(tab, "embedded", False):
         layout = QVBoxLayout(tab)
         layout.setContentsMargins(0, 0, 0, 0)
+        if spacing >= 0:
+            layout.setSpacing(spacing)
         return layout
     outer = QVBoxLayout(tab)
     outer.setContentsMargins(0, 0, 0, 0)
@@ -188,5 +235,7 @@ def scrolled_layout(tab: QWidget) -> QVBoxLayout:
     # Room above the first group box: its title sits in the margin and
     # would be clipped by the top edge of the scroll area.
     layout.setContentsMargins(6, 14, 6, 6)
+    if spacing >= 0:
+        layout.setSpacing(spacing)
     outer.addWidget(scrollable(content))
     return layout

@@ -4,10 +4,10 @@
 
 ### أداة احترافية لتحويل تطبيقات بايثون إلى ملفات تنفيذية
 
-![Version](https://img.shields.io/badge/الإصدار-2.0.0-blue?style=for-the-badge)
+![Version](https://img.shields.io/badge/الإصدار-2.1.0-blue?style=for-the-badge)
 ![Python](https://img.shields.io/badge/Python-3.8+-green?style=for-the-badge&logo=python&logoColor=white)
 ![PySide6](https://img.shields.io/badge/PySide6-Qt_6-orange?style=for-the-badge&logo=qt&logoColor=white)
-![Tests](https://img.shields.io/badge/الاختبارات-1974_passing-brightgreen?style=for-the-badge)
+![Tests](https://img.shields.io/badge/الاختبارات-2045_passing-brightgreen?style=for-the-badge)
 ![Languages](https://img.shields.io/badge/اللغات-عربي_+_English-purple?style=for-the-badge)
 ![License](https://img.shields.io/badge/الرخصة-All%20Rights%20Reserved-red?style=for-the-badge)
 

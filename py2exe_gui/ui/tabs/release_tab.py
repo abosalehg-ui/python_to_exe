@@ -5,6 +5,8 @@ release is the window's job (through ``core.release.pipeline``), and the
 token never passes through here except on its way into the OS keyring.
 """
 
+from py2exe_gui.bidi import bidi, ltr
+from py2exe_gui.bidi import separator as _separator
 from py2exe_gui.core.project_file import ReleaseAssets, ReleaseSettings, WingetSettings
 from py2exe_gui.core.release.pipeline import STEPS
 from py2exe_gui.qt import (
@@ -21,40 +23,21 @@ from py2exe_gui.qt import (
     QPushButton,
     Qt,
     QVBoxLayout,
-    QWidget,
 )
 from py2exe_gui.strings import S
 from py2exe_gui.texts import STATUS_ICONS, reason_text, step_title
-from py2exe_gui.ui.tabs.base import BaseTab, scrollable
-from py2exe_gui.ui.tabs.runtime_tab import _ltr_line, _muted, bidi
-from py2exe_gui.ui.tabs.size_tab import ltr
+from py2exe_gui.ui.tabs.base import BaseTab, scrolled_layout
+from py2exe_gui.ui.tabs.base import muted_label as _muted
+from py2exe_gui.ui.tabs.runtime_tab import _ltr_line
 
 STEP_ROLE = Qt.ItemDataRole.UserRole
-
-
-def _separator() -> str:
-    """" — " between a step and its explanation.
-
-    In a right-to-left layout the dash is pinned with right-to-left marks:
-    otherwise "SHA-256 — SHA256SUMS.txt" merges into one left-to-right run
-    and reads backwards.
-    """
-    from py2exe_gui.texts import is_rtl
-
-    return "\u200f — \u200f" if is_rtl() else " — "
 
 
 class ReleaseTab(BaseTab):
     """From version bump to published release, one checklist."""
 
     def _build(self):
-        outer = QVBoxLayout(self)
-        outer.setContentsMargins(0, 0, 0, 0)
-        content = QWidget()
-        layout = QVBoxLayout(content)
-        layout.setContentsMargins(6, 14, 6, 6)
-        layout.setSpacing(14)
-        outer.addWidget(scrollable(content))
+        layout = scrolled_layout(self, spacing=14)
 
         layout.addWidget(_muted(S.RELEASE_HINT))
         layout.addWidget(self._build_version_group())
@@ -154,7 +137,7 @@ class ReleaseTab(BaseTab):
         group = QGroupBox(S.GROUP_RELEASE_GITHUB)
         form = QFormLayout(group)
         repo_row = QHBoxLayout()
-        self.repository = _ltr_line("owner/repository")
+        self.repository = _ltr_line(S.RELEASE_REPOSITORY_PLACEHOLDER)
         detect = QPushButton(S.BTN_DETECT_REPOSITORY)
         detect.clicked.connect(self.window_action("detect_release_repository"))
         repo_row.addWidget(self.repository, 1)
@@ -218,12 +201,12 @@ class ReleaseTab(BaseTab):
         form.addRow(_muted(S.RELEASE_WINGET_HINT))
         self.winget_check = QCheckBox(S.RELEASE_WINGET_ENABLE)
         form.addRow(self.winget_check)
-        self.winget_identifier = _ltr_line("Publisher.AppName")
+        self.winget_identifier = _ltr_line(S.RELEASE_WINGET_IDENTIFIER_PLACEHOLDER)
         self.winget_publisher = QLineEdit()
         self.winget_license = QLineEdit()
-        self.winget_license.setPlaceholderText("MIT / Proprietary")
+        self.winget_license.setPlaceholderText(S.RELEASE_WINGET_LICENSE_PLACEHOLDER)
         self.winget_description = QLineEdit()
-        self.winget_locale = _ltr_line("en-US")
+        self.winget_locale = _ltr_line(S.RELEASE_WINGET_LOCALE_PLACEHOLDER)
         self.winget_locale.setMaximumWidth(120)
         form.addRow(S.RELEASE_WINGET_IDENTIFIER, self.winget_identifier)
         form.addRow(S.RELEASE_WINGET_PUBLISHER, self.winget_publisher)

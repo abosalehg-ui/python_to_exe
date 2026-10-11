@@ -178,6 +178,13 @@ class Ar:
         "سيتم تنزيل حزم من الإنترنت."
     )
     LOG_INSTALL_PYINSTALLER_DECLINED = "⚠️ تم رفض تثبيت PyInstaller — أُلغي البناء"
+    MSG_UNTRUSTED_EXTRA_FILES_CONFIRM = (
+        "⚠️ ملف الإعدادات هذا يضمّ ملفات من خارج مجلد المشروع داخل البرنامج الناتج:\n\n"
+        "{files}\n\n"
+        "ستُنسخ محتويات هذه المسارات من جهازك أنت إلى داخل كل ملف EXE تنتجه. "
+        "لا تقبل إلا إذا كنت تثق بمصدر هذا الملف.\n\n"
+        "هل تريد المتابعة؟"
+    )
     MSG_DANGEROUS_ARGS_CONFIRM = (
         "⚠️ ملف الإعدادات هذا يحتوي على أوامر تُشغِّل كوداً أثناء البناء:\n\n"
         "{flags}\n\n"
@@ -1137,7 +1144,7 @@ class Ar:
     # ── 1.6: ملف المشروع وسطر الأوامر والإصدار ─────────────────────────
     WINDOW_TITLE_PROJECT_FMT = "{project}[*] — {app}"
     TAB_RELEASE = "الإصدار"
-    MENU_PROJECT = "المشروع"
+    MENU_PROJECT = "&المشروع"
     MENU_NEW_PROJECT = "مشروع جديد"
     MENU_OPEN_PROJECT = "فتح مشروع…"
     MENU_RECENT_PROJECTS = "المشاريع الأخيرة"
@@ -1302,6 +1309,9 @@ class Ar:
     RELEASE_REASON_NO_SIGNING_KEY = "لا يوجد مفتاح توقيع التحديثات (تبويب مكتبة التشغيل)"
     RELEASE_REASON_UPDATE_OK = "update.json موقّع"
     RELEASE_REASON_UPDATE_FAILED = "فشل: {error}"
+    RELEASE_REASON_TAG_PREFIX_INVALID = (
+        "بادئة الوسم «{prefix}» غير صالحة: أحرف وأرقام و . _ / - فقط، ولا تبدأ بـ -"
+    )
     RELEASE_REASON_TAG_OFF = "غير مطلوب"
     RELEASE_REASON_NOT_GIT = "ليس مستودع git"
     RELEASE_REASON_TAG_FAILED = "فشل git: {error}"
@@ -1395,6 +1405,10 @@ class Ar:
     CLI_RELEASE_BLOCKED = "❌ لا يمكن الإصدار: راجع الخطوات المعلّمة بـ ❌."
     CLI_RELEASE_DRY_RUN_DONE = "📋 تجربة فقط: لم يتغيّر شيء."
     CLI_RELEASE_CONFIRM = "سيُنفَّذ الإصدار {version} كما في القائمة أعلاه بالضبط."
+    CLI_RELEASE_FOREIGN_API_CONFIRM = (
+        "⚠️ سيُرسَل رمز GitHub المحفوظ إلى خادم آخر غير api.github.com: {host}\n"
+        "لا يكفي ‎--yes‎ هنا؛ يلزم تأكيد تفاعلي (أو مرّر الرمز عبر GITHUB_TOKEN)."
+    )
     CLI_RELEASE_FAILED = "❌ توقّف الإصدار. ما سبق الخطوة الفاشلة اكتمل، ويمكن إعادة المحاولة بأمان."
     CLI_RELEASE_DONE = "✅ صدر {version}\n   الملفات: {path}\n   GitHub: {url}"
 
@@ -1884,9 +1898,9 @@ class Ar:
     LOG_PANEL_TITLE = "سجل البناء"
     LOG_PANEL_EMPTY = "لم يبدأ أي بناء بعد. اختر ملفاً ثم اضغط «بدء البناء»."
     LOG_PANEL_TOGGLE_TIP = "إظهار السجل أو طيّه (Ctrl+`)"
-    MENU_VIEW = "عرض"
-    MENU_TOOLS = "أدوات"
-    MENU_HELP = "مساعدة"
+    MENU_VIEW = "&عرض"
+    MENU_TOOLS = "&أدوات"
+    MENU_HELP = "&مساعدة"
     MENU_THEME = "السمة"
     MENU_LANGUAGE = "اللغة"
     MENU_ZOOM_IN = "تكبير الخط"
@@ -1947,6 +1961,29 @@ class Ar:
     DROP_TITLE = "أفلت الملف هنا"
     DROP_HINT = "ملف .py يصبح المصدر، و.ico الأيقونة، و.toml مشروعاً؛ وأي ملف آخر يُضاف إلى الملفات الإضافية."
     MSG_ISS_WRITTEN_FMT = "تم توليد ملف .iss: {path}"
+
+    # ── 2.2: human sentences in dialogs, outcome codes from threads ──
+    MSG_OUTPUT_DIR_FAILED = "تعذّر تجهيز مجلد الإخراج. التفاصيل في سجل البناء."
+    MSG_SANDBOX_FILE_FAILED = "تعذّر كتابة ملف الصندوق الرملي. التفاصيل في سجل البناء."
+    MSG_ENV_FAILED = "تعذّر إنشاء بيئة البناء. مخرجات pip في سجل البناء."
+    MSG_INSTALL_FAILED_FMT = "تعذّر تثبيت {tool}. مخرجات pip في سجل البناء."
+    LOG_OUTPUT_DIR_FAILED = "❌ تعذّر تجهيز مجلد الإخراج: {error}"
+    LOG_SANDBOX_FAILED = "❌ تعذّر كتابة ملف الصندوق الرملي: {error}"
+    THREAD_ERR_CANCELLED = "أُلغي بواسطة المستخدم"
+    THREAD_ERR_NOT_FOUND_FMT = "لم يُعثَر على {tool} (هل هو مثبّت وموجود في PATH؟)"
+    THREAD_ERR_FAILED_FMT = "انتهى {tool} برمز الخروج {code}"
+    THREAD_ERR_TIMED_OUT_FMT = "لم ينتهِ {tool} في الوقت المحدد"
+    THREAD_ERR_ERROR_FMT = "تعذّر تشغيل {tool}: {error}"
+    BUSY_INSTALLING_FMT = "جارٍ تثبيت {tool}…"
+    BUSY_ENV = "جارٍ إنشاء بيئة البناء…"
+    BUSY_DIAGNOSTIC = "جارٍ التشغيل التشخيصي…"
+    BUSY_COMPARE = "جارٍ مقارنة المحرّكات…"
+    BUSY_FREEZING = "جارٍ قراءة حزم البيئة…"
+    BUSY_UPDATE_CHECK = "جارٍ التحقق من التحديثات…"
+    RELEASE_REPOSITORY_PLACEHOLDER = "owner/repository"
+    RELEASE_WINGET_IDENTIFIER_PLACEHOLDER = "Publisher.AppName"
+    RELEASE_WINGET_LICENSE_PLACEHOLDER = "MIT / Proprietary"
+    RELEASE_WINGET_LOCALE_PLACEHOLDER = "en-US"
 
 class En:
     """English strings."""
@@ -2119,6 +2156,14 @@ class En:
         "This downloads packages from the internet."
     )
     LOG_INSTALL_PYINSTALLER_DECLINED = "⚠️ PyInstaller install declined — build cancelled"
+    MSG_UNTRUSTED_EXTRA_FILES_CONFIRM = (
+        "⚠️ This settings file bundles files from outside the project folder into the "
+        "program:\n\n"
+        "{files}\n\n"
+        "Whatever is at these paths on *your* machine is copied into every EXE you "
+        "produce. Only accept this if you trust where the file came from.\n\n"
+        "Continue?"
+    )
     MSG_DANGEROUS_ARGS_CONFIRM = (
         "⚠️ This settings file contains arguments that execute code during the build:\n\n"
         "{flags}\n\n"
@@ -3268,6 +3313,10 @@ class En:
     RELEASE_REASON_NO_SIGNING_KEY = "no update-signing key (Runtime Kit tab)"
     RELEASE_REASON_UPDATE_OK = "signed update.json"
     RELEASE_REASON_UPDATE_FAILED = "failed: {error}"
+    RELEASE_REASON_TAG_PREFIX_INVALID = (
+        "the tag prefix “{prefix}” is not valid: letters, digits and . _ / - only, "
+        "and it must not start with -"
+    )
     RELEASE_REASON_TAG_OFF = "not requested"
     RELEASE_REASON_NOT_GIT = "not a git repository"
     RELEASE_REASON_TAG_FAILED = "git failed: {error}"
@@ -3361,6 +3410,11 @@ class En:
     CLI_RELEASE_BLOCKED = "❌ Cannot release: see the steps marked ❌."
     CLI_RELEASE_DRY_RUN_DONE = "📋 Dry run only: nothing changed."
     CLI_RELEASE_CONFIRM = "Release {version} will do exactly what is listed above."
+    CLI_RELEASE_FOREIGN_API_CONFIRM = (
+        "⚠️ The stored GitHub token would be sent to a server other than api.github.com: "
+        "{host}\n--yes is not enough for this; answer here (or pass the token via "
+        "GITHUB_TOKEN)."
+    )
     CLI_RELEASE_FAILED = "❌ The release stopped. Everything before the failed step is done, and running it again is safe."
     CLI_RELEASE_DONE = "✅ Released {version}\n   Files: {path}\n   GitHub: {url}"
 
@@ -3919,6 +3973,29 @@ class En:
     DROP_TITLE = "Drop the file here"
     DROP_HINT = "A .py file becomes the source, .ico the icon, .toml a project; anything else is added to the extra files."
     MSG_ISS_WRITTEN_FMT = "Generated the .iss script: {path}"
+
+    # ── 2.2: human sentences in dialogs, outcome codes from threads ──
+    MSG_OUTPUT_DIR_FAILED = "The output folder could not be prepared. The details are in the build log."
+    MSG_SANDBOX_FILE_FAILED = "The sandbox file could not be written. The details are in the build log."
+    MSG_ENV_FAILED = "The build environment could not be created. The pip output is in the build log."
+    MSG_INSTALL_FAILED_FMT = "{tool} could not be installed. The pip output is in the build log."
+    LOG_OUTPUT_DIR_FAILED = "❌ Could not prepare the output folder: {error}"
+    LOG_SANDBOX_FAILED = "❌ Could not write the sandbox file: {error}"
+    THREAD_ERR_CANCELLED = "cancelled by the user"
+    THREAD_ERR_NOT_FOUND_FMT = "{tool} was not found (is it installed and on PATH?)"
+    THREAD_ERR_FAILED_FMT = "{tool} exited with code {code}"
+    THREAD_ERR_TIMED_OUT_FMT = "{tool} did not finish in time"
+    THREAD_ERR_ERROR_FMT = "{tool} could not be started: {error}"
+    BUSY_INSTALLING_FMT = "Installing {tool}…"
+    BUSY_ENV = "Creating the build environment…"
+    BUSY_DIAGNOSTIC = "Diagnostic run…"
+    BUSY_COMPARE = "Comparing engines…"
+    BUSY_FREEZING = "Reading the environment's packages…"
+    BUSY_UPDATE_CHECK = "Checking for updates…"
+    RELEASE_REPOSITORY_PLACEHOLDER = "owner/repository"
+    RELEASE_WINGET_IDENTIFIER_PLACEHOLDER = "Publisher.AppName"
+    RELEASE_WINGET_LICENSE_PLACEHOLDER = "MIT / Proprietary"
+    RELEASE_WINGET_LOCALE_PLACEHOLDER = "en-US"
 
 LOCALES = {"ar": Ar, "en": En}
 

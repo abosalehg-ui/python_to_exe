@@ -59,25 +59,33 @@ def deb_version(version: str) -> str:
 
 def control_text(spec: PackageSpec, installed_kb: int) -> str:
     """``DEBIAN/control``: the required fields, then the optional ones."""
-    synopsis, *rest = (spec.description or spec.name).strip().splitlines() or [spec.name]
+    # One field per line: a newline inside a value would be read as the start
+    # of another field (or of the Description's long text), so every value is
+    # flattened to one line. Only the Description keeps its continuation lines.
+    name = _one_line(spec.name)
+    synopsis, *rest = (spec.description or name).strip().splitlines() or [name]
     lines = [
         f"Package: {slug(spec.name)}",
-        f"Version: {deb_version(spec.version)}",
-        f"Section: {spec.section or 'utils'}",
+        f"Version: {_one_line(deb_version(spec.version))}",
+        f"Section: {_one_line(spec.section) or 'utils'}",
         "Priority: optional",
         f"Architecture: {deb_arch(spec.machine())}",
-        f"Maintainer: {spec.maintainer or spec.name + ' <unknown@localhost>'}",
+        f"Maintainer: {_one_line(spec.maintainer) or name + ' <unknown@localhost>'}",
         f"Installed-Size: {max(installed_kb, 1)}",
     ]
-    if spec.depends.strip():
-        lines.append(f"Depends: {spec.depends.strip()}")
-    if spec.homepage.strip():
-        lines.append(f"Homepage: {spec.homepage.strip()}")
-    lines.append(f"Description: {' '.join(synopsis.split()) or spec.name}")
+    if _one_line(spec.depends):
+        lines.append(f"Depends: {_one_line(spec.depends)}")
+    if _one_line(spec.homepage):
+        lines.append(f"Homepage: {_one_line(spec.homepage)}")
+    lines.append(f"Description: {_one_line(synopsis) or name}")
     for line in rest:
         line = line.rstrip()
         lines.append(" " + line if line.strip() else " .")
     return "\n".join(lines) + "\n"
+
+
+def _one_line(text: str) -> str:
+    return " ".join((text or "").split())
 
 
 class DebPackager(Packager):

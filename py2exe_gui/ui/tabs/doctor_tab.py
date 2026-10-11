@@ -1,9 +1,9 @@
 """Project doctor: readiness score, findings, and one-click fixes."""
 
+from py2exe_gui import icons
 from py2exe_gui.core.fixes import readiness_score
 from py2exe_gui.qt import (
     QApplication,
-    QFont,
     QGroupBox,
     QHBoxLayout,
     QLabel,
@@ -18,7 +18,7 @@ from py2exe_gui.strings import S
 from py2exe_gui.ui.finding_text import (
     copy_text,
     detail_lines,
-    finding_label,
+    finding_title,
     fix_label,
     origin_label,
 )
@@ -41,10 +41,8 @@ class DoctorTab(BaseTab):
 
         header = QHBoxLayout()
         self.score_label = QLabel(S.DOCTOR_SCORE_NONE)
-        score_font = QFont()
-        score_font.setPointSize(16)
-        score_font.setBold(True)
-        self.score_label.setFont(score_font)
+        # Sized by the stylesheet (QLabel#doctorScore) so Ctrl+= scales it.
+        self.score_label.setObjectName("doctorScore")
         self.score_label.setAccessibleName(S.DOCTOR_SCORE_NONE)
         self.summary_label = QLabel("")
         self.summary_label.setObjectName("aboutMuted")
@@ -55,6 +53,30 @@ class DoctorTab(BaseTab):
         header.addWidget(self.summary_label, stretch=1)
         header.addWidget(examine_btn)
         layout.addLayout(header)
+
+        # The actions sit above the findings: at the bottom they were the
+        # first thing the log panel covered when it opened.
+        buttons = QHBoxLayout()
+        self.apply_btn = QPushButton(S.BTN_DOCTOR_APPLY)
+        self.apply_btn.clicked.connect(lambda: self._apply(rebuild=False))
+        self.rebuild_btn = QPushButton(S.BTN_DOCTOR_APPLY_REBUILD)
+        self.rebuild_btn.setObjectName("successBtn")
+        self.rebuild_btn.clicked.connect(lambda: self._apply(rebuild=True))
+        self.diagnose_btn = QPushButton(S.BTN_DOCTOR_DIAGNOSE)
+        self.diagnose_btn.setToolTip(S.BTN_DOCTOR_DIAGNOSE_TIP)
+        self.diagnose_btn.setAccessibleDescription(S.BTN_DOCTOR_DIAGNOSE_TIP)
+        self.diagnose_btn.clicked.connect(self.window_action("start_diagnostic_run"))
+        self.sandbox_btn = QPushButton(S.BTN_SANDBOX)
+        self.sandbox_btn.setToolTip(S.BTN_SANDBOX_TIP)
+        self.sandbox_btn.setAccessibleDescription(S.BTN_SANDBOX_TIP)
+        self.sandbox_btn.clicked.connect(self.window_action("open_in_sandbox"))
+        self.action_buttons = (self.apply_btn, self.rebuild_btn, self.diagnose_btn,
+                               self.sandbox_btn)
+        for button in self.action_buttons:
+            button.setAccessibleName(button.text())
+            buttons.addWidget(button)
+        buttons.addStretch(1)
+        layout.addLayout(buttons)
 
         group = QGroupBox(S.TAB_DOCTOR)
         group_layout = QVBoxLayout(group)
@@ -84,25 +106,6 @@ class DoctorTab(BaseTab):
         detail_buttons.addStretch(1)
         group_layout.addLayout(detail_buttons)
         layout.addWidget(group, stretch=1)
-
-        buttons = QHBoxLayout()
-        self.apply_btn = QPushButton(S.BTN_DOCTOR_APPLY)
-        self.apply_btn.clicked.connect(lambda: self._apply(rebuild=False))
-        self.rebuild_btn = QPushButton(S.BTN_DOCTOR_APPLY_REBUILD)
-        self.rebuild_btn.setObjectName("successBtn")
-        self.rebuild_btn.clicked.connect(lambda: self._apply(rebuild=True))
-        self.diagnose_btn = QPushButton(S.BTN_DOCTOR_DIAGNOSE)
-        self.diagnose_btn.setToolTip(S.BTN_DOCTOR_DIAGNOSE_TIP)
-        self.diagnose_btn.setAccessibleDescription(S.BTN_DOCTOR_DIAGNOSE_TIP)
-        self.diagnose_btn.clicked.connect(self.window_action("start_diagnostic_run"))
-        self.sandbox_btn = QPushButton(S.BTN_SANDBOX)
-        self.sandbox_btn.setToolTip(S.BTN_SANDBOX_TIP)
-        self.sandbox_btn.setAccessibleDescription(S.BTN_SANDBOX_TIP)
-        self.sandbox_btn.clicked.connect(self.window_action("open_in_sandbox"))
-        for button in (self.apply_btn, self.rebuild_btn, self.diagnose_btn, self.sandbox_btn):
-            button.setAccessibleName(button.text())
-            buttons.addWidget(button)
-        layout.addLayout(buttons)
 
         self.doctor_findings = []
         self.build_findings = []
@@ -147,7 +150,11 @@ class DoctorTab(BaseTab):
             return
 
         for finding in everything:
-            item = QListWidgetItem(finding_label(finding))
+            # The severity is an icon from the set, not an emoji glyph: the
+            # emoji drew in the platform's colour font and could not follow
+            # the theme. The text is the title alone.
+            item = QListWidgetItem(finding_title(finding))
+            item.setIcon(self.severity_icon(finding.severity))
             item.setData(FINDING_ROLE, finding)
             item.setToolTip(origin_label(finding.origin))
             if finding.auto_fixable:
@@ -158,6 +165,18 @@ class DoctorTab(BaseTab):
             self.findings_list.addItem(item)
         self._set_actions_enabled(any(f.auto_fixable for f in everything))
         self.findings_list.setCurrentRow(0)
+
+    #: Finding severity → icon name (``icons.NAMES``).
+    SEVERITY_ICON_NAMES = {"error": "error", "warning": "warning", "info": "info"}
+
+    def severity_icon(self, severity: str):
+        """The theme-coloured icon for a severity (the window colours it)."""
+        name = self.SEVERITY_ICON_NAMES.get(severity, "info")
+        role = {"error": "danger", "warning": "warning"}.get(severity, "accent")
+        window_icon = getattr(self.window, "_icon", None)
+        if window_icon is not None:
+            return window_icon(name, role)
+        return icons.icon(name)
 
     def _set_actions_enabled(self, enabled: bool):
         self.apply_btn.setEnabled(enabled)

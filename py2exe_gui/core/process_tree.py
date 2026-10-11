@@ -18,12 +18,13 @@ everything around it — a CI runner, a container's init — as happened once.
 import os
 import signal
 import subprocess
-import sys
 from typing import Optional
+
+from py2exe_gui.core.platform_support import resolve as resolve_platform
 
 
 def _windows(platform: Optional[str]) -> bool:
-    return (platform if platform is not None else sys.platform).startswith("win")
+    return resolve_platform(platform).startswith("win")
 
 
 def group_kwargs(platform: Optional[str] = None) -> dict:
@@ -47,6 +48,46 @@ def leads_own_group(pid) -> bool:
         return group == pid and group != os.getpgid(0)
     except (OSError, AttributeError):
         return False
+
+
+def read_tail(stream, limit: int, chunk: int = 4096) -> str:
+    """Read ``stream`` to its end, keeping only the last ``limit`` characters.
+
+    A program under test may print without end (a server's access log, a
+    loop with a ``print``); ``communicate()`` would buffer all of it until the
+    timeout. This drains the pipe — so the program never blocks on it — while
+    holding no more than ``limit`` plus one chunk. Returns '' on a closed or
+    broken pipe.
+    """
+    kept = ""
+    while True:
+        try:
+            piece = stream.read(chunk)
+        except (OSError, ValueError):
+            break
+        if not piece:
+            break
+        kept = (kept + piece)[-limit:] if limit > 0 else ""
+    return kept
+
+
+def terminate_tree(process, platform: Optional[str] = None) -> None:
+    """Ask ``process`` and its group to stop (SIGTERM); never raises.
+
+    The polite half of ``kill_tree``: an engine gets to remove its half-written
+    output. On Windows there is no group-wide polite signal, so only the
+    leader is terminated and ``kill_tree`` sweeps the rest if it has to.
+    """
+    try:
+        if not _windows(platform) and leads_own_group(getattr(process, "pid", None)):
+            os.killpg(process.pid, signal.SIGTERM)
+            return
+    except (OSError, AttributeError):
+        pass
+    try:
+        process.terminate()
+    except OSError:
+        pass
 
 
 def kill_tree(process, platform: Optional[str] = None, run=subprocess.run) -> None:

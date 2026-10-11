@@ -5,16 +5,15 @@ The PyInstaller command itself moved to ``core/engines/pyinstaller.py``;
 """
 
 import shlex
-import sys
 from typing import List, Optional, Sequence, Tuple
 
 from py2exe_gui.core.config import BuildConfig
+from py2exe_gui.core.platform_support import resolve as resolve_platform
 
 
 def _add_data_separator(platform: Optional[str] = None) -> str:
     """Return the PyInstaller --add-data separator for the platform."""
-    plat = platform if platform is not None else sys.platform
-    return ";" if plat == "win32" else ":"
+    return ";" if resolve_platform(platform) == "win32" else ":"
 
 
 def split_extra_args(raw: str, platform: Optional[str] = None) -> List[str]:
@@ -26,8 +25,7 @@ def split_extra_args(raw: str, platform: Optional[str] = None) -> List[str]:
     """
     if not raw or not raw.strip():
         return []
-    plat = platform if platform is not None else sys.platform
-    if plat == "win32":
+    if resolve_platform(platform) == "win32":
         tokens = shlex.split(raw, posix=False)
         # Non-POSIX mode keeps the surrounding quotes; drop them.
         return [t[1:-1] if len(t) > 1 and t[0] == t[-1] == '"' else t for t in tokens]
@@ -90,11 +88,14 @@ def build_pyinstaller_command(
     ``engines.engine_for(config).build_command(...)`` to honour it.
 
     Returns a (command, error) tuple. On success error is None; on failure
-    command is None and error contains a user-facing message.
+    command is None and error contains a user-facing message (the engine's
+    code, translated here so this shim keeps its old contract).
     """
     from py2exe_gui.core.engines import get_engine
+    from py2exe_gui.core.engines.base import describe_error
 
-    return get_engine("pyinstaller").build_command(
+    command, error = get_engine("pyinstaller").build_command(
         config, python_executable=python_executable, platform=platform,
         extra_options=extra_options,
     )
+    return command, (describe_error(error) if error else error)

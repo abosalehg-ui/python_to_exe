@@ -1,7 +1,9 @@
 """Build configuration dataclass — decouples UI state from command construction."""
 
 from dataclasses import dataclass, field, fields
-from typing import Any, List
+from typing import Any, List, Optional
+
+from py2exe_gui.core.dictfields import section_from_dict
 
 # Runtime Kit services, in the order the UI lists them.
 RUNTIME_SERVICES = (
@@ -13,7 +15,8 @@ RUNTIME_SERVICES = (
 #: The engine a build uses unless it names another (``core/engines``).
 DEFAULT_ENGINE = "pyinstaller"
 #: Engine names this version knows. Kept here, not imported from
-#: ``core/engines``, so the config stays a leaf module with no imports.
+#: ``core/engines``, so the config stays a leaf module that nothing in
+#: ``core`` has to be imported before (``dictfields`` is a leaf too).
 KNOWN_ENGINES = ("pyinstaller", "nuitka")
 
 
@@ -37,7 +40,7 @@ class RuntimeKitConfig:
     crash_reporter: bool = False
     single_instance: bool = False
     updater: bool = False
-    #: 2.0: offline licence keys checked with ``p2e_runtime.license``.
+    #: Offline licence keys checked with ``p2e_runtime.license``.
     licensing: bool = False
 
     app_version: str = ""
@@ -106,20 +109,21 @@ class BuildConfig:
 
     version_file: str = ""
 
-    # Phase 5: deployment-time options
+    # Deployment-time options: shown while the EXE unpacks, and the Windows
+    # manifest to embed.
     splash_image: str = ""
     manifest_file: str = ""
 
-    # 1.4: build in this project's isolated environment instead of the
+    # Build in this project's isolated environment instead of the
     # interpreter running the app. A flag, never a path: a shared settings
     # file must not be able to name an executable for the build to run.
     isolated_env: bool = False
 
-    # 1.5: Runtime Kit services embedded in the EXE (see RuntimeKitConfig).
+    # Runtime Kit services embedded in the EXE (see RuntimeKitConfig).
     runtime_kit: RuntimeKitConfig = field(default_factory=RuntimeKitConfig)
 
-    # 2.0: which engine builds it (``core/engines``). A name from a fixed
-    # list, never a path; an unknown name falls back to the default.
+    # Which engine builds it (``core/engines``). A name from a fixed list,
+    # never a path; an unknown name falls back to the default.
     engine: str = DEFAULT_ENGINE
 
     def to_dict(self) -> dict:
@@ -150,29 +154,19 @@ class BuildConfig:
         }
 
     @classmethod
-    def from_dict(cls, data: dict) -> "BuildConfig":
-        return cls(
-            source=data.get("source", ""),
-            output_name=data.get("output_name", ""),
-            output_dir=data.get("output_dir", ""),
-            icon=data.get("icon", ""),
-            onefile=data.get("onefile", True),
-            windowed=data.get("windowed", False),
-            noconsole=data.get("noconsole", False),
-            clean=data.get("clean", True),
-            noconfirm=data.get("noconfirm", True),
-            strip=data.get("strip", False),
-            extra_files=list(data.get("extra_files", [])),
-            hidden_imports=list(data.get("hidden_imports", [])),
-            optimize=data.get("optimize", 0),
-            upx=data.get("upx", False),
-            upx_level=data.get("upx_level", 0),
-            upx_dir=data.get("upx_dir", ""),
-            extra_args=data.get("extra_args", ""),
-            version_file=data.get("version_file", ""),
-            splash_image=data.get("splash_image", ""),
-            manifest_file=data.get("manifest_file", ""),
-            isolated_env=bool(data.get("isolated_env", False)),
-            runtime_kit=RuntimeKitConfig.from_dict(data.get("runtime_kit")),
-            engine=_engine_name(data.get("engine")),
-        )
+    def from_dict(cls, data: Any, warnings: Optional[List[str]] = None) -> "BuildConfig":
+        """Lenient on missing keys, strict on types (see ``dictfields``).
+
+        A settings file is hand-edited and shared: ``"optimize": "2"`` is
+        coerced, ``"extra_files": "data"`` and ``"onefile": "yes"`` keep the
+        default instead of becoming ``['d', 'a', 't', 'a']`` or a truthy
+        string the command builder trips over. ``warnings`` collects one line
+        per dropped value when the caller wants to show them.
+        """
+        if not isinstance(data, dict):
+            return cls()
+        config = section_from_dict(cls(), data, "build", warnings,
+                                   skip=("runtime_kit", "engine"))
+        config.runtime_kit = RuntimeKitConfig.from_dict(data.get("runtime_kit"))
+        config.engine = _engine_name(data.get("engine"))
+        return config

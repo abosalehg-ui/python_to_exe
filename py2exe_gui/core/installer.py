@@ -190,10 +190,19 @@ def escape_iss(value: str) -> str:
     """Escape a string for use as an Inno Setup directive/parameter value.
 
     ``{`` starts a constant in Inno Setup, so a literal brace must be doubled.
-    Newlines are stripped because directives are line-based.
+    Newlines are stripped because directives are line-based. A double quote
+    ends a quoted ``[Files]``/``[Icons]`` parameter and Inno Setup has no
+    escape for it inside a string, so a value holding one cannot be emitted
+    safely at all: it raises ``ValueError`` instead of truncating the
+    parameter and letting the rest be parsed as further parameters.
     """
     if not value:
         return ""
+    if '"' in str(value):
+        raise ValueError(
+            "Inno Setup values cannot contain a double quote (\"): "
+            f"{str(value)[:60]!r}"
+        )
     text = str(value).replace("{", "{{")
     return text.replace("\r", " ").replace("\n", " ").strip()
 
@@ -281,7 +290,27 @@ def validate(config: "InstallerConfig", app_path: str) -> Optional[str]:
     ext = config.associate_extension.strip()
     if ext and not ext.startswith("."):
         return "File association must start with a dot (e.g. .myapp)"
+    quoted = _fields_with_quotes(config, app_path)
+    if quoted:
+        # escape_iss would raise on these; say which field before anything runs.
+        return "A double quote (\") is not allowed in: " + ", ".join(quoted)
     return None
+
+
+#: Every free-text field that ends up inside an Inno Setup string.
+_TEXT_FIELDS = (
+    "app_name", "app_version", "publisher", "publisher_url", "support_url", "app_id",
+    "output_dir", "output_base_filename", "license_file", "readme_file", "setup_icon_file",
+    "arabic_isl_path", "compression", "associate_extension",
+)
+
+
+def _fields_with_quotes(config: "InstallerConfig", app_path: str = "") -> List[str]:
+    """The fields of ``config`` (and ``app_path``) holding a ``"``."""
+    found = [name for name in _TEXT_FIELDS if '"' in str(getattr(config, name, "") or "")]
+    if '"' in (app_path or ""):
+        found.append("app_path")
+    return found
 
 
 # ── Script generation ──────────────────────────────────────────────────────
@@ -547,3 +576,17 @@ def installer_output_path(config: "InstallerConfig", fallback_dir: str = "") -> 
     """Absolute path of the Setup.exe that ``generate_iss_script`` will produce."""
     out_dir = config.output_dir or fallback_dir
     return os.path.join(out_dir, default_output_basename(config) + ".exe")
+
+
+def write_iss_script(script: str, inst_cfg: "InstallerConfig", app_path: str,
+                     onefile: bool) -> str:
+    """Write ``script`` next to the build (or in ``inst_cfg.output_dir``); the path.
+
+    Raises ``OSError`` when the folder cannot be created or written.
+    """
+    target_dir = inst_cfg.output_dir or (app_path if not onefile else os.path.dirname(app_path))
+    iss_path = os.path.join(target_dir, f"{inst_cfg.app_name or 'setup'}.iss")
+    os.makedirs(target_dir, exist_ok=True)
+    with open(iss_path, "w", encoding="utf-8") as f:
+        f.write(script)
+    return iss_path

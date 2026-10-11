@@ -7,6 +7,7 @@ the real ``dpkg-deb`` and ``appimagetool`` (the latter only when it is
 already present or downloads were allowed for the test run).
 """
 
+import hashlib
 import os
 import plistlib
 import shutil
@@ -33,8 +34,10 @@ from py2exe_gui.core.packagers import (
     run_packaging,
     spec_from_project,
 )
+from py2exe_gui.core.packagers import appimage as appimage_module
 from py2exe_gui.core.packagers.appimage import (
     KNOWN_DIGESTS,
+    KNOWN_RUNTIME_DIGESTS,
     appimage_arch,
     appimagetool_url,
     apprun_script,
@@ -42,6 +45,7 @@ from py2exe_gui.core.packagers.appimage import (
     find_appimagetool,
     find_runtime,
     runtime_url,
+    safe_urlopen,
 )
 from py2exe_gui.core.packagers.base import (
     desktop_categories,
@@ -191,6 +195,32 @@ def test_desktop_entry_fields(tmp_path, onefile):
     assert "Exec=hello-app\nIcon=hello-app\nTerminal=false\nCategories=Utility;Development;\n" in text
     console = desktop_entry(spec_for(onefile, tmp_path), "x", "x")
     assert "Terminal=true" in console
+
+
+def test_desktop_entry_flattens_every_field(tmp_path, onefile):
+    """A newline in any value would start a new key (``Exec=`` from a name)."""
+    spec = spec_for(onefile, tmp_path, name="Hello\nExec=evil", description="a\nb",
+                    categories="Utility;\nX")
+    text = desktop_entry(spec, exec_line="run\nExec=rm -rf /", icon_name="ic\non")
+    assert [line for line in text.splitlines() if line.startswith("Exec=")] == [
+        "Exec=run Exec=rm -rf /"]
+    assert "Name=Hello Exec=evil\n" in text and "Icon=ic on\n" in text
+    assert "Comment=a b\n" in text
+    assert all("=" in line for line in text.splitlines()[1:])
+
+
+def test_control_text_flattens_every_field(tmp_path, onefile):
+    spec = spec_for(onefile, tmp_path, maintainer="Me\nDepends: evil", homepage="h\nx",
+                    depends="libc6\nPre-Depends: y", section="utils\nz", version="1.2.3")
+    text = control_text(spec, installed_kb=1)
+    assert "Maintainer: Me Depends: evil\n" in text
+    assert "Depends: libc6 Pre-Depends: y\n" in text and "Homepage: h x\n" in text
+    assert "Section: utils z\n" in text
+    assert not any(line.startswith("Pre-Depends") for line in text.splitlines())
+    bare = control_text(spec_for(onefile, tmp_path, name="Odd\nName", maintainer="",
+                                 description=""), 1)
+    assert "Maintainer: Odd Name <unknown@localhost>\n" in bare
+    assert "Description: Odd Name\n" in bare
 
 
 # ── Icons ─────────────────────────────────────────────────────────────────
@@ -396,7 +426,8 @@ def test_download_fetches_both_files_and_reports_the_digest(tmp_path):
 
     lines = []
     tools = str(tmp_path / "tools")
-    path, digest, matches = download_appimagetool(tools, lines.append, "x86_64", urlopen=urlopen)
+    path, digest, matches = download_appimagetool(tools, lines.append, "x86_64", urlopen=urlopen,
+                                                  allow_unverified=True)
     assert fetched == [appimagetool_url("x86_64"), runtime_url("x86_64")]
     assert path == os.path.join(tools, "appimagetool-x86_64.AppImage")
     assert os.path.isfile(path) and os.path.isfile(os.path.join(tools, "runtime-x86_64"))
@@ -407,6 +438,83 @@ def test_download_fetches_both_files_and_reports_the_digest(tmp_path):
     fetched.clear()
     download_appimagetool(tools, lines.append, "x86_64", urlopen=urlopen)
     assert fetched == []
+
+
+def test_digest_mismatch_is_refused_and_the_file_deleted(tmp_path):
+    """A recorded digest is enforced: the fake bytes are not the real tool."""
+    def urlopen(url, timeout=0):
+        return FakeResponse(b"not-the-real-tool")
+
+    tools = str(tmp_path / "tools")
+    with pytest.raises(ValueError, match="sha256 mismatch"):
+        download_appimagetool(tools, machine="x86_64", urlopen=urlopen)
+    assert not os.path.exists(os.path.join(tools, "appimagetool-x86_64.AppImage"))
+    assert not [n for n in os.listdir(tools) if n.endswith(".part")]
+
+
+def test_runtime_digest_mismatch_is_refused_too(tmp_path, monkeypatch):
+    """The tool matches but the runtime does not: the runtime is refused."""
+    monkeypatch.setitem(KNOWN_DIGESTS, "x86_64", hashlib.sha256(b"tool-bytes").hexdigest())
+    assert "x86_64" in KNOWN_RUNTIME_DIGESTS
+
+    def urlopen(url, timeout=0):
+        return FakeResponse(b"tool-bytes" if "appimagetool" in url else b"runtime-bytes")
+
+    tools = str(tmp_path / "tools")
+    with pytest.raises(ValueError, match="sha256 mismatch for runtime"):
+        download_appimagetool(tools, machine="x86_64", urlopen=urlopen)
+    assert not os.path.exists(os.path.join(tools, "runtime-x86_64"))
+
+
+def test_matching_digest_needs_no_consent_for_unverified(tmp_path, monkeypatch):
+    monkeypatch.setitem(KNOWN_DIGESTS, "x86_64", hashlib.sha256(b"tool-bytes").hexdigest())
+    monkeypatch.setitem(KNOWN_RUNTIME_DIGESTS, "x86_64",
+                        hashlib.sha256(b"runtime-bytes").hexdigest())
+
+    def urlopen(url, timeout=0):
+        return FakeResponse(b"tool-bytes" if "appimagetool" in url else b"runtime-bytes")
+
+    path, _digest, matches = download_appimagetool(str(tmp_path / "t"), machine="x86_64",
+                                                   urlopen=urlopen)
+    assert matches is True and os.path.isfile(path)
+
+
+def test_plain_http_download_is_refused_before_any_request(tmp_path, monkeypatch):
+    monkeypatch.setattr(appimage_module, "APPIMAGETOOL_URL",
+                        "http://github.com/x/appimagetool-{arch}.AppImage")
+    calls = []
+    with pytest.raises(ValueError, match="non-HTTPS"):
+        download_appimagetool(str(tmp_path / "t"), machine="x86_64",
+                              urlopen=lambda url, timeout=0: calls.append(url))
+    assert calls == []
+
+
+def test_default_opener_is_the_hardened_one(monkeypatch):
+    """Downloads go through the runtime's opener, whose redirect handler
+    refuses an https:// → http:// downgrade."""
+    import urllib.request
+
+    from p2e_runtime import updates
+
+    opened = []
+
+    class Opener:
+        def open(self, url, timeout=None):
+            opened.append((url, timeout))
+            return FakeResponse(b"")
+
+    monkeypatch.setattr(appimage_module, "build_opener", lambda: Opener())
+    safe_urlopen("https://example.com/tool", timeout=7)
+    assert opened == [("https://example.com/tool", 7)]
+    import inspect
+
+    assert inspect.signature(download_appimagetool).parameters["urlopen"].default is safe_urlopen
+    handler = next(h for h in updates.build_opener().handlers
+                   if isinstance(h, updates._SafeRedirects))
+    request = urllib.request.Request(appimagetool_url("x86_64"))
+    with pytest.raises(updates.UpdateError):
+        handler.redirect_request(request, None, 302, "Found", {},
+                                 "http://github.com/appimagetool-x86_64.AppImage")
 
 
 def test_cut_download_leaves_no_tool(tmp_path):
@@ -639,7 +747,10 @@ def test_run_packaging_downloads_after_consent(tmp_path, onefile, monkeypatch):
     spec = spec_for(onefile, tmp_path)
     runner = FakeRunner()
 
-    def downloader(folder, log, machine, env=None):
+    seen = []
+
+    def downloader(folder, log, machine, env=None, allow_unverified=False):
+        seen.append(allow_unverified)
         os.makedirs(folder, exist_ok=True)
         path = os.path.join(folder, "appimagetool-x86_64.AppImage")
         open(path, "wb").write(b"t")
@@ -649,11 +760,45 @@ def test_run_packaging_downloads_after_consent(tmp_path, onefile, monkeypatch):
     lines = []
     results = run_packaging(spec, ["appimage"], lines.append, runner, LINUX, env={},
                             download_consent=lambda *_: True, downloader=downloader)
+    assert seen == [False]  # a plain yes never accepts an unverified file
     assert results[0].ok and results[0].path.endswith(".AppImage")
     assert runner.calls[0][0][0] == os.path.join(tools, "appimagetool-x86_64.AppImage")
     assert runner.calls[0][1]["env"]["APPIMAGE_EXTRACT_AND_RUN"] == "1"
     assert any("differs" in line for line in lines)
     assert [f.code for f in results[0].findings] == ["package_icon_placeholder"]
+
+
+def test_run_packaging_mismatch_refused_unless_consent_says_unverified(tmp_path, onefile,
+                                                                        monkeypatch):
+    tools = str(tmp_path / "tools")
+    tool = AppImagePackager(tools_dir=tools)
+    monkeypatch.setitem(sys.modules["py2exe_gui.core.packagers"]._PACKAGERS, "appimage", tool)
+    monkeypatch.setattr(shutil, "which", lambda _name: None)
+    spec = spec_for(onefile, tmp_path)
+
+    def urlopen(url, timeout=0):
+        return FakeResponse(b"tool-bytes" if "appimagetool" in url else b"runtime-bytes")
+
+    def downloader(folder, log, machine, env=None, allow_unverified=False):
+        return download_appimagetool(folder, log, machine, urlopen=urlopen, env=env,
+                                     allow_unverified=allow_unverified)
+
+    results = run_packaging(spec, ["appimage"], platform=LINUX, env={},
+                            download_consent=lambda *_: True, downloader=downloader)
+    assert results[0].error_code == "appimagetool_download_failed"
+    assert "sha256 mismatch" in results[0].error
+    assert not os.path.exists(os.path.join(tools, "appimagetool-x86_64.AppImage"))
+    # Any other truthy answer is not consent either.
+    results = run_packaging(spec, ["appimage"], platform=LINUX, env={},
+                            download_consent=lambda *_: "yes", downloader=downloader)
+    assert results[0].error_code == "appimagetool_missing"
+
+    lines = []
+    results = run_packaging(spec, ["appimage"], lines.append, FakeRunner(), LINUX, env={},
+                            download_consent=lambda *_: "unverified", downloader=downloader)
+    assert results[0].ok, results[0].error
+    assert os.path.isfile(os.path.join(tools, "appimagetool-x86_64.AppImage"))
+    assert any("differs" in line for line in lines)
 
 
 def test_run_packaging_reports_a_failed_download(tmp_path, onefile, monkeypatch):
@@ -739,3 +884,8 @@ def test_real_appimage_builds_and_runs(tmp_path, monkeypatch):
     squash = tmp_path / "squashfs-root"
     assert (squash / "AppRun").is_file() and (squash / "hello-app.desktop").is_file()
     assert (squash / "usr" / "bin" / "hello-app").is_file()
+
+
+def test_placeholder_png_is_memoised_per_size():
+    assert placeholder_png(16) is placeholder_png(16)
+    assert placeholder_png(16) != placeholder_png(24)

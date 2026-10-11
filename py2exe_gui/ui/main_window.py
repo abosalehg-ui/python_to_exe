@@ -11,151 +11,51 @@ import json
 import os
 import subprocess
 import sys
-import tempfile
-import time
 import webbrowser
-from dataclasses import replace
 
+from py2exe_gui.bidi import ltr
 from py2exe_gui.constants import (
-    APP_NAME,
     APP_VERSION,
     HISTORY_FILE,
     PRESETS_FILE,
-    PYINSTALLER_REQUIREMENT,
     SETTINGS_FILE,
 )
 from py2exe_gui.core import (
     RELEASES_PAGE_URL,
     BuildConfig,
     BuildHistory,
-    InstallerConfig,
-    ManifestConfig,
     PresetLibrary,
-    apply_fixes,
-    build_iscc_command,
-    build_signtool_command,
     check_for_update,
-    dedupe_findings,
     detect_imports,
-    diagnose_output,
-    diagnostic_config,
-    examine,
     filter_non_stdlib,
-    find_iscc,
-    generate_iss_script,
-    generate_manifest,
-    generate_version_file,
-    installer_output_path,
-    licensing,
-    local_module_names,
-    locate_built_executable,
-    make_record,
-    needs_diagnostic_run,
     parse_requirements,
-    readiness_score,
-    redact_password,
-    resolve_languages,
-    sort_findings,
-    summarize,
 )
-from py2exe_gui.core.build_report import (
-    ReportData,
-    parse_versions,
-    render_html,
-    report_path_for,
-    sha256_file,
-    write_report,
-)
-from py2exe_gui.core.build_runner import popen_options
-from py2exe_gui.core.compare import COMPARE_DIR
-from py2exe_gui.core.diagnostics import build_name, build_root
-from py2exe_gui.core.engines import engine_for, engine_names, get_engine
-from py2exe_gui.core.fixes import (
-    ORIGIN_BUILD,
-    ORIGIN_RUNTIME,
-    Finding,
-    finding_resolved,
-    fix_is_applied,
-)
-from py2exe_gui.core.installer import validate as validate_installer
-from py2exe_gui.core.knowledge import default_is_installed
 from py2exe_gui.core.project_file import (
-    PROJECT_FILE_NAME,
     SECTIONS,
     ProjectConfig,
-    ProjectFileError,
-    load_project,
-    new_project_for_script,
-    project_path_for_script,
-    save_project,
     sections_in,
+    split_untrusted_flags,
     untrusted_flags,
 )
-from py2exe_gui.core.project_scan import project_imports
 from py2exe_gui.core.release import credentials
-from py2exe_gui.core.release.changelog import draft_notes
-from py2exe_gui.core.release.git import remote_slug
-from py2exe_gui.core.release.pipeline import (
-    DONE,
-    ReleaseContext,
-    ReleaseOptions,
-    confirmation,
-    has_blocking_problems,
-)
-from py2exe_gui.core.release.versioning import apply_version, is_semver, version_mismatches
+
+# The side navigation (2.1): six sections, in the order the work happens.
+# Each holds one or more of the former tabs; "build" is one composed page.
+# Worker classes, dialogs and core helpers the controller mixins
+# (py2exe_gui/ui/controllers) reach through this module at call time, so one
+# monkeypatch of ``py2exe_gui.ui.main_window.X`` covers every controller.
+from py2exe_gui.core.release.pipeline import ReleaseOptions  # noqa: F401
 from py2exe_gui.core.runtime_kit import (
-    preview_options,
-    render_hook,
-    render_runtime_config,
     untrusted_risks,
-    write_kit,
 )
-from py2exe_gui.core.sandbox import generate_wsb, sandbox_available, wsb_for_output
-from py2exe_gui.core.size_analyzer import (
-    analyze,
-    exclude_suggestions,
-    format_size,
-    group_label_key,
-    indirect_packages,
-    onefile_too_big,
-    output_path_for,
-    previous_size,
-)
+from py2exe_gui.core.sandbox import sandbox_available  # noqa: F401
 from py2exe_gui.core.update_signing import (
-    backup_existing,
-    fingerprint,
-    is_inside,
-    key_to_json,
-    new_signing_key,
-    publish_update,
-    read_key_file,
     read_public_key,
-    write_key_file,
 )
-from py2exe_gui.core.venv_manager import (
-    InstalledChecker,
-    delete_env,
-    env_dir_for,
-    env_exists,
-    env_python,
-    env_status,
-    find_uv,
-    folder_size,
-    format_lock,
-    freeze_command,
-    lock_file_path,
-    plan_environment,
-    project_requirements,
-    quote_command,
-    write_metadata,
-)
-from py2exe_gui.core.workspace import summarize_projects
+from py2exe_gui.core.venv_manager import find_uv  # noqa: F401
 from py2exe_gui.icons import themed_icon
 from py2exe_gui.paths import envs_dir, license_key_path, signing_key_path
 from py2exe_gui.qt import (
-    QAction,
-    QActionGroup,
-    QDesktopServices,
     QFileDialog,
     QFrame,
     QHBoxLayout,
@@ -170,15 +70,12 @@ from py2exe_gui.qt import (
     QSplitter,
     Qt,
     QTimer,
-    QUrl,
     QVBoxLayout,
     QWidget,
-    application_font,
 )
 from py2exe_gui.strings import (
     LOCALE_LAYOUT,
     S,
-    available_locales,
     current_locale,
     set_locale,
 )
@@ -190,29 +87,25 @@ from py2exe_gui.styles import (
     resolve_theme,
     themed_stylesheet,
 )
-from py2exe_gui.templates import TEMPLATES, template_name
-from py2exe_gui.texts import notes_titles, project_error_text, runtime_texts
-from py2exe_gui.ui.batch_thread import BatchThread
+from py2exe_gui.ui import streaming_thread
+from py2exe_gui.ui.batch_thread import BatchThread  # noqa: F401
 from py2exe_gui.ui.build_page import BuildPage
-from py2exe_gui.ui.compare_thread import CompareThread
-from py2exe_gui.ui.conversion_thread import ConversionThread
-from py2exe_gui.ui.diagnostic_thread import DiagnosticThread
-from py2exe_gui.ui.dialogs import (
-    CiPreviewDialog,
-    CommandPreviewDialog,
-    PresetNameDialog,
-    ReleaseConfirmDialog,
-    ShortcutsDialog,
-)
-from py2exe_gui.ui.env_thread import EnvThread
-from py2exe_gui.ui.finding_text import finding_detail, finding_title, fix_label, service_label
-from py2exe_gui.ui.icon_studio_dialog import IconStudioDialog
-from py2exe_gui.ui.installer_thread import InstallerThread
-from py2exe_gui.ui.license_dialog import LicenseGeneratorDialog
+from py2exe_gui.ui.compare_thread import CompareThread  # noqa: F401
+from py2exe_gui.ui.controllers.build import BuildController
+from py2exe_gui.ui.controllers.doctor import DoctorController
+from py2exe_gui.ui.controllers.environment import EnvironmentController
+from py2exe_gui.ui.controllers.keys import KeysController
+from py2exe_gui.ui.controllers.project import ProjectController
+from py2exe_gui.ui.controllers.release import ReleaseController
+from py2exe_gui.ui.conversion_thread import ConversionThread  # noqa: F401
+from py2exe_gui.ui.diagnostic_thread import DiagnosticThread  # noqa: F401
+from py2exe_gui.ui.dialogs import CommandPreviewDialog  # noqa: F401
+from py2exe_gui.ui.env_thread import CommandThread, EnvThread, TaskThread  # noqa: F401
+from py2exe_gui.ui.installer_thread import InstallerThread  # noqa: F401
 from py2exe_gui.ui.navigation import SectionView
-from py2exe_gui.ui.package_thread import PackageThread
-from py2exe_gui.ui.post_build_thread import PostBuildThread
-from py2exe_gui.ui.release_thread import ReleaseThread
+from py2exe_gui.ui.package_thread import PackageThread  # noqa: F401
+from py2exe_gui.ui.post_build_thread import PostBuildThread  # noqa: F401
+from py2exe_gui.ui.release_thread import ReleaseThread  # noqa: F401
 from py2exe_gui.ui.tabs import (
     AboutTab,
     AdvancedTab,
@@ -231,13 +124,10 @@ from py2exe_gui.ui.tabs import (
     TemplatesTab,
     VersionInfoTab,
 )
-from py2exe_gui.ui.tabs.settings_tab import THEME_LABEL_KEYS
-from py2exe_gui.ui.tabs.size_tab import ltr, size_text
+from py2exe_gui.ui.tabs.base import em_width
 from py2exe_gui.ui.tray import BuildTray
 from py2exe_gui.ui.widgets import DropOverlay, NoticeBar
 
-# The side navigation (2.1): six sections, in the order the work happens.
-# Each holds one or more of the former tabs; "build" is one composed page.
 NAV_SECTIONS = ("projects", "build", "check", "distribute", "tools", "settings")
 #: The former tabs that are sections of the Build page, with their titles.
 BUILD_SECTIONS = ("advanced", "version_info", "deploy")
@@ -271,7 +161,7 @@ ALL_SECTIONS = ("build", "project") + SECTIONS
 DOCTOR_DEBOUNCE_MS = 500
 
 
-class MainWindow(QMainWindow):
+class MainWindow(BuildController, EnvironmentController, ReleaseController, KeysController, ProjectController, DoctorController, QMainWindow):
     """النافذة الرئيسية للتطبيق."""
 
     def __init__(self):
@@ -283,6 +173,9 @@ class MainWindow(QMainWindow):
         self.compare_thread = None
         self.diagnostic_thread = None
         self.env_thread = None
+        # One-off commands (pip installs, pip freeze) and the update check.
+        self.command_thread = None
+        self.task_thread = None
         self.settings = {}
         self.current_theme = "dark"
         self.font_scale = DEFAULT_FONT_SCALE
@@ -415,10 +308,10 @@ class MainWindow(QMainWindow):
             if name:
                 button.setIcon(self._icon(name, button.property("iconRole") or "text"))
         self.log_panel.set_chevrons(self._icon("chevron_down"), self._icon("chevron_up"))
-        side = "chevron_left" if self.layoutDirection() == Qt.LayoutDirection.RightToLeft \
-            else "chevron_right"
+        # Always "chevron_right": it is in icons.DIRECTIONAL, so _icon() already
+        # mirrors it under RTL. Asking for chevron_left there mirrored twice.
         for section in self.build_page.sections.values():
-            section.set_chevrons(self._icon("chevron_down"), self._icon(side))
+            section.set_chevrons(self._icon("chevron_down"), self._icon("chevron_right"))
         for action, name in getattr(self, "_menu_icons", []):
             action.setIcon(self._icon(name))
         self.notice_bar.set_icons(
@@ -751,10 +644,10 @@ class MainWindow(QMainWindow):
             button.setMinimumHeight(36)
             button.setAccessibleName(text)
             if primary:
-                font = application_font(11)
-                font.setBold(True)
-                button.setFont(font)
-                button.setMinimumWidth(160)
+                # Sized by the stylesheet (QPushButton[primary="true"]) so
+                # Ctrl+= scales it with the rest of the window.
+                button.setProperty("primary", "true")
+                button.setMinimumWidth(em_width(button, 14))
             button.clicked.connect(handler)
             row.addWidget(button)
             return button
@@ -782,7 +675,7 @@ class MainWindow(QMainWindow):
         self.progress_bar.setValue(0)
         self.progress_bar.setFormat(S.PROGRESS_READY)
         self.progress_bar.setTextVisible(False)
-        self.progress_bar.setFixedWidth(180)
+        self.progress_bar.setFixedWidth(em_width(self.progress_bar, 16))
         self.progress_bar.setFixedHeight(10)
         self.progress_bar.setAccessibleName(S.PROGRESS_READY)
         self.progress_bar.setVisible(False)
@@ -791,12 +684,77 @@ class MainWindow(QMainWindow):
         return bar
 
     def _refresh_progress_label(self, *_args):
-        """Mirror the bar's format (stage + percentage) into the label."""
+        """Mirror the bar's format (stage + percentage) into the label.
+
+        The percentage is rendered here rather than by the bar: Qt's "%p%"
+        inside a right-to-left paragraph came out as "%42". The number is
+        isolated so it reads "42%" in both directions.
+        """
         if hasattr(self, "progress_label"):
-            text = self.progress_bar.text()
+            text = self.progress_text()
             self.progress_label.setText(text)
             self.progress_label.setVisible(self.progress_bar.isVisibleTo(self))
             self.progress_bar.setAccessibleName(text)
+
+    def progress_text(self) -> str:
+        """The bar's format with ``%p%`` replaced by an isolated percentage."""
+        bar = self.progress_bar
+        text = bar.format()
+        if "%p%" not in text:
+            return text
+        span = bar.maximum() - bar.minimum()
+        if span <= 0:  # busy (0, 0): no percentage to show
+            return text.replace("%p%", "").rstrip(" —-–")
+        percent = round((bar.value() - bar.minimum()) * 100 / span)
+        return text.replace("%p%", ltr(f"{percent}%"))
+
+    # ── Busy state ─────────────────────────────────────────────────────────
+
+    def _set_busy(self, text: str):
+        """Show an indeterminate bar labelled ``text`` while a task runs.
+
+        The environment, the diagnostic run and the comparison used to set
+        the bar's range to (0, 0) and nothing else; the bar was hidden, so
+        nothing moved on screen for minutes.
+        """
+        self.progress_bar.setRange(0, 0)
+        self.progress_bar.setFormat(text)
+        self.progress_bar.setVisible(True)
+        self.progress_label.setVisible(True)
+        self._refresh_progress_label()
+        self.set_status(text)
+
+    def _clear_busy(self):
+        """Back to the idle bar: hidden, determinate, "ready"."""
+        self.progress_bar.setRange(0, 100)
+        self.progress_bar.setValue(0)
+        self.progress_bar.setFormat(S.PROGRESS_READY)
+        self.progress_bar.setVisible(False)
+        self.progress_label.setVisible(False)
+        self._refresh_progress_label()
+        self.set_status(S.STATUS_READY)
+
+    def thread_error_text(self, code: str, tool: str = "", thread=None) -> str:
+        """A worker's outcome code in the active locale.
+
+        Threads report ``streaming_thread`` codes, never sentences; ``tool``
+        names the program for the sentence and ``thread`` supplies the exit
+        code or the OS error it kept.
+        """
+        tool = tool or "?"
+        if code == streaming_thread.CANCELLED:
+            return S.THREAD_ERR_CANCELLED
+        if code == streaming_thread.NOT_FOUND:
+            return S.THREAD_ERR_NOT_FOUND_FMT.format(tool=tool)
+        if code == streaming_thread.TIMED_OUT:
+            return S.THREAD_ERR_TIMED_OUT_FMT.format(tool=tool)
+        if code == streaming_thread.ERROR:
+            return S.THREAD_ERR_ERROR_FMT.format(
+                tool=tool, error=getattr(thread, "error", "") or "?")
+        if code == streaming_thread.FAILED:
+            return S.THREAD_ERR_FAILED_FMT.format(
+                tool=tool, code=getattr(thread, "returncode", None))
+        return code
 
     # ── Status bar ─────────────────────────────────────────────────────────
 
@@ -900,20 +858,6 @@ class MainWindow(QMainWindow):
         if added:
             self._append_log(S.LOG_REQS_HINT)
 
-    # ─── Templates ──────────────────────────────────────────────────────
-
-    def apply_selected_template(self):
-        key = self.templates_tab.selected_template()
-        if not key:
-            return
-        template = TEMPLATES[key]
-        self.main_tab.windowed_check.setChecked(template["windowed"])
-        self.main_tab.onefile_check.setChecked(template["onefile"])
-        self.advanced_tab.merge_hidden_imports(template["hidden_imports"])
-        name = template_name(key)
-        self._append_log(S.LOG_TEMPLATE_APPLIED.format(name=name))
-        self.notify(S.MSG_TEMPLATE_OK_FMT.format(name=name), "success")
-
     # ─── Configuration ──────────────────────────────────────────────────
 
     def _current_project(self) -> ProjectConfig:
@@ -994,7 +938,7 @@ class MainWindow(QMainWindow):
         code into every EXE the build produces. The user needs to see that
         before it silently becomes part of a signed binary.
         """
-        flags = untrusted_flags(config)
+        flags, outside = split_untrusted_flags(untrusted_flags(config))
         if flags:
             shown = config.extra_args
             if config.upx and config.upx_dir.strip():
@@ -1006,6 +950,18 @@ class MainWindow(QMainWindow):
                     flags="\n".join(f"  • {f}" for f in flags),
                     args=shown,
                 ),
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                QMessageBox.StandardButton.No,
+            )
+            if reply != QMessageBox.StandardButton.Yes:
+                return False
+        if outside:
+            # Paths outside the project copy this machine's files into the EXE.
+            reply = QMessageBox.question(
+                self,
+                S.MSG_CONFIRM,
+                S.MSG_UNTRUSTED_EXTRA_FILES_CONFIRM.format(
+                    files="\n".join(f"  • {f}" for f in outside)),
                 QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
                 QMessageBox.StandardButton.No,
             )
@@ -1027,250 +983,6 @@ class MainWindow(QMainWindow):
             QMessageBox.StandardButton.No,
         )
         return reply == QMessageBox.StandardButton.Yes
-
-    # ─── Presets ────────────────────────────────────────────────────────
-
-    def _refresh_presets_list(self):
-        if hasattr(self, "templates_tab"):
-            self.templates_tab.refresh_presets(self.presets)
-
-    def save_current_preset(self):
-        """Store the current form under a name the user chooses."""
-        dialog = PresetNameDialog(self, initial=self.main_tab.output_name.text().strip())
-        if not dialog.exec():
-            return
-        name = dialog.get_value()
-        if not name:
-            QMessageBox.warning(self, S.MSG_WARNING, S.ERR_PRESET_NAME)
-            return
-
-        if self.presets.has(name):
-            reply = QMessageBox.question(
-                self,
-                S.MSG_CONFIRM,
-                S.PRESET_OVERWRITE_CONFIRM.format(name=name),
-                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
-                QMessageBox.StandardButton.No,
-            )
-            if reply != QMessageBox.StandardButton.Yes:
-                return
-
-        if not self.presets.put(name, self._current_project().to_settings_dict()):
-            QMessageBox.critical(
-                self, S.MSG_ERROR, S.ERR_PRESET_SAVE_FAIL.format(error=self.presets.last_error)
-            )
-            return
-        self._refresh_presets_list()
-        self._append_log(S.PRESET_SAVED_FMT.format(name=name))
-
-    def apply_selected_preset(self):
-        """Load the selected preset back into the form."""
-        name = self.templates_tab.selected_preset()
-        if not name:
-            return
-        data = self.presets.get(name)
-        if data is None:
-            return
-        project = ProjectConfig.from_settings_dict(data)
-        # A preset can be imported from elsewhere, so it gets the same
-        # dangerous-flag check as a settings file.
-        if not self._confirm_untrusted_config(project.build):
-            return
-        self._apply_project(project, self._sections_of(data))
-        self._append_log(S.PRESET_APPLIED_FMT.format(name=name))
-
-    def delete_selected_preset(self):
-        name = self.templates_tab.selected_preset()
-        if not name:
-            return
-        reply = QMessageBox.question(
-            self,
-            S.MSG_CONFIRM,
-            S.MSG_PRESET_DELETE_CONFIRM.format(name=name),
-            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
-            QMessageBox.StandardButton.No,
-        )
-        if reply != QMessageBox.StandardButton.Yes:
-            return
-        if self.presets.delete(name):
-            self._refresh_presets_list()
-            self._append_log(S.PRESET_DELETED_FMT.format(name=name))
-
-    def export_presets(self):
-        if len(self.presets) == 0:
-            return
-        file_path, _ = QFileDialog.getSaveFileName(
-            self, S.DIALOG_EXPORT_PRESETS, "py2exe_presets.json", S.DIALOG_FILTER_JSON
-        )
-        if not file_path:
-            return
-        try:
-            with open(file_path, "w", encoding="utf-8") as f:
-                json.dump(self.presets.export_all(), f, ensure_ascii=False, indent=2)
-        except (OSError, TypeError) as e:
-            QMessageBox.critical(self, S.MSG_ERROR, S.ERR_SAVE_FAIL.format(error=str(e)))
-            return
-        self._append_log(S.LOG_SETTINGS_SAVED.format(path=file_path))
-
-    def import_presets(self):
-        """Merge a shared preset file, without overwriting the user's own."""
-        file_path, _ = QFileDialog.getOpenFileName(
-            self, S.DIALOG_IMPORT_PRESETS, "", S.DIALOG_FILTER_JSON
-        )
-        if not file_path:
-            return
-        try:
-            with open(file_path, encoding="utf-8") as f:
-                data = json.load(f)
-        except (OSError, ValueError) as e:
-            QMessageBox.critical(self, S.MSG_ERROR, S.ERR_LOAD_FAIL.format(error=str(e)))
-            return
-
-        added = self.presets.import_all(data)
-        self._refresh_presets_list()
-        if added:
-            self._append_log(S.LOG_PRESET_IMPORTED_FMT.format(count=len(added)))
-        else:
-            self._append_log(S.LOG_PRESET_IMPORT_NONE)
-
-    # ─── Batch conversion ───────────────────────────────────────────────
-
-    def start_batch_conversion(self):
-        """Build every queued file in turn with the current settings."""
-        if self._build_in_progress():
-            QMessageBox.warning(self, S.MSG_WARNING, S.ERR_BATCH_BUSY)
-            return
-
-        jobs = self.batch_tab.jobs()
-        if not jobs:
-            QMessageBox.warning(self, S.MSG_WARNING, S.ERR_BATCH_NO_FILES)
-            return
-
-        if not self._ensure_pyinstaller():
-            return
-
-        self._batch_jobs = jobs
-        self.batch_tab.set_running(True)
-        self.convert_btn.setEnabled(False)
-        self.progress_bar.setValue(0)
-        self.progress_bar.setFormat(S.PROGRESS_CONVERTING)
-
-        self.batch_thread = BatchThread(
-            jobs, self._current_config(), python_for=self.build_python,
-            options_for=self._runtime_kit_options,
-        )
-        self.batch_thread.log_signal.connect(self._append_log)
-        self.batch_thread.progress_signal.connect(self.progress_bar.setValue)
-        self.batch_thread.job_signal.connect(self._on_batch_job_update)
-        self.batch_thread.finished_signal.connect(self._on_batch_finished)
-        self.batch_thread.start()
-
-    def cancel_batch_conversion(self):
-        if not (self.batch_thread and self.batch_thread.isRunning()):
-            return
-        reply = QMessageBox.question(
-            self,
-            S.MSG_CONFIRM,
-            S.MSG_BATCH_CANCEL_CONFIRM,
-            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
-            QMessageBox.StandardButton.No,
-        )
-        if reply == QMessageBox.StandardButton.Yes:
-            self.batch_thread.cancel()
-
-    def _on_batch_job_update(self, index, _total, _status):
-        if 0 <= index < len(self._batch_jobs):
-            self.batch_tab.update_row(index, self._batch_jobs[index])
-
-    def _on_batch_finished(self, completed):
-        self.batch_tab.set_running(False)
-        self.convert_btn.setEnabled(True)
-        self.progress_bar.setFormat(S.PROGRESS_DONE if completed else S.PROGRESS_FAILED)
-        self.batch_tab.show_summary(self._batch_jobs)
-
-        # Every batch job is a real build, so each belongs in the history.
-        for job in self._batch_jobs:
-            record = make_record(
-                source=job.source,
-                output_name=job.output_name,
-                success=job.status == "success",
-                duration_seconds=job.duration_seconds,
-                config=self._current_project().to_settings_dict(),
-            )
-            self.history.add(record)
-        self._refresh_history_list()
-
-        summary = summarize(self._batch_jobs)
-        self._notify_build_result(
-            summary.failed == 0 and summary.cancelled == 0,
-            f"{summary.succeeded}/{summary.total}",
-        )
-
-    # ─── Compare engines (2.0) ──────────────────────────────────────────
-
-    def start_compare(self, allow_downloads: bool = False):
-        """Build the project with every engine into p2e_compare/, then measure."""
-        if self._build_in_progress():
-            QMessageBox.warning(self, S.MSG_WARNING, S.MSG_COMPARE_BUSY)
-            return
-        project = self._current_project()
-        config = project.build
-        if not config.source or not os.path.isfile(config.source):
-            QMessageBox.warning(self, S.MSG_WARNING, S.ERR_NO_SOURCE)
-            return
-        if config.isolated_env and not env_exists(self._env_dir(config.source)):
-            QMessageBox.warning(self, S.MSG_WARNING, S.FINDING_ENV_NOT_CREATED_DETAIL)
-            return
-        python = self.build_python(config)
-        for name in engine_names():
-            if not self._ensure_engine(get_engine(name), python):
-                return
-        self.size_tab.show_compare([], None)
-        self.size_tab.compare_btn.setEnabled(False)
-        self.convert_btn.setEnabled(False)
-        self.progress_bar.setRange(0, 0)  # busy: one bar for several builds
-        self.compare_thread = CompareThread(
-            project, python, runs=self.size_tab.compare_runs.value(),
-            timeout=float(self.size_tab.compare_timeout.value()),
-            texts=self._runtime_texts(), rtl=self._rtl(), allow_downloads=allow_downloads,
-        )
-        self.compare_thread.log_signal.connect(self._append_log)
-        self.compare_thread.phase_signal.connect(self._on_compare_phase)
-        self.compare_thread.finished_signal.connect(self._on_compare_finished)
-        self.compare_thread.start()
-
-    def _on_compare_phase(self, engine: str, phase: str):
-        template = getattr(S, f"COMPARE_PHASE_{phase.upper()}", "{engine}")
-        text = template.format(engine=get_engine(engine).display_name)
-        self.progress_bar.setFormat(text)
-        self._append_log(text)
-
-    def _on_compare_finished(self, rows, recommendation):
-        self.progress_bar.setRange(0, 100)
-        self.progress_bar.setValue(0)
-        self.progress_bar.setFormat(S.PROGRESS_READY)
-        self.size_tab.compare_btn.setEnabled(True)
-        self.convert_btn.setEnabled(True)
-        self._compare_view = (rows, recommendation)
-        self.size_tab.show_compare(rows, recommendation)
-        config = self._current_config()
-        self._append_log(S.COMPARE_DONE_LOG.format(
-            folder=os.path.join(build_root(config), COMPARE_DIR)))
-        self.tabs.setCurrentWidget(self.size_tab)
-        declined = [f for row in rows for f in row.findings
-                    if f.code == "nuitka_download_declined"]
-        if declined and self.ask_download_consent(declined[0].params.get("tool", "")):
-            self._allow_downloads_once = False  # the consent goes to this comparison
-            self.start_compare(allow_downloads=True)
-
-    def _build_in_progress(self) -> bool:
-        for thread in (
-            self.conversion_thread, self.batch_thread, self.diagnostic_thread, self.env_thread,
-            self.release_thread, self.compare_thread, self.package_thread,
-        ):
-            if thread and thread.isRunning():
-                return True
-        return False
 
     # ─── Preferences ────────────────────────────────────────────────────
 
@@ -1295,345 +1007,6 @@ class MainWindow(QMainWindow):
             self._append_log(S.LOG_SETTINGS_SAVE_FAIL.format(error=str(e)))
             return False
         return True
-
-    # ─── Build pipeline ─────────────────────────────────────────────────
-
-    def ask_download_consent(self, tool: str) -> bool:
-        """Ask before letting the engine download a tool; True allows the next build."""
-        reply = QMessageBox.question(
-            self, S.MSG_CONFIRM, S.MSG_NUITKA_DOWNLOAD_CONFIRM.format(tool=tool or "?"),
-            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No, QMessageBox.StandardButton.No,
-        )
-        if reply != QMessageBox.StandardButton.Yes:
-            return False
-        self._allow_downloads_once = True
-        self._append_log(S.LOG_NUITKA_DOWNLOAD_ALLOWED)
-        return True
-
-    def _ensure_engine(self, engine, python: str = "") -> bool:
-        """The build engine is installed in ``python``, or installed with consent."""
-        if engine.name == "pyinstaller":
-            return self._ensure_pyinstaller(python)
-        python = python or sys.executable
-        if engine.is_available(python):
-            return True
-        install_cmd = [python, "-m", "pip", "install", *engine.requirements()]
-        reply = QMessageBox.question(
-            self, S.MSG_CONFIRM,
-            S.MSG_INSTALL_ENGINE_CONFIRM.format(engine=engine.display_name,
-                                                cmd=quote_command(install_cmd)),
-            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No, QMessageBox.StandardButton.No,
-        )
-        if reply != QMessageBox.StandardButton.Yes:
-            self._append_log(S.LOG_INSTALL_ENGINE_DECLINED.format(engine=engine.display_name))
-            return False
-        self._append_log(S.LOG_INSTALL_ENGINE.format(engine=engine.display_name))
-        self._append_log(quote_command(install_cmd))
-        try:
-            subprocess.run(install_cmd, capture_output=True, check=True, timeout=1200)
-        except (OSError, subprocess.SubprocessError) as e:
-            QMessageBox.critical(self, S.MSG_ERROR, S.ERR_INSTALL_ENGINE_FAIL.format(
-                engine=engine.display_name, error=str(e)))
-            return False
-        self._append_log(S.LOG_INSTALL_ENGINE_OK.format(engine=engine.display_name))
-        return True
-
-    def _ensure_pyinstaller(self, python: str = "") -> bool:
-        """Check for PyInstaller, offering to install it with explicit consent.
-
-        The previous version ran ``pip install pyinstaller`` silently on the
-        first build: an unattended network install, unpinned, from whatever
-        index the environment happened to point at. ``python`` is the build
-        interpreter (an isolated environment's), defaulting to this one.
-        """
-        try:
-            subprocess.run(
-                [python or sys.executable, "-m", "PyInstaller", "--version"],
-                capture_output=True,
-                check=True,
-            )
-            return True
-        except (OSError, subprocess.CalledProcessError):
-            pass
-
-        install_cmd = [python or sys.executable, "-m", "pip", "install", PYINSTALLER_REQUIREMENT]
-        reply = QMessageBox.question(
-            self,
-            S.MSG_CONFIRM,
-            S.MSG_INSTALL_PYINSTALLER_CONFIRM.format(cmd=" ".join(install_cmd)),
-            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
-            QMessageBox.StandardButton.No,
-        )
-        if reply != QMessageBox.StandardButton.Yes:
-            self._append_log(S.LOG_INSTALL_PYINSTALLER_DECLINED)
-            return False
-
-        self._append_log(S.LOG_INSTALL_PYINSTALLER)
-        self._append_log(" ".join(install_cmd))
-        try:
-            subprocess.run(install_cmd, capture_output=True, check=True, timeout=600)
-        except (OSError, subprocess.SubprocessError) as e:
-            QMessageBox.critical(
-                self, S.MSG_ERROR, S.ERR_INSTALL_PYINSTALLER_FAIL.format(error=str(e))
-            )
-            return False
-        self._append_log(S.LOG_INSTALL_PYINSTALLER_OK)
-        return True
-
-    def start_conversion(self):
-        config = self._current_config()
-        engine = engine_for(config)
-        native = []
-        if engine.version_info_mode == "options":
-            native += engine.metadata_options(self._current_project().version_info)
-        else:
-            version_path = self._materialize_version_file()
-            if version_path:
-                config.version_file = version_path
-        if engine.supports("manifest"):
-            manifest_path = self._materialize_manifest_file()
-            if manifest_path:
-                config.manifest_file = manifest_path
-        # Consent to downloads is given for one build at a time, by a person.
-        if self._allow_downloads_once:
-            self._allow_downloads_once = False
-            native += engine.consent_options()
-
-        # Every early return below must clean up the temp files created above;
-        # one path used to skip that and leak into %TEMP%.
-        python = self.build_python(config)
-        cmd, error = engine.build_command(config, python_executable=python,
-                                          extra_options=native)
-        if error:
-            self._cleanup_temp_files()
-            QMessageBox.warning(self, S.MSG_WARNING, error)
-            return
-        kit_options, kit_error = self._runtime_kit_options(config)
-        if kit_error:
-            self._cleanup_temp_files()
-            QMessageBox.warning(self, S.MSG_WARNING, kit_error)
-            return
-        if kit_options:
-            cmd, _error = engine.build_command(
-                config, python_executable=python, extra_options=native + kit_options
-            )
-            self._append_log(S.LOG_KIT_EMBEDDED_FMT.format(
-                services=", ".join(self._runtime_service_labels(config))
-            ))
-
-        if config.isolated_env and not env_exists(self._env_dir(config.source)):
-            self._cleanup_temp_files()
-            reply = QMessageBox.question(
-                self, S.MSG_CONFIRM, S.MSG_ENV_NEEDED,
-                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No, QMessageBox.StandardButton.Yes,
-            )
-            if reply == QMessageBox.StandardButton.Yes:
-                self.create_build_env(then_build=True)
-            return
-
-        if not self._ensure_engine(engine, python):
-            self._cleanup_temp_files()
-            return
-        if python != sys.executable:
-            self._append_log(S.LOG_ENV_PYTHON.format(python=python))
-        if engine.name != "pyinstaller":
-            self._append_log(S.LOG_ENGINE_BUILD.format(engine=engine.display_name))
-        try:
-            engine.prepare_output(config)
-        except OSError as e:
-            self._cleanup_temp_files()
-            QMessageBox.critical(self, S.MSG_ERROR, str(e))
-            return
-        self._build_command = list(cmd)
-
-        self._build_start_time = time.monotonic()
-        self._build_wall_start = time.time()
-        snapshot = self._current_project()
-        snapshot.build = config
-        self._build_config_snapshot = snapshot.to_settings_dict()
-        self._build_output = []
-
-        # A last look before building: the doctor never blocks a build, but
-        # errors it can already see are worth one line in the log.
-        self.run_doctor()
-        errors = sum(f.severity == "error" for f in self._doctor_findings)
-        if errors:
-            self._append_log(S.LOG_DOCTOR_PREBUILD.format(errors=errors))
-
-        work_dir = self.main_tab.output_dir.text() or os.path.dirname(
-            self.main_tab.source_input.text()
-        )
-
-        self._set_building(True)
-        self.progress_bar.setValue(0)
-        self.progress_bar.setFormat(S.PROGRESS_CONVERTING)
-        self.progress_bar.setVisible(True)
-        self._refresh_progress_label()
-        self.log_panel.set_expanded(True)
-        self.set_status(S.STATUS_BUILDING)
-
-        self.conversion_thread = ConversionThread(
-            cmd, work_dir, stages=engine.stages,
-            popen_kwargs=popen_options(engine.name, engine.build_env(python)),
-        )
-        self.conversion_thread.log_signal.connect(self._append_log)
-        self.conversion_thread.log_signal.connect(self._build_output.append)
-        self.conversion_thread.progress_signal.connect(self.progress_bar.setValue)
-        self.conversion_thread.stage_signal.connect(self._on_stage_changed)
-        self.conversion_thread.finished_signal.connect(self.on_conversion_finished)
-        self.conversion_thread.start()
-
-        # A build runs for minutes; make sure it can report from the tray even
-        # if the window ends up minimised or behind something else.
-        self.tray.show()
-
-    def _on_stage_changed(self, stage_key: str):
-        """Name the phase the engine has reached on the progress bar."""
-        label = getattr(S, f"STAGE_{stage_key.upper()}", "")
-        if label:
-            self.progress_bar.setFormat(S.PROGRESS_STAGE_FMT.format(stage=label))
-            self._refresh_progress_label()
-            self.set_status(S.STATUS_BUILDING_STAGE_FMT.format(stage=label))
-
-    def _notify_build_result(self, success: bool, name: str):
-        """Raise a desktop notification, unless the window is already focused."""
-        if self.isActiveWindow():
-            return
-        if success:
-            self.tray.notify(
-                S.TRAY_BUILD_OK_TITLE, S.TRAY_BUILD_OK_BODY.format(name=name), True
-            )
-        else:
-            self.tray.notify(S.TRAY_BUILD_FAIL_TITLE, S.TRAY_BUILD_FAIL_BODY, False)
-
-    def cancel_conversion(self):
-        if self.conversion_thread and self.conversion_thread.isRunning():
-            self.conversion_thread.cancel()
-            self._append_log(S.LOG_CANCELLING)
-
-    def _set_building(self, active: bool):
-        """Swap the Build and Cancel buttons; only one is ever shown."""
-        self.convert_btn.setEnabled(not active)
-        self.convert_btn.setVisible(not active)
-        self.cancel_btn.setEnabled(active)
-        self.cancel_btn.setVisible(active)
-
-    def on_conversion_finished(self, success, message):
-        self._set_building(False)
-        duration = max(0.0, time.monotonic() - self._build_start_time)
-        snapshot = self._build_config_snapshot
-
-        # Measure before recording: the record stores the size, and the
-        # comparison must be against the build *before* this one.
-        size_report, previous = None, 0
-        if success and snapshot:
-            built = BuildConfig.from_dict(snapshot)
-            previous = previous_size(
-                self.history.records, built.source, snapshot.get("output_name", "")
-            )
-            size_report = analyze(built)
-
-        if snapshot:
-            record = make_record(
-                source=snapshot.get("source", ""),
-                output_name=snapshot.get("output_name", ""),
-                success=success,
-                duration_seconds=round(duration, 2),
-                config=snapshot,
-                size_bytes=size_report.output_bytes if size_report else 0,
-            )
-            if not self.history.add(record):
-                self._append_log(
-                    S.LOG_HISTORY_SAVE_FAIL.format(error=self.history.last_error)
-                )
-            self._refresh_history_list()
-            self.refresh_home()
-
-        diagnosed = []
-        if snapshot and message != S.CONV_CANCELLED:
-            diagnosed = self._diagnose_build(BuildConfig.from_dict(snapshot))
-            if not success and diagnosed:
-                message += S.MSG_DOCTOR_FAILED_HINT.format(count=len(diagnosed))
-
-        if size_report is not None:
-            built = BuildConfig.from_dict(snapshot)
-            self._show_size(built, size_report, previous)
-            if size_report.output_bytes:
-                self._append_log(
-                    S.LOG_SIZE_SUMMARY.format(disk=size_text(size_report.output_bytes))
-                )
-            if self.size_tab.report_auto.isChecked():
-                self._write_build_report(built, size_report, previous, duration, success)
-
-        # Post-build actions only make sense for a successful build.
-        if success and snapshot:
-            try:
-                self._run_post_build_actions(BuildConfig.from_dict(snapshot))
-            except (OSError, ValueError) as e:
-                self._append_log(S.LOG_SIGNING_FAIL.format(error=str(e)))
-
-        output_name = snapshot.get("output_name", "") if snapshot else ""
-        self._build_config_snapshot = {}
-        self._cleanup_temp_files()
-
-        # Notify before the modal box: the dialog blocks until acknowledged,
-        # and the whole point is to reach a user who is looking elsewhere.
-        self._notify_build_result(success, output_name)
-
-        if success:
-            self.progress_bar.setFormat(S.PROGRESS_DONE)
-            self._refresh_progress_label()
-            self.set_status(S.STATUS_DONE_FMT.format(duration=ltr(f"{duration:.0f}s")))
-            # The outcome stays until closed; the tray already pinged anyone
-            # who was looking elsewhere.
-            self.notify(message, "success", 0)
-        else:
-            self.progress_bar.setFormat(S.PROGRESS_FAILED)
-            self._refresh_progress_label()
-            self.set_status(S.STATUS_CANCELLED if message == S.CONV_CANCELLED
-                            else S.STATUS_FAILED)
-            declined = [f for f in diagnosed if f.code == "nuitka_download_declined"]
-            if declined:
-                # The engine stopped to ask for a download; only a person says yes.
-                if self.ask_download_consent(declined[0].params.get("tool", "")):
-                    self.start_conversion()
-            elif message != S.CONV_CANCELLED:
-                QMessageBox.critical(self, S.MSG_ERROR, message)
-
-    def preview_command(self):
-        """Show the command the selected engine would run."""
-        config = self._current_config()
-        engine = engine_for(config)
-        kit = preview_options(config) if engine.supports("runtime_kit") else []
-        native = engine.metadata_options(self._current_project().version_info)
-        cmd, error = engine.build_command(
-            config, python_executable=self.build_python(config),
-            extra_options=native + kit,
-        )
-        if error:
-            QMessageBox.warning(self, S.MSG_WARNING, error)
-            return
-        CommandPreviewDialog(cmd, parent=self).exec()
-
-    def open_output_folder(self):
-        output_dir = self.main_tab.output_dir.text() or os.path.dirname(
-            self.main_tab.source_input.text()
-        )
-        dist_dir = os.path.join(output_dir, "dist")
-        if os.path.isdir(dist_dir):
-            target = dist_dir
-        elif os.path.isdir(output_dir):
-            target = output_dir
-        else:
-            QMessageBox.warning(self, S.MSG_WARNING, S.ERR_OUTPUT_MISSING)
-            return
-
-        if sys.platform == "win32":
-            os.startfile(target)
-        elif sys.platform == "darwin":
-            subprocess.run(["open", target])
-        else:
-            subprocess.run(["xdg-open", target])
 
     # ─── Log / theme / locale ───────────────────────────────────────────
 
@@ -1733,9 +1106,26 @@ class MainWindow(QMainWindow):
             self.check_for_updates(interactive=False)
 
     def check_for_updates(self, interactive: bool = True):
-        """Look for a newer release. Reports only — nothing is downloaded."""
+        """Look for a newer release. Reports only — nothing is downloaded.
+
+        The network call runs on a worker: a slow or absent connection used
+        to freeze the window for the whole timeout.
+        """
+        if self.task_thread is not None and self.task_thread.isRunning():
+            return
         self._append_log(S.LOG_UPDATE_CHECKING)
-        info = check_for_update(APP_VERSION)
+        self.set_status(S.BUSY_UPDATE_CHECK)
+        self.task_thread = TaskThread(lambda: check_for_update(APP_VERSION))
+        self.task_thread.finished_signal.connect(
+            lambda info, error: self._on_update_checked(info, error, interactive)
+        )
+        self.task_thread.start()
+
+    def _on_update_checked(self, info, error: str, interactive: bool):
+        self.set_status(S.STATUS_READY)
+        if error:
+            self._append_log(error)
+            info = None
         if info is None:
             self._append_log(S.LOG_UPDATE_NONE.format(version=APP_VERSION))
             if interactive:
@@ -1830,1819 +1220,6 @@ class MainWindow(QMainWindow):
             if key == current_key:
                 self.tabs.setCurrentWidget(widget)
         self._refresh_page_bar()
-
-    # ─── Version info / manifest temp files ─────────────────────────────
-
-    def _cleanup_temp_files(self):
-        """Remove every temp file created for the current build."""
-        self._cleanup_temp_version_file()
-        self._cleanup_temp_manifest_file()
-
-    def _materialize_version_file(self) -> str:
-        """Write a temp version.txt when the form has data; return its path."""
-        # Drop any file from a previous attempt first — overwriting the
-        # attribute used to orphan it in %TEMP%.
-        self._cleanup_temp_version_file()
-        info = self.version_info_tab.version_info()
-        if info.is_empty():
-            return ""
-        content = generate_version_file(info)
-        fd, path = tempfile.mkstemp(prefix="py2exe_version_", suffix=".txt", text=True)
-        try:
-            with os.fdopen(fd, "w", encoding="utf-8") as f:
-                f.write(content)
-        except OSError:
-            return ""
-        self._temp_version_file = path
-        return path
-
-    def _cleanup_temp_version_file(self):
-        if self._temp_version_file and os.path.exists(self._temp_version_file):
-            try:
-                os.unlink(self._temp_version_file)
-            except OSError:
-                pass
-        self._temp_version_file = ""
-
-    def _materialize_manifest_file(self) -> str:
-        """Write a temp manifest.xml when generation is on; return its path."""
-        self._cleanup_temp_manifest_file()
-        deploy, vi = self.deploy_tab, self.version_info_tab
-        if not deploy.manifest_enable.isChecked():
-            return ""
-        config = ManifestConfig(
-            name=self.main_tab.output_name.text() or "MyApp",
-            version=vi.vi_product_version.text() or vi.vi_file_version.text() or "1.0.0.0",
-            description=vi.vi_file_description.text(),
-            dpi_aware=deploy.manifest_dpi.isChecked(),
-            require_admin=deploy.manifest_admin.isChecked(),
-            supported_os=deploy.selected_supported_os(),
-        )
-        xml = generate_manifest(config)
-        fd, path = tempfile.mkstemp(prefix="py2exe_manifest_", suffix=".xml", text=True)
-        try:
-            with os.fdopen(fd, "w", encoding="utf-8") as f:
-                f.write(xml)
-        except OSError:
-            return ""
-        self._temp_manifest_file = path
-        return path
-
-    def _cleanup_temp_manifest_file(self):
-        if self._temp_manifest_file and os.path.exists(self._temp_manifest_file):
-            try:
-                os.unlink(self._temp_manifest_file)
-            except OSError:
-                pass
-        self._temp_manifest_file = ""
-
-    # ─── History ────────────────────────────────────────────────────────
-
-    def _refresh_history_list(self):
-        if not hasattr(self, "history_tab"):
-            return
-        self.history_tab.refresh(self.history)
-
-    def restore_from_history(self):
-        """Load the selected history record's config back into the form."""
-        row = self.history_tab.selected_row()
-        if row < 0:
-            return
-        record = self.history.get(row)
-        if record is None:
-            return
-        project = ProjectConfig.from_settings_dict(record.config)
-        if not self._confirm_untrusted_config(project.build):
-            return
-        self._apply_project(project, self._sections_of(record.config))
-        try:
-            label_time = record.short_label().split("@", 1)[1].strip()
-        except IndexError:
-            label_time = record.timestamp
-        self._append_log(S.LOG_RESTORED.format(time=label_time))
-
-    def clear_history(self):
-        """Wipe the build log — after confirming, since there is no undo."""
-        if len(self.history) == 0:
-            return
-        reply = QMessageBox.question(
-            self,
-            S.MSG_CONFIRM,
-            S.MSG_CLEAR_HISTORY_CONFIRM.format(count=len(self.history)),
-            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
-            QMessageBox.StandardButton.No,
-        )
-        if reply != QMessageBox.StandardButton.Yes:
-            return
-        if not self.history.clear():
-            self._append_log(S.LOG_HISTORY_SAVE_FAIL.format(error=self.history.last_error))
-        self._refresh_history_list()
-        self._append_log(S.HISTORY_CLEARED)
-
-    # ─── Project doctor ─────────────────────────────────────────────────
-
-    def on_engine_changed(self):
-        """Another engine: re-examine, and say what it cannot do here."""
-        if not hasattr(self, "_doctor_timer"):
-            return  # still building the window
-        self._schedule_doctor()
-        self.refresh_engine_status()
-
-    def refresh_engine_status(self):
-        if not hasattr(self, "main_tab"):
-            return
-        config = self._current_config()
-        engine = engine_for(config)
-        missing = engine.unsupported_features(config)
-        missing += [f for f in self._current_project().features_used()
-                    if not engine.supports(f) and f not in missing]
-        self.main_tab.set_engine_status(missing)
-
-    def _schedule_doctor(self, *_args):
-        self._doctor_timer.start()
-
-    def _source_path(self) -> str:
-        return self.main_tab.source_input.text().strip()
-
-    def run_doctor(self):
-        """Examine the current script and settings, then refresh the views."""
-        self._doctor_timer.stop()
-        source = self._source_path()
-        if not source or not os.path.isfile(source):
-            self._doctor_findings = []
-            self._source_imports = set()
-            self._refresh_doctor_view()
-            self.refresh_env_view()
-            return
-        # Findings from a build of a different script no longer apply.
-        if self._build_findings and source != self._build_findings_source:
-            self._build_findings = []
-        config = self._current_config()
-        extra = []
-        if config.isolated_env and not env_exists(self._env_dir(source)):
-            # Its packages will be installed when it is created; until then
-            # there is nothing to ask, so don't report them all as missing.
-            is_installed = lambda _module: True  # noqa: E731
-            extra.append(Finding("env_not_created", "warning"))
-        else:
-            is_installed = self._installed_checker(config)
-        report = examine(source, config, is_installed=is_installed,
-                         extra_features=self._current_project().features_used())
-        self._doctor_findings = sort_findings(report.findings + extra)
-        self._source_imports = report.imports
-        self._refresh_doctor_view()
-        self.refresh_env_view()
-        self.refresh_engine_status()
-
-    def _refresh_doctor_view(self):
-        source = self._source_path()
-        has_source = bool(source) and os.path.isfile(source)
-        self.doctor_tab.show_findings(
-            self._doctor_findings, self._build_findings, has_source=has_source
-        )
-        self.main_tab.set_readiness(
-            self.doctor_tab_score() if has_source else None
-        )
-
-    def doctor_tab_score(self) -> int:
-        return readiness_score(self._doctor_findings)
-
-    def show_doctor_tab(self):
-        self.tabs.setCurrentWidget(self.doctor_tab)
-
-    def _set_build_findings(self, findings, source: str):
-        # A fix already in the settings is not a remedy any more (bundling a
-        # file that is read by a relative path, say): keep the finding and its
-        # advice, drop the no-op fix so it isn't offered again.
-        config = self._current_config()
-        findings = [
-            replace(
-                f,
-                fixes=tuple(x for x in f.fixes if not fix_is_applied(config, x)),
-                alternatives=tuple(x for x in f.alternatives if not fix_is_applied(config, x)),
-            )
-            for f in findings
-        ]
-        self._build_findings = sort_findings(dedupe_findings(findings))
-        self._build_findings_source = source
-        self._refresh_doctor_view()
-        if self._build_findings:
-            self._append_log(
-                S.LOG_DOCTOR_BUILD_FINDINGS.format(count=len(self._build_findings))
-            )
-
-    def apply_doctor_fixes(self, fixes, rebuild: bool = False):
-        """Apply fixes chosen on the Doctor tab, optionally rebuilding."""
-        if not fixes:
-            self.notify(S.DOCTOR_NOTHING_SELECTED, "warning")
-            return
-        if self._build_in_progress():
-            QMessageBox.warning(self, S.MSG_WARNING, S.MSG_DIAG_BUSY)
-            return
-        new_config, applied = apply_fixes(self._current_config(), fixes)
-        self._apply_config(new_config)
-        for fix in applied:
-            self._append_log(S.LOG_DOCTOR_FIX_APPLIED.format(fix=fix_label(fix)))
-
-        # Build/runtime findings whose fixes (or alternative) are now all in
-        # place are resolved.
-        self._build_findings = [
-            f for f in self._build_findings if not finding_resolved(new_config, f)
-        ]
-        self.run_doctor()
-        self._refresh_size_view()
-        if rebuild:
-            self.start_conversion()
-
-    def _diagnose_build(self, config: BuildConfig):
-        """Read the build log and warn file of the build that just ended."""
-        findings = diagnose_output(
-            "\n".join(self._build_output),
-            origin=ORIGIN_BUILD,
-            source=config.source,
-            source_imports=self._source_imports,
-            is_installed=self._installed_checker(config),
-            engine=config.engine,
-        )
-        findings += engine_for(config).build_findings(
-            config,
-            local_module_names(os.path.dirname(os.path.abspath(config.source))),
-            min_mtime=self._build_wall_start,
-        )
-        self._set_build_findings(findings, config.source)
-        return self._build_findings
-
-    def _on_smoke_result(self, config: BuildConfig, passed: bool, output: str):
-        """Turn what the built EXE printed into findings."""
-        findings = []
-        if output and (not passed or "Traceback" in output):
-            findings = diagnose_output(
-                output,
-                origin=ORIGIN_RUNTIME,
-                source=config.source,
-                source_imports=self._source_imports,
-                is_installed=self._installed_checker(config),
-                engine=config.engine,
-            )
-        if findings:
-            self._set_build_findings(self._build_findings + findings, config.source)
-        if passed and needs_diagnostic_run(config):
-            self._append_log(S.LOG_SMOKE_WINDOWED_HINT)
-
-    def start_diagnostic_run(self):
-        """Build a console copy of the app, run it, and diagnose its output."""
-        if self._build_in_progress():
-            QMessageBox.warning(self, S.MSG_WARNING, S.MSG_DIAG_BUSY)
-            return
-        config = self._current_config()
-        if not config.source or not os.path.isfile(config.source):
-            QMessageBox.warning(self, S.MSG_WARNING, S.ERR_NO_SOURCE)
-            return
-        if not config.output_dir:
-            config.output_dir = os.path.dirname(os.path.abspath(config.source))
-        if config.isolated_env and not env_exists(self._env_dir(config.source)):
-            QMessageBox.warning(self, S.MSG_WARNING, S.FINDING_ENV_NOT_CREATED_DETAIL)
-            return
-        diag = diagnostic_config(config)
-        python = self.build_python(config)
-        # The same services as the real app (its code may import them), minus
-        # anything that would stop on a dialog or reach the network.
-        kit_options, error = self._runtime_kit_options(diag, diagnostic=True)
-        engine = engine_for(diag)
-        if not error:
-            cmd, error = engine.build_command(
-                diag, python_executable=python, extra_options=kit_options
-            )
-        if error:
-            QMessageBox.warning(self, S.MSG_WARNING, error)
-            return
-        if not self._ensure_engine(engine, python):
-            return
-        engine.prepare_output(diag)
-
-        self.convert_btn.setEnabled(False)
-        self.doctor_tab.diagnose_btn.setEnabled(False)
-        self.progress_bar.setRange(0, 0)  # busy: no stage tracking here
-
-        timeout = max(8.0, float(self.deploy_tab.smoke_timeout.value()))
-        self.diagnostic_thread = DiagnosticThread(
-            cmd, diag, timeout=timeout,
-            popen_kwargs=popen_options(engine.name, engine.build_env(python)),
-        )
-        self.diagnostic_thread.log_signal.connect(self._append_log)
-        self.diagnostic_thread.finished_signal.connect(
-            lambda built, output, build_log: self._on_diagnostic_finished(
-                config, built, output, build_log
-            )
-        )
-        self.diagnostic_thread.start()
-
-    def _on_diagnostic_finished(self, config, built: bool, output: str, build_log: str):
-        self.progress_bar.setRange(0, 100)
-        self.progress_bar.setValue(0)
-        self.progress_bar.setFormat(S.PROGRESS_READY)
-        self.convert_btn.setEnabled(True)
-        self.doctor_tab.diagnose_btn.setEnabled(True)
-
-        imports = self._source_imports
-        checker = self._installed_checker(config)
-        if built:
-            findings = diagnose_output(
-                output, origin=ORIGIN_RUNTIME, source=config.source,
-                source_imports=imports, is_installed=checker, engine=config.engine,
-            )
-        else:
-            findings = diagnose_output(
-                build_log, origin=ORIGIN_BUILD, source=config.source,
-                source_imports=imports, is_installed=checker, engine=config.engine,
-            )
-        # The diagnostic run is the freshest evidence: it replaces, not adds to,
-        # what the last build reported.
-        self._set_build_findings(findings, config.source)
-        if built and not findings:
-            self._append_log(S.LOG_DIAG_CLEAN)
-        self._append_log(S.LOG_DIAG_DONE_FMT.format(count=len(findings)))
-        self.show_doctor_tab()
-
-    # ─── Build environment ──────────────────────────────────────────────
-
-    def _env_dir(self, source: str) -> str:
-        return env_dir_for(source, ENVS_ROOT)
-
-    def _base_python(self) -> str:
-        return self.size_tab.base_python.text().strip() or sys.executable
-
-    def build_python(self, config: BuildConfig) -> str:
-        """The interpreter that runs PyInstaller for ``config``."""
-        if config.isolated_env and config.source:
-            return env_python(self._env_dir(config.source))
-        return sys.executable
-
-    def _installed_checker(self, config: BuildConfig):
-        """``is_installed`` answering for the build interpreter, not this one."""
-        python = self.build_python(config)
-        if python == sys.executable:
-            return default_is_installed
-        if python not in self._checkers:
-            self._checkers[python] = InstalledChecker(python)
-        return self._checkers[python]
-
-    def on_env_mode_changed(self, *_args):
-        self._schedule_doctor()
-
-    def refresh_env_view(self):
-        source = self._source_path()
-        if not source or not os.path.isfile(source):
-            self.size_tab.show_env(None, "", False, has_source=False)
-            return
-        status = env_status(self._env_dir(source), with_size=False)
-        if status.exists and not status.metadata.get("size_bytes"):
-            # An environment made outside the app (or before 1.4) has no
-            # recorded size: measure it once and remember it.
-            status.metadata["size_bytes"] = folder_size(status.env_dir)
-            write_metadata(status.env_dir, status.metadata)
-        requirements = project_requirements(source)
-        if requirements.origin == "lock":
-            text = S.ENV_REQ_FROM_LOCK.format(file=requirements.describe())
-        elif requirements.origin == "file":
-            text = S.ENV_REQ_FROM_FILE.format(file=requirements.describe())
-        else:
-            text = ", ".join(requirements.args) if requirements.args else S.ENV_REQ_NONE
-        self.size_tab.show_env(status, text, bool(find_uv()), has_source=True)
-
-    def create_build_env(self, recreate: bool = False, then_build: bool = False):
-        """Create (or refresh) the project's environment, after explicit consent."""
-        if self._build_in_progress():
-            QMessageBox.warning(self, S.MSG_WARNING, S.MSG_DIAG_BUSY)
-            return
-        source = self._source_path()
-        if not source or not os.path.isfile(source):
-            QMessageBox.warning(self, S.MSG_WARNING, S.ERR_NO_SOURCE)
-            return
-        base = self._base_python()
-        if not os.path.isfile(base):
-            QMessageBox.warning(self, S.MSG_WARNING, S.ERR_ENV_PYTHON_MISSING.format(path=base))
-            return
-
-        tools = engine_for(self._current_config()).requirements() or PYINSTALLER_REQUIREMENT
-        plan = plan_environment(
-            source, ENVS_ROOT, base, tools,
-            uv=find_uv(), recreate=recreate,
-        )
-        commands = "\n\n".join(quote_command(c) for c in plan.all_commands())
-        reply = QMessageBox.question(
-            self, S.MSG_CONFIRM, S.MSG_ENV_CONFIRM.format(commands=commands),
-            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No, QMessageBox.StandardButton.No,
-        )
-        if reply != QMessageBox.StandardButton.Yes:
-            return
-        if recreate and env_exists(plan.env_dir):
-            delete_env(plan.env_dir, ENVS_ROOT)
-        os.makedirs(ENVS_ROOT, exist_ok=True)
-
-        self.size_tab.set_env_busy()
-        self.convert_btn.setEnabled(False)
-        self.progress_bar.setRange(0, 0)
-        self.env_thread = EnvThread(plan, base_python=base)
-        self.env_thread.log_signal.connect(self._append_log)
-        self.env_thread.finished_signal.connect(
-            lambda ok, failed, error: self._on_env_finished(plan, ok, failed, error, then_build)
-        )
-        self.env_thread.start()
-
-    def recreate_build_env(self):
-        self.create_build_env(recreate=True)
-
-    def _on_env_finished(self, plan, ok: bool, failed, error: str, then_build: bool):
-        self.progress_bar.setRange(0, 100)
-        self.progress_bar.setValue(0)
-        self.progress_bar.setFormat(S.PROGRESS_READY)
-        self.convert_btn.setEnabled(True)
-        # The environment changed: what it can import must be asked again.
-        self._checkers.pop(plan.python, None)
-        if ok:
-            if failed:
-                self._append_log(S.LOG_ENV_DONE_PARTIAL.format(names=", ".join(failed)))
-            else:
-                self._append_log(S.LOG_ENV_DONE)
-        else:
-            self._append_log(S.LOG_ENV_FAILED.format(error=error))
-            QMessageBox.critical(self, S.MSG_ERROR, S.LOG_ENV_FAILED.format(error=error))
-        self.run_doctor()
-        if ok and then_build:
-            self.start_conversion()
-
-    def delete_build_env(self):
-        source = self._source_path()
-        if not source:
-            return
-        env_dir = self._env_dir(source)
-        status = env_status(env_dir, with_size=False)
-        if not status.exists:
-            return
-        size = format_size(int(status.metadata.get("size_bytes", 0) or 0))
-        reply = QMessageBox.question(
-            self, S.MSG_CONFIRM, S.MSG_ENV_DELETE_CONFIRM.format(size=size),
-            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No, QMessageBox.StandardButton.No,
-        )
-        if reply != QMessageBox.StandardButton.Yes:
-            return
-        if delete_env(env_dir, ENVS_ROOT):
-            self._append_log(S.LOG_ENV_DELETED)
-        self._checkers.pop(env_python(env_dir), None)
-        self.run_doctor()
-
-    def save_env_lock(self):
-        """Pin the environment's exact versions in p2e-build.lock."""
-        source = self._source_path()
-        env_dir = self._env_dir(source) if source else ""
-        if not env_dir or not env_exists(env_dir):
-            return
-        try:
-            result = subprocess.run(
-                freeze_command(env_python(env_dir), find_uv()),
-                capture_output=True, text=True, timeout=120,
-            )
-        except (OSError, subprocess.SubprocessError) as e:
-            self._append_log(S.LOG_ENV_LOCK_FAILED.format(error=str(e)))
-            return
-        if result.returncode != 0:
-            self._append_log(
-                S.LOG_ENV_LOCK_FAILED.format(error=(result.stderr or "").strip()[:300])
-            )
-            return
-        path = lock_file_path(source)
-        try:
-            with open(path, "w", encoding="utf-8") as f:
-                f.write(format_lock(result.stdout))
-        except OSError as e:
-            self._append_log(S.LOG_ENV_LOCK_FAILED.format(error=str(e)))
-            return
-        self._append_log(S.LOG_ENV_LOCK_SAVED.format(path=path))
-        self.refresh_env_view()
-
-    # ─── Size lab and build report ──────────────────────────────────────
-
-    def _show_size(self, config: BuildConfig, report, previous: int):
-        self._size_view = (config, report, previous)
-        self._refresh_size_view()
-
-    def _refresh_size_view(self):
-        """Render the size lab. Text is built here, so a language switch
-        re-renders it in the new language rather than keeping the old one."""
-        if self._compare_view is not None:
-            self.size_tab.show_compare(*self._compare_view)
-        if self._size_view is None:
-            self.size_tab.show_size_report(None)
-            self.size_tab.show_suggestions([])
-            return
-        config, report, previous = self._size_view
-        imports = project_imports(config.source) if config.source else set()
-        # Against the current settings: an exclusion just applied drops out.
-        suggestions = exclude_suggestions(report, imports, self._current_config())
-        hints = []
-        indirect = indirect_packages(report, imports)
-        if indirect and not config.isolated_env:
-            hints.append(S.SIZE_INDIRECT_FMT.format(
-                size=size_text(sum(size for _n, size in indirect)),
-                names=", ".join(name for name, _s in indirect[:6]),
-            ))
-        if onefile_too_big(report, config):
-            hints.append(S.SIZE_ONEFILE_SLOW_FMT.format(size=size_text(report.output_bytes)))
-        self.size_tab.show_size_report(report, previous, hints)
-        self.size_tab.show_suggestions(suggestions)
-
-    def analyze_last_build(self):
-        """Re-read the inventory of the current settings' last build."""
-        config = self._current_config()
-        if not config.source:
-            return
-        report = analyze(config)
-        if not report.ok:
-            self._size_view = None
-            self._refresh_size_view()
-            return
-        previous = previous_size(
-            self.history.records, config.source, config.output_name, skip=1
-        )
-        # Re-reading changes no settings, so hints use the settings as they are.
-        self._show_size(config, report, previous)
-
-    def _report_labels(self) -> dict:
-        keys = (
-            "title", "details", "result", "success", "failed", "size_on_disk",
-            "contents", "duration", "previous", "app", "date", "source", "output",
-            "mode", "onefile", "onedir", "environment", "python", "pyinstaller",
-            "platform", "breakdown", "package", "size", "share", "largest_files", "engine",
-            "findings", "options", "none", "runtime_kit",
-        )
-        return {key: getattr(S, f"REPORT_{key.upper()}") for key in keys}
-
-    def _write_build_report(self, config, report, previous, duration, success):
-        output = report.output_path or output_path_for(config)
-        exe = output if os.path.isfile(output) else locate_built_executable(
-            build_root(config), build_name(config), config.onefile, engine=config.engine
-        ) or ""
-        groups = []
-        for group, size in report.ranked(20):
-            key = group_label_key(group)
-            groups.append((getattr(S, key) if key else group, size))
-        versions = parse_versions("\n".join(self._build_output))
-        findings = [
-            (f.severity, finding_title(f), finding_detail(f))
-            for f in self._build_findings + self._doctor_findings
-        ]
-        data = ReportData(
-            app_name=build_name(config),
-            source=config.source,
-            output_path=output,
-            timestamp=time.strftime("%Y-%m-%d %H:%M:%S"),
-            success=success,
-            duration_seconds=duration,
-            output_bytes=report.output_bytes,
-            content_bytes=report.content_bytes,
-            previous_bytes=previous,
-            sha256=sha256_file(exe),
-            onefile=config.onefile,
-            environment=S.REPORT_ENV_ISOLATED if config.isolated_env else S.REPORT_ENV_CURRENT,
-            python_version=versions.get("python", ""),
-            pyinstaller_version=versions.get("pyinstaller", ""),
-            engine=(f"Nuitka {versions.get('nuitka', '')}".strip()
-                    if config.engine == "nuitka" else ""),
-            platform=versions.get("platform", ""),
-            command=self._build_command,
-            groups=groups,
-            largest_files=report.largest_files,
-            findings=findings,
-            runtime_services=self._runtime_service_labels(config),
-        )
-        document = render_html(
-            data,
-            self._report_labels(),
-            rtl=LOCALE_LAYOUT.get(current_locale(), "ltr") == "rtl",
-            lang=current_locale(),
-            generator=S.REPORT_GENERATOR_FMT.format(app=APP_NAME, version=APP_VERSION),
-        )
-        path = report_path_for(config)
-        error = write_report(path, document)
-        if error:
-            self._append_log(S.LOG_REPORT_FAILED.format(error=error))
-            return
-        self._last_report_path = path
-        self.size_tab.set_report_path(path)
-        self._append_log(S.LOG_REPORT_SAVED.format(path=path))
-
-    def open_last_report(self):
-        if self._last_report_path and os.path.isfile(self._last_report_path):
-            QDesktopServices.openUrl(QUrl.fromLocalFile(self._last_report_path))
-
-    # ─── Runtime Kit ────────────────────────────────────────────────────
-
-    def _runtime_texts(self) -> dict:
-        return runtime_texts()
-
-    def _rtl(self) -> bool:
-        return LOCALE_LAYOUT.get(current_locale(), "ltr") == "rtl"
-
-    def _runtime_service_labels(self, config: BuildConfig):
-        return [service_label(name) for name in config.runtime_kit.enabled_services()]
-
-    def _runtime_kit_options(self, config: BuildConfig, diagnostic: bool = False):
-        """Write the kit for ``config``; returns (PyInstaller options, error text)."""
-        engine = engine_for(config)
-        if config.runtime_kit.enabled and not engine.supports("runtime_kit"):
-            return [], S.ERR_KIT_NEEDS_PYINSTALLER.format(engine=engine.display_name)
-        try:
-            options, errors = write_kit(
-                config, self._runtime_texts(), rtl=self._rtl(), diagnostic=diagnostic
-            )
-        except OSError as e:
-            return [], S.MSG_KIT_INVALID_FMT.format(problems=str(e))
-        if errors:
-            problems = "\n".join(f"• {finding_title(f)}" for f in errors)
-            return [], S.MSG_KIT_INVALID_FMT.format(problems=problems)
-        return options, None
-
-    def on_runtime_kit_changed(self):
-        self.refresh_runtime_preview()
-        self._schedule_doctor()
-
-    def refresh_runtime_preview(self, *_args):
-        if not hasattr(self, "runtime_tab"):
-            return
-        config = self._current_config()
-        if not config.runtime_kit.enabled:
-            self.runtime_tab.show_preview("", "")
-            return
-        text = render_runtime_config(
-            config.runtime_kit, build_name(config) if config.source or config.output_name
-            else "app", config.onefile, self._runtime_texts(), self._rtl(),
-        )
-        self.runtime_tab.show_preview(render_hook(), text)
-
-    def refresh_signing_key(self):
-        self.runtime_tab.show_key(read_public_key(SIGNING_KEY_FILE), SIGNING_KEY_FILE)
-        self.runtime_tab.show_license_key(read_public_key(LICENSE_KEY_FILE), LICENSE_KEY_FILE)
-
-    def use_my_public_key(self):
-        public = read_public_key(SIGNING_KEY_FILE)
-        if public:
-            self.runtime_tab.public_key.setText(public)
-
-    def generate_signing_key(self):
-        """Create the developer's key pair. Replacing one needs a hard yes."""
-        existing = read_public_key(SIGNING_KEY_FILE)
-        if existing or os.path.exists(SIGNING_KEY_FILE):
-            reply = QMessageBox.question(
-                self, S.MSG_CONFIRM,
-                S.MSG_KIT_KEY_REPLACE_CONFIRM.format(fingerprint=fingerprint(existing) or "?"),
-                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No, QMessageBox.StandardButton.No,
-            )
-            if reply != QMessageBox.StandardButton.Yes:
-                return
-        key = new_signing_key()
-        try:
-            backup = backup_existing(SIGNING_KEY_FILE)
-            write_key_file(SIGNING_KEY_FILE, key)
-        except OSError as e:
-            QMessageBox.critical(self, S.MSG_ERROR, S.ERR_KIT_KEY_WRITE.format(error=str(e)))
-            return
-        if backup:
-            self._append_log(S.LOG_KIT_KEY_REPLACED.format(path=backup))
-        # Only the public half is ever shown or logged.
-        self._append_log(S.LOG_KIT_KEY_GENERATED.format(fingerprint=fingerprint(key.public_hex)))
-        self.refresh_signing_key()
-        if self.runtime_tab.service_checks["updater"].isChecked():
-            self.runtime_tab.public_key.setText(key.public_hex)
-
-    def _forbidden_key_folders(self):
-        config = self._current_config()
-        folders = []
-        if config.source:
-            folders.append(os.path.dirname(os.path.abspath(config.source)))
-        if config.output_dir:
-            folders.append(config.output_dir)
-        return folders
-
-    def export_signing_key(self):
-        """Back up the private key — after a warning, and never into the project."""
-        self._export_key(SIGNING_KEY_FILE, S.MSG_KIT_KEY_EXPORT_WARNING,
-                         S.DIALOG_KIT_KEY_EXPORT, S.LOG_KIT_KEY_EXPORTED)
-
-    def _export_key(self, key_file: str, warning: str, title: str, log_fmt: str):
-        try:
-            key = read_key_file(key_file)
-        except (OSError, ValueError) as e:
-            QMessageBox.warning(self, S.MSG_WARNING, S.ERR_KIT_KEY_READ.format(error=str(e)))
-            return
-        reply = QMessageBox.warning(
-            self, S.MSG_CONFIRM, warning, QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No, QMessageBox.StandardButton.No,
-        )
-        if reply != QMessageBox.StandardButton.Yes:
-            return
-        path, _ = QFileDialog.getSaveFileName(
-            self, title, os.path.basename(key_file), S.DIALOG_FILTER_KEY
-        )
-        if not path:
-            return
-        if any(is_inside(path, folder) for folder in self._forbidden_key_folders()):
-            QMessageBox.warning(self, S.MSG_WARNING, S.ERR_KIT_KEY_EXPORT_IN_PROJECT)
-            return
-        try:
-            fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
-            with os.fdopen(fd, "w", encoding="utf-8") as f:
-                f.write(key_to_json(key))
-        except OSError as e:
-            QMessageBox.critical(self, S.MSG_ERROR, S.ERR_KIT_KEY_WRITE.format(error=str(e)))
-            return
-        self._append_log(log_fmt.format(path=path))
-
-    def import_signing_key(self):
-        self._import_key(SIGNING_KEY_FILE, S.DIALOG_KIT_KEY_IMPORT,
-                         S.MSG_KIT_KEY_REPLACE_CONFIRM, S.LOG_KIT_KEY_IMPORTED)
-
-    def _import_key(self, key_file: str, title: str, replace_fmt: str, log_fmt: str):
-        path, _ = QFileDialog.getOpenFileName(self, title, "", S.DIALOG_FILTER_KEY)
-        if not path:
-            return
-        try:
-            key = read_key_file(path)
-        except (OSError, ValueError) as e:
-            QMessageBox.warning(self, S.MSG_WARNING, S.ERR_KIT_KEY_READ.format(error=str(e)))
-            return
-        existing = read_public_key(key_file)
-        if existing == key.public_hex:
-            self._append_log(log_fmt.format(fingerprint=fingerprint(existing)))
-            return
-        if existing or os.path.exists(key_file):
-            reply = QMessageBox.question(
-                self, S.MSG_CONFIRM,
-                replace_fmt.format(fingerprint=fingerprint(existing) or "?"),
-                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No, QMessageBox.StandardButton.No,
-            )
-            if reply != QMessageBox.StandardButton.Yes:
-                return
-        try:
-            backup = backup_existing(key_file)
-            write_key_file(key_file, key)
-        except OSError as e:
-            QMessageBox.critical(self, S.MSG_ERROR, S.ERR_KIT_KEY_WRITE.format(error=str(e)))
-            return
-        if backup:
-            self._append_log(S.LOG_KIT_KEY_REPLACED.format(path=backup))
-        self._append_log(log_fmt.format(fingerprint=fingerprint(key.public_hex)))
-        self.refresh_signing_key()
-
-    # ─── Offline licensing (2.0) ────────────────────────────────────────
-
-    def use_my_license_key(self):
-        public = read_public_key(LICENSE_KEY_FILE)
-        if public:
-            self.runtime_tab.license_public_key.setText(public)
-
-    def create_license_key(self):
-        """Create the licence key pair. Replacing one needs a hard yes."""
-        existing = read_public_key(LICENSE_KEY_FILE)
-        if existing or os.path.exists(LICENSE_KEY_FILE):
-            reply = QMessageBox.question(
-                self, S.MSG_CONFIRM,
-                S.MSG_KIT_LICENSE_KEY_REPLACE_CONFIRM.format(
-                    fingerprint=fingerprint(existing) or "?"),
-                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No, QMessageBox.StandardButton.No,
-            )
-            if reply != QMessageBox.StandardButton.Yes:
-                return
-        try:
-            key, backup = licensing.replace_key(LICENSE_KEY_FILE)
-        except OSError as e:
-            QMessageBox.critical(self, S.MSG_ERROR, S.ERR_KIT_KEY_WRITE.format(error=str(e)))
-            return
-        if backup:
-            self._append_log(S.LOG_KIT_KEY_REPLACED.format(path=backup))
-        self._append_log(S.LOG_KIT_LICENSE_KEY_CREATED.format(
-            fingerprint=fingerprint(key.public_hex)))
-        self.refresh_signing_key()
-        if self.runtime_tab.service_checks["licensing"].isChecked():
-            self.runtime_tab.license_public_key.setText(key.public_hex)
-
-    def export_license_key(self):
-        self._export_key(LICENSE_KEY_FILE, S.MSG_KIT_LICENSE_KEY_EXPORT_WARNING,
-                         S.DIALOG_KIT_LICENSE_KEY_EXPORT, S.LOG_KIT_LICENSE_KEY_EXPORTED)
-
-    def import_license_key(self):
-        self._import_key(LICENSE_KEY_FILE, S.DIALOG_KIT_LICENSE_KEY_IMPORT,
-                         S.MSG_KIT_LICENSE_KEY_REPLACE_CONFIRM, S.LOG_KIT_LICENSE_KEY_IMPORTED)
-
-    def _issue_license(self, request):
-        """Sign one licence with the stored key; logs the public facts only."""
-        key = read_key_file(LICENSE_KEY_FILE)
-        text = licensing.issue(request, key)
-        self._append_log(S.LOG_KIT_LICENSE_ISSUED.format(
-            name=request.name, product=request.product,
-            expiry=request.expiry or S.KIT_LICENSE_NO_EXPIRY, length=len(text),
-        ))
-        return text
-
-    def open_license_generator(self):
-        """The licence dialog; refuses to open without a key rather than
-        creating one behind the developer's back."""
-        if not read_public_key(LICENSE_KEY_FILE):
-            QMessageBox.warning(self, S.MSG_WARNING, S.ERR_KIT_LICENSE_NO_KEY)
-            return
-        config = self._current_config()
-        product = config.runtime_kit.license_product.strip()
-        if not product and (config.source or config.output_name):
-            product = build_name(config)
-        dialog = LicenseGeneratorDialog(self._issue_license, product, self)
-        self._license_dialog = dialog  # tests reach it; the user sees it modal
-        dialog.exec()
-
-    def publish_update(self):
-        """Write and sign update.json for a new build. Uploads nothing."""
-        try:
-            key = read_key_file(SIGNING_KEY_FILE)
-        except (OSError, ValueError):
-            QMessageBox.warning(self, S.MSG_WARNING, S.ERR_KIT_NO_KEY)
-            return
-        fields = self.runtime_tab.publish_fields()
-        config = self._current_config()
-        app_name = build_name(config) if config.source or config.output_name else ""
-        try:
-            result = publish_update(
-                fields["file"], fields["version"], fields["url"], key,
-                notes=fields["notes"], min_version=fields["min_version"], app_name=app_name,
-            )
-        except (OSError, ValueError) as e:
-            QMessageBox.warning(self, S.MSG_WARNING, S.ERR_KIT_PUBLISH_FMT.format(error=str(e)))
-            return
-        self._append_log(S.LOG_KIT_PUBLISHED.format(
-            manifest=result.manifest_path, signature=result.signature_path
-        ))
-        self.notify(S.MSG_KIT_PUBLISHED_FMT.format(
-            manifest=result.manifest_path, signature=result.signature_path
-        ), "success", 0)
-
-    # ─── Windows Sandbox ────────────────────────────────────────────────
-
-    def open_in_sandbox(self):
-        """Run the last build on a clean Windows inside Windows Sandbox."""
-        config = self._current_config()
-        output = output_path_for(config) if config.source else ""
-        if not output:
-            self.notify(S.MSG_SANDBOX_NO_BUILD, "warning")
-            return
-        if not sandbox_available():
-            self.notify(S.SANDBOX_UNAVAILABLE.format(path=output), "warning")
-            return
-        host, exe = wsb_for_output(output, config.onefile)
-        path = os.path.join(build_root(config), f"{build_name(config)}.wsb")
-        try:
-            with open(path, "w", encoding="utf-8") as f:
-                f.write(generate_wsb(host, exe))
-        except OSError as e:
-            QMessageBox.critical(self, S.MSG_ERROR, str(e))
-            return
-        self._append_log(S.LOG_SANDBOX_WRITTEN.format(path=path))
-        os.startfile(path)  # Windows only: guarded by sandbox_available() above
-
-    # ─── Icon studio ────────────────────────────────────────────────────
-
-    def open_icon_studio(self):
-        source = self._source_path()
-        name = self.main_tab.output_name.text().strip() or (
-            os.path.splitext(os.path.basename(source))[0] if source else ""
-        )
-        start_dir = os.path.dirname(source) if source else ""
-        dialog = IconStudioDialog(self, app_name=name, start_dir=start_dir)
-        if dialog.exec() and dialog.saved_path:
-            self.main_tab.icon_input.setText(dialog.saved_path)
-            self._append_log(
-                S.LOG_ICON_STUDIO_SAVED.format(sizes="16–256", path=dialog.saved_path)
-            )
-
-    # ─── Post-build: signing, smoke test, installer ─────────────────────
-
-    def _run_post_build_actions(self, config: BuildConfig):
-        """Sign and/or smoke-test the produced EXE, then build the installer."""
-        exe_path = locate_built_executable(
-            config.output_dir or os.path.dirname(config.source),
-            config.output_name or os.path.splitext(os.path.basename(config.source))[0],
-            config.onefile,
-            engine=config.engine,
-        )
-        if not exe_path:
-            self._last_built_exe = ""
-            if (
-                self.deploy_tab.signing_enable.isChecked()
-                or self.deploy_tab.smoke_enable.isChecked()
-                or self.installer_tab.installer_enable.isChecked()
-            ):
-                self._append_log(S.LOG_SMOKE_NOT_FOUND)
-            return
-        self._last_built_exe = exe_path
-
-        sign_cfg = self.deploy_tab.signing_config()
-        smoke_enabled = self.deploy_tab.smoke_enable.isChecked()
-
-        if not sign_cfg.enabled and not smoke_enabled:
-            self._start_installer_step(config)
-            return
-
-        # Signing waits on a timestamp server and the smoke test waits on the
-        # new EXE: both used to run inline and froze the window for minutes.
-        self.post_build_thread = PostBuildThread(
-            exe_path,
-            signing_config=sign_cfg,
-            smoke_enabled=smoke_enabled,
-            smoke_timeout=float(self.deploy_tab.smoke_timeout.value()),
-        )
-        self.post_build_thread.log_signal.connect(self._append_log)
-        self.post_build_thread.smoke_signal.connect(
-            lambda passed, output: self._on_smoke_result(config, passed, output)
-        )
-        self.post_build_thread.finished_signal.connect(
-            lambda *_: self._start_installer_step(config)
-        )
-        self.post_build_thread.start()
-
-    def _start_installer_step(self, config: BuildConfig):
-        """Chain the installer build after signing/smoke-testing has finished."""
-        inst_cfg = self._current_installer_config()
-        if inst_cfg.enabled:
-            self._run_installer(inst_cfg, config)
-
-    # ─── Installer ──────────────────────────────────────────────────────
-
-    def detect_iscc(self):
-        """Locate ISCC.exe and report the result in the log."""
-        path = self.installer_tab.inst_iscc_path.text().strip() or find_iscc()
-        if path:
-            self.installer_tab.inst_iscc_path.setText(path)
-            self._append_log(S.LOG_ISCC_FOUND.format(path=path))
-        else:
-            self._append_log(S.LOG_ISCC_MISSING)
-
-    def _current_installer_config(self) -> InstallerConfig:
-        vi = self.version_info_tab
-        return self.installer_tab.installer_config(
-            fallback_name=self.main_tab.output_name.text().strip(),
-            fallback_version=vi.vi_product_version.text().strip(),
-            fallback_publisher=vi.vi_company_name.text().strip(),
-            fallback_icon=self.main_tab.icon_input.text().strip(),
-        )
-
-    def _installer_source(self, config: BuildConfig):
-        """Return (app_path, onefile) describing what the installer packages.
-
-        onefile → the produced .exe; onedir → the folder containing it.
-        """
-        exe_path = self._last_built_exe or locate_built_executable(
-            config.output_dir or os.path.dirname(config.source),
-            config.output_name or os.path.splitext(os.path.basename(config.source))[0],
-            config.onefile,
-            engine=config.engine,
-        )
-        if not exe_path:
-            return "", config.onefile
-        if config.onefile:
-            return exe_path, True
-        return os.path.dirname(exe_path), False
-
-    def _write_iss_script(self, inst_cfg: InstallerConfig, build_cfg: BuildConfig):
-        """Render the .iss script to disk. Returns (path, error)."""
-        app_path, onefile = self._installer_source(build_cfg)
-        if not app_path:
-            return "", S.ERR_INSTALLER_NO_EXE
-
-        error = validate_installer(inst_cfg, app_path)
-        if error:
-            return "", error
-
-        _entries, warnings = resolve_languages(inst_cfg)
-        if warnings:
-            self._append_log(S.LOG_INSTALLER_LANG_WARN.format(langs=", ".join(warnings)))
-
-        exe_name = "" if onefile else os.path.basename(self._last_built_exe or "")
-        script = generate_iss_script(inst_cfg, app_path, onefile=onefile, exe_name=exe_name)
-
-        target_dir = inst_cfg.output_dir or (
-            app_path if not onefile else os.path.dirname(app_path)
-        )
-        iss_path = os.path.join(target_dir, f"{inst_cfg.app_name or 'setup'}.iss")
-        try:
-            os.makedirs(target_dir, exist_ok=True)
-            with open(iss_path, "w", encoding="utf-8") as f:
-                f.write(script)
-        except OSError as e:
-            return "", str(e)
-        return iss_path, None
-
-    def generate_iss_only(self):
-        """Write the .iss script without invoking the compiler (dry run)."""
-        inst_cfg = self._current_installer_config()
-        inst_cfg.enabled = True  # an explicit button press overrides the checkbox
-        if not inst_cfg.app_name:
-            QMessageBox.warning(self, S.MSG_WARNING, S.ERR_INSTALLER_NO_NAME)
-            return
-        iss_path, error = self._write_iss_script(inst_cfg, self._current_config())
-        if error:
-            self._append_log(S.LOG_ISS_FAIL.format(error=error))
-            QMessageBox.warning(self, S.MSG_WARNING, error)
-            return
-        self._append_log(S.LOG_ISS_WRITTEN.format(path=iss_path))
-        self.notify(S.MSG_ISS_WRITTEN_FMT.format(path=iss_path), "success", 0)
-
-    def build_installer_now(self):
-        """Generate the script and run ISCC on it (manual trigger)."""
-        inst_cfg = self._current_installer_config()
-        inst_cfg.enabled = True
-        if not inst_cfg.app_name:
-            QMessageBox.warning(self, S.MSG_WARNING, S.ERR_INSTALLER_NO_NAME)
-            return
-        self._run_installer(inst_cfg, self._current_config(), interactive=True)
-
-    def _run_installer(
-        self, inst_cfg: InstallerConfig, build_cfg: BuildConfig, interactive: bool = False
-    ):
-        """Compile the installer in a background thread."""
-        if self.installer_thread and self.installer_thread.isRunning():
-            return
-
-        iss_path, error = self._write_iss_script(inst_cfg, build_cfg)
-        if error:
-            self._append_log(S.LOG_INSTALLER_SKIPPED.format(reason=error))
-            if interactive:
-                QMessageBox.warning(self, S.MSG_WARNING, error)
-            return
-        self._append_log(S.LOG_ISS_WRITTEN.format(path=iss_path))
-
-        sign_command = None
-        if inst_cfg.sign_installer:
-            sign_cfg = self.deploy_tab.signing_config()
-            # The installer is signed by ISCC itself, so build the command
-            # against a placeholder that ISCC substitutes via $f.
-            candidate, sign_error = build_signtool_command("$f", sign_cfg)
-            if sign_error or candidate is None:
-                self._append_log(
-                    S.LOG_SIGNING_SKIPPED.format(reason=sign_error or "unknown")
-                )
-            else:
-                sign_command = candidate[:-1]  # drop the "$f" placeholder token
-
-        cmd, error = build_iscc_command(
-            iss_path,
-            iscc_path=self.installer_tab.inst_iscc_path.text().strip() or None,
-            sign_command=sign_command,
-        )
-        if error or cmd is None:
-            self._append_log(S.LOG_INSTALLER_SKIPPED.format(reason=error or "unknown"))
-            if interactive:
-                QMessageBox.warning(self, S.MSG_WARNING, error or "")
-            return
-
-        app_path, onefile = self._installer_source(build_cfg)
-        fallback_dir = app_path if not onefile else os.path.dirname(app_path)
-        expected = installer_output_path(inst_cfg, fallback_dir)
-
-        self._append_log(S.LOG_INSTALLER_START)
-        self._append_log(" ".join(redact_password(cmd)))
-
-        self.installer_thread = InstallerThread(
-            cmd, os.path.dirname(iss_path), expected_output=expected
-        )
-        self.installer_thread.log_signal.connect(self._append_log)
-        self.installer_thread.finished_signal.connect(
-            lambda ok, msg: self._on_installer_finished(ok, msg, interactive)
-        )
-        self.installer_thread.start()
-
-    def _on_installer_finished(self, success: bool, message: str, interactive: bool):
-        if success:
-            self._append_log(S.LOG_INSTALLER_OK.format(path=message))
-            if interactive:
-                self.notify(S.MSG_INSTALLER_OK.format(path=message), "success", 0)
-        else:
-            self._append_log(S.LOG_INSTALLER_FAIL.format(error=message))
-            if interactive:
-                QMessageBox.critical(
-                    self, S.MSG_ERROR, S.LOG_INSTALLER_FAIL.format(error=message)
-                )
-
-    # ─── Project file (p2e.toml) ────────────────────────────────────────
-
-    def _build_menu(self):
-        """Project, View, Tools and Help. Rebuilt on a language switch.
-
-        Until 2.1 there was one menu; the theme, the language and the font
-        size were reachable only from the bottom of the Templates tab or by
-        shortcuts nobody could discover from the window.
-        """
-        bar = self.menuBar()
-        bar.clear()
-        # Kept on self: PySide6 6.10 hands the new menu to Python, and an
-        # unreferenced one is deleted with its wrapper (6.12 and PyQt5 leave
-        # it with the bar). A reference is harmless on every binding.
-        self._menu_actions = []
-
-        self._menu_icons = []
-
-        def item(menu, text, handler, keys="", checkable=False, checked=False, icon=""):
-            # The shortcut is shown in the menu but bound once, as a
-            # QShortcut: binding it here too would make it ambiguous.
-            action = QAction(f"{text}\t{keys}" if keys else text, self)
-            if icon:
-                self._menu_icons.append((action, icon))
-            if checkable:
-                action.setCheckable(True)
-                action.setChecked(bool(checked))
-                action.toggled.connect(lambda on: handler(on))
-            else:
-                action.triggered.connect(lambda _checked=False: handler())
-            menu.addAction(action)
-            self._menu_actions.append(action)
-            return action
-
-        # ── Project ──
-        self.project_menu = menu = bar.addMenu(S.MENU_PROJECT)
-        self.new_project_action = item(menu, S.MENU_NEW_PROJECT, self.new_project, "Ctrl+N",
-                                       icon="file_text")
-        self.open_project_action = item(menu, S.MENU_OPEN_PROJECT, self.open_project_dialog,
-                                        "Ctrl+Shift+O", icon="open_folder")
-        self.recent_menu = menu.addMenu(S.MENU_RECENT_PROJECTS)
-        menu.addSeparator()
-        self.save_project_action = item(menu, S.MENU_SAVE_PROJECT, self.save_project, "Ctrl+S",
-                                        icon="save")
-        self.save_as_action = item(menu, S.MENU_SAVE_PROJECT_AS, self.save_project_as,
-                                   "Ctrl+Shift+S", icon="save")
-        menu.addSeparator()
-        self.init_project_action = item(menu, S.MENU_INIT_PROJECT, self.init_project_from_script)
-        self._refresh_recent_menu()
-
-        # ── View ──
-        self.view_menu = view = bar.addMenu(S.MENU_VIEW)
-        self.theme_menu = view.addMenu(S.MENU_THEME)
-        self.theme_actions = {}
-        theme_group = QActionGroup(self)
-        theme_group.setExclusive(True)
-        stored_theme = self.settings.get("theme", "dark")
-        for code, label_key in THEME_LABEL_KEYS:
-            action = QAction(getattr(S, label_key), self)
-            action.setCheckable(True)
-            action.setData(code)
-            action.setChecked(code == stored_theme)
-            action.triggered.connect(lambda _c=False, c=code: self.apply_theme(c))
-            theme_group.addAction(action)
-            self.theme_menu.addAction(action)
-            self.theme_actions[code] = action
-        self._menu_actions.append(theme_group)
-        self.language_menu = view.addMenu(S.MENU_LANGUAGE)
-        self.language_actions = {}
-        language_group = QActionGroup(self)
-        language_group.setExclusive(True)
-        for code, native in available_locales().items():
-            action = QAction(native, self)
-            action.setCheckable(True)
-            action.setData(code)
-            action.setChecked(code == current_locale())
-            action.triggered.connect(lambda _c=False, c=code: self.set_language(c))
-            language_group.addAction(action)
-            self.language_menu.addAction(action)
-            self.language_actions[code] = action
-        self._menu_actions.append(language_group)
-        view.addSeparator()
-        item(view, S.MENU_ZOOM_IN, self.zoom_in, "Ctrl++", icon="zoom_in")
-        item(view, S.MENU_ZOOM_OUT, self.zoom_out, "Ctrl+-", icon="zoom_out")
-        item(view, S.MENU_ZOOM_RESET, self.zoom_reset, "Ctrl+0")
-        view.addSeparator()
-        self.show_log_action = item(
-            view, S.MENU_SHOW_LOG, self.log_panel.set_expanded, "Ctrl+`",
-            checkable=True, checked=self.log_panel.is_expanded(), icon="log")
-        self.advanced_sections_action = item(
-            view, S.MENU_ADVANCED_SECTIONS, self.set_advanced_sections_open,
-            checkable=True, checked=self.build_page.any_expanded())
-        self.collapse_nav_action = item(
-            view, S.MENU_COLLAPSE_NAV, lambda on: self._set_nav_collapsed(on),
-            checkable=True, checked=self.tabs.nav.is_collapsed())
-        view.addSeparator()
-        item(view, S.MENU_SETTINGS,
-             lambda: self.tabs.setCurrentWidget(self.settings_tab), "Ctrl+,",
-             icon="section_settings")
-
-        # ── Tools ──
-        self.tools_menu = tools = bar.addMenu(S.MENU_TOOLS)
-        item(tools, S.MENU_DETECT_IMPORTS, self.detect_imports_action, "F5", icon="detect")
-        item(tools, S.MENU_IMPORT_REQUIREMENTS, self.import_requirements_file, icon="import")
-        tools.addSeparator()
-        item(tools, S.MENU_PREVIEW_COMMAND, self.preview_command, "Ctrl+P", icon="preview")
-        item(tools, S.MENU_OPEN_OUTPUT, self.open_output_folder, icon="open_folder")
-        item(tools, S.MENU_ICON_STUDIO, self.open_icon_studio, icon="icon_studio")
-        tools.addSeparator()
-        item(tools, S.MENU_BATCH, lambda: self.tabs.setCurrentWidget(self.batch_tab),
-             icon="batch")
-        item(tools, S.MENU_CHECK_UPDATES, self.check_for_updates, icon="update")
-
-        # ── Help ──
-        self.help_menu = help_menu = bar.addMenu(S.MENU_HELP)
-        item(help_menu, S.MENU_SHORTCUTS, self.show_shortcuts, "F1", icon="keyboard")
-        item(help_menu, S.MENU_ABOUT, lambda: self.tabs.setCurrentWidget(self.about_tab),
-             icon="about")
-        self._apply_icons()
-
-    def _set_nav_collapsed(self, collapsed: bool):
-        self.tabs.set_collapsed(bool(collapsed))
-        self.settings["nav_collapsed"] = bool(collapsed)
-
-    def shortcut_table(self):
-        """(keys, description) for every binding, for the Help dialog."""
-        rows = [
-            ("Ctrl+O", S.SHORTCUT_OPEN_SOURCE),
-            ("Ctrl+B", S.SHORTCUT_BUILD),
-            ("Ctrl+Shift+B", S.SHORTCUT_CANCEL),
-            ("Ctrl+P", S.SHORTCUT_PREVIEW),
-            ("F5", S.SHORTCUT_DETECT),
-            ("Ctrl+N", S.SHORTCUT_NEW),
-            ("Ctrl+Shift+O", S.SHORTCUT_OPEN_PROJECT),
-            ("Ctrl+S", S.SHORTCUT_SAVE),
-            ("Ctrl+Shift+S", S.SHORTCUT_SAVE_AS),
-            ("Ctrl+`", S.SHORTCUT_TOGGLE_LOG),
-            ("Ctrl+F", S.SHORTCUT_FIND_LOG),
-            ("Ctrl+L", S.SHORTCUT_CLEAR_LOG),
-            ("Ctrl+E", S.SHORTCUT_EXPORT_LOG),
-            ("Ctrl+T", S.SHORTCUT_THEME),
-            ("Ctrl++ / Ctrl+=", S.SHORTCUT_ZOOM_IN),
-            ("Ctrl+-", S.SHORTCUT_ZOOM_OUT),
-            ("Ctrl+0", S.SHORTCUT_ZOOM_RESET),
-        ]
-        for number, key in enumerate(NAV_SECTIONS, start=1):
-            rows.append((f"Ctrl+{number}", S.SHORTCUT_SECTION_FMT.format(
-                section=self.tabs.section_title(key))))
-        return rows
-
-    def show_shortcuts(self):
-        ShortcutsDialog(self.shortcut_table(), parent=self).exec()
-
-    def recent_projects(self):
-        recent = self.settings.get("recent_projects", [])
-        return [p for p in recent if isinstance(p, str)] if isinstance(recent, list) else []
-
-    def _remember_project(self, path: str):
-        path = os.path.abspath(path)
-        recent = [p for p in self.recent_projects()
-                  if os.path.normcase(p) != os.path.normcase(path)]
-        self.settings["recent_projects"] = [path] + recent[: RECENT_PROJECTS_MAX - 1]
-        self.save_settings()
-        self._refresh_recent_menu()
-        self.refresh_home()
-
-    def _refresh_recent_menu(self):
-        if not hasattr(self, "recent_menu"):
-            return
-        self.recent_menu.clear()
-        recent = self.recent_projects()
-        if not recent:
-            empty = self.recent_menu.addAction(S.MENU_RECENT_EMPTY)
-            empty.setEnabled(False)
-            return
-        for path in recent:
-            action = self.recent_menu.addAction(path)
-            action.triggered.connect(lambda _c=False, p=path: self.open_project_path(p))
-
-    # ─── Home: the projects workspace (2.0) ─────────────────────────────
-
-    def refresh_home(self):
-        """Rebuild the project cards from the recent list and the history.
-
-        Cheap enough to call after every event that changes what they show:
-        a project opened or saved, a build or a release finished, a theme or
-        language switch (the cards are rebuilt with the new strings).
-        """
-        if not hasattr(self, "home_tab"):
-            return
-        summaries = summarize_projects(self.recent_projects(), self.history.records)
-        colors = PALETTES.get(self.current_theme) or PALETTES["dark"]
-        self.home_tab.show_projects(summaries, self.project_path, colors)
-
-    def _ensure_project_open(self, path: str) -> bool:
-        """Open ``path`` unless it is already the project in the form."""
-        if self.project_path and os.path.normcase(os.path.normpath(path)) == os.path.normcase(
-                os.path.normpath(self.project_path)):
-            return True
-        return self.open_project_path(path)
-
-    def build_project(self, path: str):
-        """From a card: open the project and run the Convert button's build."""
-        if self._build_in_progress():
-            QMessageBox.warning(self, S.MSG_WARNING, S.MSG_DIAG_BUSY)
-            return
-        if not self._ensure_project_open(path):
-            return
-        self._append_log(S.LOG_HOME_BUILD.format(path=path))
-        self.tabs.setCurrentWidget(self.main_tab)
-        self.start_conversion()
-
-    def release_project(self, path: str):
-        """From a card: open the project and start the Release tab's release
-        (the dry run, then the confirmation, exactly as from that tab)."""
-        if self._build_in_progress():
-            QMessageBox.warning(self, S.MSG_WARNING, S.MSG_DIAG_BUSY)
-            return
-        if not self._ensure_project_open(path):
-            return
-        self._append_log(S.LOG_HOME_RELEASE.format(path=path))
-        self.tabs.setCurrentWidget(self.release_tab)
-        self.start_release()
-
-    def forget_project(self, path: str):
-        """Drop ``path`` from the recent list (the file itself is not touched)."""
-        key = os.path.normcase(os.path.normpath(path))
-        self.settings["recent_projects"] = [
-            p for p in self.recent_projects() if os.path.normcase(os.path.normpath(p)) != key]
-        self.save_settings()
-        self._refresh_recent_menu()
-        self.refresh_home()
-        self._append_log(S.LOG_HOME_FORGOTTEN.format(path=path))
-
-    def _project_snapshot(self) -> dict:
-        return self._current_project().to_settings_dict()
-
-    def is_project_modified(self) -> bool:
-        return self._saved_snapshot is not None and self._project_snapshot() != self._saved_snapshot
-
-    def _mark_saved(self):
-        self._saved_snapshot = self._project_snapshot()
-        self._update_modified()
-
-    def _watch_project_fields(self):
-        """Re-check the unsaved-changes marker whenever any project field changes."""
-        from py2exe_gui.qt import (
-            QAbstractButton,
-            QComboBox,
-            QLineEdit,
-            QListWidget,
-            QPlainTextEdit,
-            QSpinBox,
-        )
-
-        for tab in self._project_tabs:
-            for widget in tab.findChildren(QLineEdit):
-                widget.textChanged.connect(self._schedule_modified)
-            for widget in tab.findChildren(QAbstractButton):
-                if widget.isCheckable():
-                    widget.toggled.connect(self._schedule_modified)
-            for widget in tab.findChildren(QComboBox):
-                widget.currentIndexChanged.connect(self._schedule_modified)
-            for widget in tab.findChildren(QSpinBox):
-                widget.valueChanged.connect(self._schedule_modified)
-            for widget in tab.findChildren(QListWidget):
-                if widget is not self.release_tab.steps_list:
-                    model = widget.model()
-                    model.rowsInserted.connect(self._schedule_modified)
-                    model.rowsRemoved.connect(self._schedule_modified)
-            for widget in tab.findChildren(QPlainTextEdit):
-                if widget is not self.release_tab.notes_edit:
-                    widget.textChanged.connect(self._schedule_modified)
-
-    def _schedule_modified(self, *_args):
-        if hasattr(self, "_modified_timer"):
-            self._modified_timer.start()
-
-    def _update_modified(self):
-        if not hasattr(self, "release_tab"):
-            return
-        self.setWindowModified(bool(self.project_path) and self.is_project_modified())
-        self.release_tab.show_mismatches(version_mismatches(self._current_project()))
-        self._update_title()
-        if hasattr(self, "build_page"):
-            self.build_page.refresh_summaries()
-
-    def _update_title(self):
-        base = S.WINDOW_TITLE_FMT.format(name=APP_NAME, version=APP_VERSION)
-        if self.project_path:
-            name = self.project_name or (
-                self._current_project().display_name() if hasattr(self, "release_tab") else ""
-            ) or os.path.basename(os.path.dirname(self.project_path))
-            # "[*]" is where Qt draws the unsaved-changes marker.
-            self.setWindowTitle(S.WINDOW_TITLE_PROJECT_FMT.format(project=name, app=base))
-        else:
-            self.setWindowTitle(base)
-
-    def _maybe_save_changes(self) -> bool:
-        """Offer to save unsaved project changes. False means "cancel"."""
-        if not self.project_path or not self.isVisible() or not self.is_project_modified():
-            return True
-        reply = QMessageBox.question(
-            self, S.MSG_CONFIRM,
-            S.MSG_PROJECT_UNSAVED.format(path=self.project_path),
-            QMessageBox.StandardButton.Save | QMessageBox.StandardButton.Discard | QMessageBox.StandardButton.Cancel, QMessageBox.StandardButton.Save,
-        )
-        if reply == QMessageBox.StandardButton.Cancel:
-            return False
-        if reply == QMessageBox.StandardButton.Save:
-            return self.save_project()
-        return True
-
-    def _set_project(self, path: str, project: ProjectConfig):
-        self.project_path = os.path.abspath(path) if path else ""
-        self.project_name = project.name
-        if path:
-            self._remember_project(path)
-        self._mark_saved()
-
-    def new_project(self):
-        """Start over with defaults and no project file."""
-        if not self._maybe_save_changes():
-            return
-        password = self.deploy_tab.signing_password.text()
-        self._apply_project(ProjectConfig())
-        self.deploy_tab.signing_password.setText(password)
-        self.release_tab.notes_edit.clear()
-        self._set_project("", ProjectConfig())
-        self._append_log(S.LOG_PROJECT_NEW)
-
-    def open_project_dialog(self):
-        start = os.path.dirname(self.project_path) if self.project_path else ""
-        path, _ = QFileDialog.getOpenFileName(
-            self, S.DIALOG_OPEN_PROJECT, start, S.DIALOG_FILTER_PROJECT
-        )
-        if path:
-            self.open_project_path(path)
-
-    def open_project_path(self, path: str) -> bool:
-        """Open ``path`` — after the same checks as a shared settings file."""
-        if not self._maybe_save_changes():
-            return False
-        try:
-            loaded = load_project(path)
-        except ProjectFileError as e:
-            message = project_error_text(e)
-            self._append_log(S.LOG_PROJECT_OPEN_FAIL.format(path=path, error=message))
-            QMessageBox.critical(self, S.MSG_ERROR,
-                                 S.ERR_PROJECT_OPEN.format(path=path, error=message))
-            if e.code == "unreadable":
-                self.settings["recent_projects"] = [
-                    p for p in self.recent_projects() if p != path]
-                self._refresh_recent_menu()
-                self.refresh_home()
-            return False
-        # A project file is shared content: someone else may have written it.
-        if not self._confirm_untrusted_config(loaded.project.build):
-            self._append_log(S.LOG_SETTINGS_REJECTED.format(path=path))
-            return False
-        self._apply_project(loaded.project)
-        self.release_tab.notes_edit.clear()
-        self._set_project(loaded.path, loaded.project)
-        for warning in loaded.warnings:
-            self._append_log(S.LOG_PROJECT_WARNING.format(warning=warning))
-        self._append_log(S.LOG_PROJECT_OPENED.format(path=loaded.path))
-        return True
-
-    def save_shortcut(self):
-        """Ctrl+S: the project when one is open, otherwise a settings file."""
-        if self.project_path:
-            self.save_project()
-        else:
-            self.save_current_settings()
-
-    def save_project(self) -> bool:
-        if not self.project_path:
-            return self.save_project_as()
-        return self._write_project(self.project_path)
-
-    def save_project_as(self) -> bool:
-        source = self.main_tab.source_input.text().strip()
-        start = self.project_path or (
-            project_path_for_script(source) if source else PROJECT_FILE_NAME
-        )
-        path, _ = QFileDialog.getSaveFileName(
-            self, S.DIALOG_SAVE_PROJECT, start, S.DIALOG_FILTER_PROJECT
-        )
-        if not path:
-            return False
-        return self._write_project(path)
-
-    def _write_project(self, path: str) -> bool:
-        project = self._current_project()
-        try:
-            written = save_project(project, path)
-        except (OSError, TypeError, ValueError) as e:
-            QMessageBox.critical(self, S.MSG_ERROR, S.ERR_SAVE_FAIL.format(error=str(e)))
-            return False
-        self._set_project(written, project)
-        self._append_log(S.LOG_PROJECT_SAVED.format(path=written))
-        return True
-
-    def init_project_from_script(self):
-        """Write a p2e.toml beside the script, from the current settings."""
-        source = self.main_tab.source_input.text().strip()
-        if not source or not os.path.isfile(source):
-            QMessageBox.warning(self, S.MSG_WARNING, S.ERR_NO_SOURCE)
-            return
-        path = project_path_for_script(source)
-        if os.path.exists(path):
-            reply = QMessageBox.question(
-                self, S.MSG_CONFIRM, S.MSG_PROJECT_OVERWRITE.format(path=path),
-                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No, QMessageBox.StandardButton.No,
-            )
-            if reply != QMessageBox.StandardButton.Yes:
-                return
-        current = self._current_project()
-        version = current.version if is_semver(current.version) else ""
-        project = new_project_for_script(source, current, version)
-        if not project.release.repository:
-            project.release.repository = remote_slug(os.path.dirname(path))
-        self._apply_project(project)
-        if self._write_project(path):
-            self._append_log(S.LOG_PROJECT_INIT.format(path=path))
-
-    # ─── Release ────────────────────────────────────────────────────────
-
-    def apply_release_version(self):
-        """Put the release tab's version into every tab that records one."""
-        project = self._current_project()
-        try:
-            changes = apply_version(project, project.version)
-        except ValueError:
-            QMessageBox.warning(self, S.MSG_WARNING,
-                                S.ERR_RELEASE_VERSION.format(version=project.version or "—"))
-            return
-        self._apply_project(project, ("project", "version_info", "installer", "build"))
-        self._append_log(S.LOG_RELEASE_VERSION_APPLIED.format(
-            version=project.version, count=len(changes)))
-
-    def _release_cwd(self) -> str:
-        if self.project_path:
-            return os.path.dirname(self.project_path)
-        source = self.main_tab.source_input.text().strip()
-        return os.path.dirname(os.path.abspath(source)) if source else ""
-
-    def draft_release_notes(self):
-        cwd = self._release_cwd()
-        notes = draft_notes(cwd, self.release_tab.tag_prefix.text().strip() or "v",
-                            notes_titles()) if cwd else ""
-        if not notes:
-            self._append_log(S.LOG_RELEASE_NO_GIT)
-            return
-        self.release_tab.notes_edit.setPlainText(notes)
-
-    def detect_release_repository(self):
-        cwd = self._release_cwd()
-        slug = remote_slug(cwd) if cwd else ""
-        if slug:
-            self.release_tab.repository.setText(slug)
-        else:
-            self._append_log(S.LOG_RELEASE_NO_REMOTE)
-
-    def refresh_token_status(self):
-        token = credentials.find_token(keyring_module=KEYRING)
-        self.release_tab.show_token_status(token.source)
-
-    def save_github_token(self):
-        """Into the OS keyring — never the settings, the project or the log."""
-        token = self.release_tab.token_input.text().strip()
-        self.release_tab.token_input.clear()
-        if not token:
-            return
-        try:
-            credentials.store_token(token, KEYRING)
-        except credentials.CredentialError as e:
-            QMessageBox.warning(self, S.MSG_WARNING, S.ERR_TOKEN_STORE.format(error=str(e)))
-            return
-        self._append_log(S.LOG_TOKEN_SAVED)
-        self.refresh_token_status()
-
-    def forget_github_token(self):
-        if credentials.delete_token(KEYRING):
-            self._append_log(S.LOG_TOKEN_FORGOTTEN)
-        self.refresh_token_status()
-
-    def _release_context(self, project: ProjectConfig, dry_run: bool) -> ReleaseContext:
-        tab = self.release_tab
-        python = self.build_python(project.build)
-        checker = self._installed_checker(project.build)
-
-        def doctor(ctx):
-            return examine(ctx.project.build.source, ctx.project.build, is_installed=checker,
-                           extra_features=ctx.project.features_used())
-
-        options = ReleaseOptions(
-            version=project.version,
-            notes=tab.notes_edit.toPlainText(),
-            dry_run=dry_run,
-            allow_doctor_errors=tab.allow_errors_check.isChecked(),
-            create_tag=tab.create_tag_check.isChecked(),
-            push_tag=tab.create_tag_check.isChecked() and tab.push_tag_check.isChecked(),
-            publish=tab.publish_check.isChecked(),
-            sign_password=self.deploy_tab.signing_password.text(),
-            iscc_path=self.installer_tab.inst_iscc_path.text().strip(),
-            signing_key_path=SIGNING_KEY_FILE,
-            notes_titles=notes_titles(),
-            # The plan lists "download appimagetool" as a command; the
-            # confirmation dialog that shows it is the consent for the real run.
-            allow_downloads=not dry_run,
-            macos_sign_identity=os.environ.get(MACOS_SIGN_ENV, "").strip(),
-        )
-        return ReleaseContext(
-            project, options, project_path=self.project_path, python=python,
-            doctor=doctor, texts=runtime_texts(), rtl=self._rtl(),
-            token_provider=lambda: credentials.find_token(keyring_module=KEYRING),
-        )
-
-    def start_release(self):
-        """Plan the release (a dry run); then, unless only a preview was asked
-        for, confirm the full list of actions and run it."""
-        if self._build_in_progress():
-            QMessageBox.warning(self, S.MSG_WARNING, S.MSG_DIAG_BUSY)
-            return
-        project = self._current_project()
-        if not is_semver(project.version):
-            QMessageBox.warning(self, S.MSG_WARNING,
-                                S.ERR_RELEASE_VERSION.format(version=project.version or "—"))
-            return
-        if not project.build.source or not os.path.isfile(project.build.source):
-            QMessageBox.warning(self, S.MSG_WARNING, S.ERR_NO_SOURCE)
-            return
-        if project.build.isolated_env and not env_exists(self._env_dir(project.build.source)):
-            QMessageBox.warning(self, S.MSG_WARNING, S.ERR_RELEASE_ENV)
-            return
-        self._release_after_plan = not self.release_tab.dry_run_check.isChecked()
-        self._append_log(S.LOG_RELEASE_PLANNING.format(version=project.version))
-        self._run_release(self._release_context(project, dry_run=True))
-
-    def _run_release(self, context: ReleaseContext):
-        self.release_tab.reset_steps()
-        self.release_tab.set_running(True)
-        self.release_tab.show_result("", bool(self._last_release_dir))
-        self.convert_btn.setEnabled(False)
-        self.release_thread = ReleaseThread(context)
-        self.release_thread.log_signal.connect(self._append_log)
-        self.release_thread.step_signal.connect(self.release_tab.show_step)
-        self.release_thread.finished_signal.connect(self._on_release_finished)
-        self.release_thread.start()
-
-    def _on_release_finished(self, context, results):
-        self.release_tab.set_running(False)
-        self.convert_btn.setEnabled(True)
-        if context.dry_run:
-            if not self.release_tab.notes_edit.toPlainText().strip() and context.notes:
-                # The drafted notes, ready to edit before anything is published.
-                self.release_tab.notes_edit.setPlainText(context.notes)
-            if has_blocking_problems(results):
-                self.release_tab.show_result(S.RELEASE_RESULT_BLOCKED, False)
-                QMessageBox.warning(self, S.MSG_WARNING, S.RELEASE_RESULT_BLOCKED)
-                return
-            if not self._release_after_plan:
-                self.release_tab.show_result(S.RELEASE_RESULT_PLANNED, False)
-                return
-            dialog = ReleaseConfirmDialog(confirmation(results), context.version, self)
-            if not dialog.exec():
-                self._append_log(S.LOG_RELEASE_CANCELLED)
-                return
-            self._append_log(S.LOG_RELEASE_STARTED.format(version=context.version))
-            self._run_release(self._release_context(self._current_project(), dry_run=False))
-            return
-
-        self._last_release_dir = context.out_dir if os.path.isdir(context.out_dir) else ""
-        self.refresh_home()
-        version_step = results[0]
-        if version_step.status == DONE and version_step.actions:
-            # Show the bumped version everywhere; the pipeline saved the file.
-            self._apply_project(context.project, ("project", "version_info", "installer",
-                                                  "build"))
-            if context.project_changed:
-                self._mark_saved()
-        if has_blocking_problems(results):
-            self.release_tab.show_result(S.RELEASE_RESULT_FAILED, bool(self._last_release_dir))
-            self._notify_build_result(False, context.tag)
-            return
-        text = S.RELEASE_RESULT_DONE.format(version=context.version, path=context.out_dir,
-                                            url=context.release_url or "—")
-        self.release_tab.show_result(text, bool(self._last_release_dir))
-        self._append_log(text)
-        self._notify_build_result(True, context.tag)
-
-    def open_release_folder(self):
-        if self._last_release_dir and os.path.isdir(self._last_release_dir):
-            QDesktopServices.openUrl(QUrl.fromLocalFile(self._last_release_dir))
-
-    # ─── Platforms: packages and the CI workflow (2.0) ──────────────────
-
-    def build_packages(self):
-        """Package the last build for this host, with consent for any download."""
-        from py2exe_gui.core.packagers import get_packager, spec_from_project
-        from py2exe_gui.core.packagers.appimage import appimagetool_url
-        from py2exe_gui.core.platform_support import is_supported, platform_label
-        from py2exe_gui.core.release import artifacts
-
-        if self._build_in_progress():
-            QMessageBox.warning(self, S.MSG_WARNING, S.MSG_COMPARE_BUSY)
-            return
-        project = self._current_project()
-        formats = project.packaging.enabled_formats()
-        if not formats:
-            QMessageBox.warning(self, S.MSG_WARNING, S.MSG_PACKAGES_NONE_SELECTED)
-            return
-        here = [f for f in formats if is_supported(f)]
-        if not here:
-            QMessageBox.warning(self, S.MSG_WARNING,
-                                S.MSG_PACKAGES_NONE_HERE.format(platform=platform_label()))
-            return
-        built = artifacts.built_output(project.build)
-        if not built:
-            QMessageBox.warning(self, S.MSG_WARNING, S.MSG_PACKAGES_NO_BUILD)
-            return
-        version = project.version if is_semver(project.version) else "0.0.0"
-        out_dir = artifacts.release_dir(project.build, version)
-        spec = spec_from_project(project, built, version, out_dir,
-                                 sign_identity=os.environ.get(MACOS_SIGN_ENV, "").strip())
-        allow_download = False
-        if "appimage" in here and not get_packager("appimage").tool_path():
-            packager = get_packager("appimage")
-            reply = QMessageBox.question(
-                self, S.MSG_CONFIRM,
-                S.MSG_APPIMAGETOOL_CONFIRM.format(url=appimagetool_url(spec.machine()),
-                                                  path=packager.tools_dir),
-                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No, QMessageBox.StandardButton.No,
-            )
-            if reply == QMessageBox.StandardButton.Yes:
-                allow_download = True
-            else:
-                self._append_log(S.LOG_APPIMAGETOOL_DECLINED)
-                here = [f for f in here if f != "appimage"]
-                if not here:
-                    return
-        self._append_log(S.LOG_PACKAGES_START.format(
-            formats=", ".join(get_packager(f).display_name for f in here)))
-        self.platforms_tab.set_running(True)
-        self.platforms_tab.show_packages_result("", bool(self._last_packages_dir))
-        self.convert_btn.setEnabled(False)
-        self.package_thread = PackageThread(spec, here, allow_download)
-        self.package_thread.log_signal.connect(self._append_log)
-        self.package_thread.finished_signal.connect(self._on_packages_finished)
-        self.package_thread.start()
-
-    def _on_packages_finished(self, results):
-        from py2exe_gui.core.packagers import get_packager
-
-        self.platforms_tab.set_running(False)
-        self.convert_btn.setEnabled(True)
-        done = []
-        for result in results:
-            label = get_packager(result.format).display_name
-            for finding in result.findings:
-                self._append_log(f"  • [{finding.code}] {finding_title(finding)}")
-            if result.ok:
-                done.append(result)
-                self._append_log(S.LOG_PACKAGE_DONE.format(
-                    format=label, path=result.path, size=size_text(result.size_bytes)))
-            else:
-                self._append_log(S.LOG_PACKAGE_FAILED.format(
-                    format=label, error=result.error or result.error_code))
-        folder = os.path.dirname(done[0].path) if done else ""
-        if folder:
-            self._last_packages_dir = folder
-        all_ok = bool(results) and len(done) == len(results)
-        text = (S.PACKAGES_RESULT_DONE.format(count=ltr(str(len(done))), folder=ltr(folder))
-                if all_ok else S.PACKAGES_RESULT_FAILED)
-        self.platforms_tab.show_packages_result(text, bool(self._last_packages_dir))
-        self._notify_build_result(all_ok, S.RELEASE_STEP_PACKAGES)
-
-    def open_packages_folder(self):
-        if self._last_packages_dir and os.path.isdir(self._last_packages_dir):
-            QDesktopServices.openUrl(QUrl.fromLocalFile(self._last_packages_dir))
-
-    def generate_ci_workflow(self):
-        """Preview the GitHub Actions workflow; write it only on "Write the file"."""
-        from py2exe_gui.core.ci_generator import (
-            options_for,
-            render_workflow,
-            repo_root,
-            workflow_path,
-            write_workflow,
-        )
-
-        if not self.project_path:
-            QMessageBox.warning(self, S.MSG_WARNING, S.MSG_CI_NEEDS_PROJECT)
-            return
-        project = self._current_project()
-        project_dir = os.path.dirname(self.project_path)
-        root = repo_root(project_dir)
-        opts, findings = options_for(project, self.project_path, root,
-                                     tool_requirement=self.platforms_tab.tool_requirement())
-        for finding in findings:
-            self._append_log(f"[{finding.code}] {finding_title(finding)}")
-        problems = [finding_title(f) for f in findings if f.severity == "error"]
-        if problems:
-            QMessageBox.warning(self, S.MSG_WARNING,
-                                S.MSG_CI_BLOCKED.format(problems="\n".join(problems)))
-            return
-        text = render_workflow(opts)
-        path = workflow_path(root or project_dir)
-        dialog = CiPreviewDialog(text, path, os.path.exists(path), opts.secrets_used(), self)
-        if not dialog.exec():
-            self._append_log(S.LOG_CI_CANCELLED)
-            return
-        write_workflow(text, path)
-        self._append_log(S.LOG_CI_WRITTEN.format(path=path))
 
     # ─── Shortcuts ──────────────────────────────────────────────────────
 
@@ -3756,17 +1333,13 @@ class MainWindow(QMainWindow):
             if reply != QMessageBox.StandardButton.Yes:
                 event.ignore()
                 return
-            # Both threads spawn a child process; leaving either running
-            # orphans a PyInstaller run after the window is gone.
-            for thread in (
-                self.conversion_thread, self.batch_thread, self.diagnostic_thread,
-                self.env_thread, self.compare_thread,
-            ):
-                if thread and thread.isRunning():
-                    thread.cancel()
-                    thread.wait()
-            if self.release_thread and self.release_thread.isRunning():
-                self.release_thread.wait()
+            # Every worker spawns a child process or writes files; leaving
+            # one running orphans a PyInstaller run after the window is gone.
+            for thread in self._running_threads():
+                cancel = getattr(thread, "cancel", None)
+                if cancel is not None:
+                    cancel()
+                thread.wait()
 
         self._cleanup_temp_files()
         self.tray.hide()

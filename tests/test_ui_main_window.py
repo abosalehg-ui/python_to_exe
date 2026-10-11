@@ -14,14 +14,61 @@ pytest.importorskip("py2exe_gui.qt", reason="no Qt binding (PySide6/PyQt5) insta
 
 from py2exe_gui.core import BuildConfig  # noqa: E402
 from py2exe_gui.qt import (
+    QApplication,  # noqa: E402
     QMessageBox,  # noqa: E402
     Qt,  # noqa: E402
 )
-from py2exe_gui.strings import set_locale  # noqa: E402
+from py2exe_gui.strings import S, set_locale  # noqa: E402
+from py2exe_gui.ui import streaming_thread  # noqa: E402
+from py2exe_gui.ui.conversion_thread import ConversionThread  # noqa: E402
+from py2exe_gui.ui.env_thread import CommandThread, TaskThread  # noqa: E402
 from py2exe_gui.ui.main_window import BUILD_SECTIONS, NAV_SECTIONS  # noqa: E402
 from tests.conftest import MemoryKeyring  # noqa: E402
 
 pytestmark = pytest.mark.gui
+
+
+class SyncCommandThread(CommandThread):
+    """The real CommandThread, run to completion on ``start()``.
+
+    Signals are emitted on the calling thread, so a test sees the window's
+    finished slot run before ``start()`` returns and nothing is left running
+    when the window closes.
+    """
+
+    def start(self, *_args, **_kwargs):
+        self.run()
+
+    def isRunning(self):
+        return False
+
+
+class SyncTaskThread(TaskThread):
+    def start(self, *_args, **_kwargs):
+        self.run()
+
+    def isRunning(self):
+        return False
+
+
+class SyncConversionThread(ConversionThread):
+    """A build that finishes immediately with a canned outcome."""
+
+    outcome = (True, "ok", "ok")
+    last = None
+
+    def start(self, *_args, **_kwargs):
+        SyncConversionThread.last = self
+        self.finished_signal.emit(*self.outcome)
+
+    def isRunning(self):
+        return False
+
+
+@pytest.fixture
+def sync_workers(monkeypatch):
+    monkeypatch.setattr("py2exe_gui.ui.main_window.CommandThread", SyncCommandThread)
+    monkeypatch.setattr("py2exe_gui.ui.main_window.TaskThread", SyncTaskThread)
 
 
 @pytest.fixture
@@ -946,7 +993,7 @@ def test_startup_update_check_is_skipped_when_not_opted_in(window, monkeypatch):
     assert not called
 
 
-def test_startup_update_check_runs_when_opted_in(window, monkeypatch):
+def test_startup_update_check_runs_when_opted_in(window, monkeypatch, sync_workers):
     called = []
     monkeypatch.setattr(
         "py2exe_gui.ui.main_window.check_for_update",
@@ -957,7 +1004,7 @@ def test_startup_update_check_runs_when_opted_in(window, monkeypatch):
     assert called
 
 
-def test_update_check_reports_a_newer_release(window, monkeypatch):
+def test_update_check_reports_a_newer_release(window, monkeypatch, sync_workers):
     from py2exe_gui.core.update_checker import UpdateInfo
 
     monkeypatch.setattr(
@@ -971,7 +1018,339 @@ def test_update_check_reports_a_newer_release(window, monkeypatch):
     assert "99.0.0" in window.main_tab.log_text()
 
 
+def test_update_check_runs_off_the_ui_thread_and_survives_an_error(window, monkeypatch):
+    """A slow or absent network must not freeze the window: the check is a
+    TaskThread, and an exception in it becomes a log line, not a crash."""
+    started = []
+
+    class Worker:
+        def __init__(self, task):
+            self.task = task
+            self.slot = None
+            self.finished_signal = self
+
+        def connect(self, slot):
+            self.slot = slot
+
+        def start(self):
+            started.append(self.task)
+
+        def isRunning(self):
+            return False
+
+    monkeypatch.setattr("py2exe_gui.ui.main_window.TaskThread", Worker)
+    window.check_for_updates(interactive=False)
+    assert len(started) == 1 and window.statusBar().currentMessage() == S.BUSY_UPDATE_CHECK
+    window.task_thread.slot(None, "socket timed out")
+    assert "socket timed out" in window.main_tab.log_text()
+    assert window.statusBar().currentMessage() == S.STATUS_READY
+
+
 def test_welcome_dialog_only_appears_once(window):
     window.settings["welcomed"] = True
     window.run_startup_tasks()  # must not block on a modal
     assert window.settings["welcomed"] is True
+
+
+# ── RTL: no double mirroring, percentages read as numbers ──────────────────
+
+
+def _chevron_images(qapp, tmp_path, monkeypatch, locale):
+    """The section chevron pixmap rendered under ``locale``."""
+    monkeypatch.setattr("py2exe_gui.ui.main_window.SETTINGS_FILE", str(tmp_path / "s.json"))
+    monkeypatch.setattr("py2exe_gui.ui.main_window.HISTORY_FILE", str(tmp_path / "h.json"))
+    monkeypatch.setattr("py2exe_gui.ui.main_window.PRESETS_FILE", str(tmp_path / "p.json"))
+    monkeypatch.setattr("py2exe_gui.ui.main_window.KEYRING", MemoryKeyring())
+    from py2exe_gui.qt import QSize
+    from py2exe_gui.ui.main_window import MainWindow
+
+    set_locale(locale)
+    win = MainWindow()
+    try:
+        section = next(iter(win.build_page.sections.values()))
+        icon = section._chevrons[1]  # the "closed" chevron, the directional one
+        return icon.pixmap(QSize(24, 24)).toImage()
+    finally:
+        win.close()
+
+
+def test_section_chevron_is_mirrored_exactly_once_under_rtl(qapp, tmp_path, monkeypatch):
+    """chevron_left is in icons.DIRECTIONAL, so asking for it under RTL
+    mirrored it twice and the arrow pointed the wrong way."""
+    ltr_image = _chevron_images(qapp, tmp_path, monkeypatch, "en")
+    rtl_image = _chevron_images(qapp, tmp_path, monkeypatch, "ar")
+    assert ltr_image.mirrored(True, False) == rtl_image
+    assert ltr_image != rtl_image
+
+
+def test_progress_percent_is_isolated_under_rtl(window):
+    """"%p%" inside an Arabic paragraph rendered as "%42"."""
+    from py2exe_gui.bidi import LRI, PDI
+
+    set_locale("ar")
+    window.retranslate("ar")
+    window.progress_bar.setVisible(True)
+    window._on_stage_changed("analyzing")
+    window.progress_bar.setValue(42)
+    text = window.progress_label.text()
+    assert f"{LRI}42%{PDI}" in text
+    assert "%p" not in text and "%42" not in text
+    assert S.STAGE_ANALYZING in text
+
+
+def test_busy_bar_shows_no_percentage(window):
+    window._set_busy(S.BUSY_ENV)
+    assert window.progress_bar.isVisibleTo(window)
+    assert window.progress_label.isVisibleTo(window)
+    assert window.progress_bar.maximum() == 0
+    assert window.progress_label.text() == S.BUSY_ENV
+    window._clear_busy()
+    assert not window.progress_bar.isVisibleTo(window)
+    assert window.progress_bar.maximum() == 100
+    assert window.statusBar().currentMessage() == S.STATUS_READY
+
+
+# ── Feedback: every long task shows the bar ────────────────────────────────
+
+
+def test_create_build_env_shows_the_busy_bar(window, tmp_path, monkeypatch):
+    from tests.test_ui_size import FakeEnvThread, answer, make_source
+
+    monkeypatch.setattr("py2exe_gui.ui.main_window.EnvThread", FakeEnvThread)
+    monkeypatch.setattr("py2exe_gui.ui.main_window.find_uv", lambda: "")
+    window.main_tab.source_input.setText(make_source(tmp_path))
+    answer(monkeypatch, "question", QMessageBox.StandardButton.Yes)
+    window.create_build_env()
+    assert window.env_thread.started
+    assert window.progress_bar.isVisibleTo(window)
+    assert window.progress_label.text() == S.BUSY_ENV
+    assert not window.convert_btn.isEnabled()
+
+
+def test_engine_install_runs_on_a_worker_then_continues(window, tmp_path, monkeypatch):
+    """Consent on the UI thread; pip on a CommandThread; the build after it."""
+    import subprocess
+
+    from tests.test_ui_size import answer, make_source
+
+    window.main_tab.source_input.setText(make_source(tmp_path))
+    answer(monkeypatch, "question", QMessageBox.StandardButton.Yes)
+    runs = []
+
+    def fake_run(cmd, **_kwargs):
+        runs.append(cmd)
+        return subprocess.CompletedProcess(cmd, 0, stdout="Successfully installed\n", stderr="")
+
+    monkeypatch.setattr("py2exe_gui.ui.env_thread.CommandThread.runner", staticmethod(fake_run))
+    # The availability probe (on the UI thread, instant) says "missing".
+    monkeypatch.setattr(
+        "py2exe_gui.ui.main_window.subprocess.run",
+        lambda *a, **k: (_ for _ in ()).throw(OSError("no PyInstaller")),
+    )
+    started = []
+
+    class Worker(SyncCommandThread):
+        def start(self, *args, **kwargs):
+            started.append(list(self.command))
+            # Nothing is bar-visible after start() in a sync thread, so look now.
+            assert window.progress_bar.isVisibleTo(window)
+            assert S.BUSY_INSTALLING_FMT.format(tool="PyInstaller") == window.progress_label.text()
+            super().start()
+
+    monkeypatch.setattr("py2exe_gui.ui.main_window.CommandThread", Worker)
+    continued = []
+    assert window._ensure_pyinstaller(then=lambda: continued.append(True)) is False
+    assert started and "pip" in started[0] and runs
+    assert continued == [True]
+    assert not window.progress_bar.isVisibleTo(window)
+    assert window.convert_btn.isEnabled()
+    assert "Successfully installed" in window.main_tab.log_text()
+
+
+def test_failed_install_shows_one_sentence_and_logs_pip(window, tmp_path, monkeypatch):
+    import subprocess
+
+    from tests.test_ui_size import answer
+
+    answer(monkeypatch, "question", QMessageBox.StandardButton.Yes)
+    shown = []
+    answer(monkeypatch, "critical", QMessageBox.StandardButton.Ok, shown)
+    monkeypatch.setattr(
+        "py2exe_gui.ui.env_thread.CommandThread.runner",
+        staticmethod(lambda cmd, **_k: subprocess.CompletedProcess(cmd, 1, stdout="ERROR: No matching distribution\n", stderr="")),
+    )
+    monkeypatch.setattr(
+        "py2exe_gui.ui.main_window.subprocess.run",
+        lambda *a, **k: (_ for _ in ()).throw(OSError("no PyInstaller")),
+    )
+    monkeypatch.setattr("py2exe_gui.ui.main_window.CommandThread", SyncCommandThread)
+    continued = []
+    assert window._ensure_pyinstaller(then=lambda: continued.append(True)) is False
+    assert continued == []
+    assert shown == [S.MSG_INSTALL_FAILED_FMT.format(tool="PyInstaller")]
+    log = window.main_tab.log_text()
+    assert "No matching distribution" in log
+    assert S.THREAD_ERR_FAILED_FMT.format(tool="pip", code=1) in log
+
+
+def test_output_folder_failure_is_a_sentence_with_the_detail_in_the_log(
+    window, tmp_path, monkeypatch
+):
+    from tests.test_ui_size import answer, make_source
+
+    window.main_tab.source_input.setText(make_source(tmp_path))
+    monkeypatch.setattr(window, "_ensure_engine", lambda *a, **k: True)
+    shown = []
+    answer(monkeypatch, "critical", QMessageBox.StandardButton.Ok, shown)
+
+    def boom(_config):
+        raise OSError("[Errno 13] Permission denied: 'dist'")
+
+    from py2exe_gui.core.engines import get_engine
+
+    monkeypatch.setattr(get_engine("pyinstaller").__class__, "prepare_output",
+                        lambda self, config: boom(config))
+    window.start_conversion()
+    assert shown == [S.MSG_OUTPUT_DIR_FAILED]
+    assert "Permission denied" in window.main_tab.log_text()
+    assert window.conversion_thread is None
+
+
+# ── Outcome codes from the threads ─────────────────────────────────────────
+
+
+def test_cancelled_build_is_told_by_its_status_code(window, monkeypatch):
+    """Not by comparing the message against S.CONV_CANCELLED."""
+    shown = []
+    monkeypatch.setattr(
+        QMessageBox, "critical", staticmethod(lambda *a, **k: shown.append(a[2]))
+    )
+    window._build_start_time = 0.0
+    window.on_conversion_finished(False, "whatever text", streaming_thread.CANCELLED)
+    assert shown == []
+    assert window.statusBar().currentMessage() == S.STATUS_CANCELLED
+    window.on_conversion_finished(False, S.CONV_FAILED_MSG, streaming_thread.FAILED)
+    assert shown == [S.CONV_FAILED_MSG]
+    assert window.statusBar().currentMessage() == S.STATUS_FAILED
+
+
+def test_thread_error_text_translates_every_code(window):
+    thread = type("T", (), {"returncode": 3, "error": "boom"})()
+    assert window.thread_error_text(streaming_thread.CANCELLED) == S.THREAD_ERR_CANCELLED
+    assert window.thread_error_text(streaming_thread.NOT_FOUND, "ISCC.exe") == \
+        S.THREAD_ERR_NOT_FOUND_FMT.format(tool="ISCC.exe")
+    assert window.thread_error_text(streaming_thread.FAILED, "ISCC.exe", thread) == \
+        S.THREAD_ERR_FAILED_FMT.format(tool="ISCC.exe", code=3)
+    assert window.thread_error_text(streaming_thread.ERROR, "x", thread) == \
+        S.THREAD_ERR_ERROR_FMT.format(tool="x", error="boom")
+    assert window.thread_error_text(streaming_thread.TIMED_OUT, "x") == \
+        S.THREAD_ERR_TIMED_OUT_FMT.format(tool="x")
+
+
+def test_installer_failure_code_is_translated_in_the_window(window, monkeypatch):
+    shown = []
+    monkeypatch.setattr(
+        QMessageBox, "critical", staticmethod(lambda *a, **k: shown.append(a[2]))
+    )
+    window.installer_thread = type("T", (), {"returncode": 2, "error": "",
+                                             "isRunning": lambda s: False})()
+    window._on_installer_finished(False, streaming_thread.NOT_FOUND, interactive=True)
+    expected = S.THREAD_ERR_NOT_FOUND_FMT.format(tool="ISCC.exe")
+    assert expected in window.main_tab.log_text()
+    assert shown == [S.LOG_INSTALLER_FAIL.format(error=expected)]
+    window._on_installer_finished(False, streaming_thread.CANCELLED, interactive=True)
+    assert len(shown) == 1  # a cancel is logged, never a dialog
+
+
+def test_every_worker_counts_as_a_build_in_progress(window):
+    class Running:
+        def isRunning(self):
+            return True
+
+    for name in ("installer_thread", "post_build_thread", "package_thread",
+                 "command_thread", "task_thread"):
+        setattr(window, name, Running())
+        assert window._build_in_progress(), name
+        setattr(window, name, None)
+    assert not window._build_in_progress()
+
+
+def test_close_cancels_and_waits_for_every_running_worker(window, monkeypatch):
+    from py2exe_gui.qt import QCloseEvent
+
+    log = []
+
+    class Running:
+        def __init__(self, name):
+            self.name = name
+
+        def isRunning(self):
+            return True
+
+        def cancel(self):
+            log.append(("cancel", self.name))
+
+        def wait(self):
+            log.append(("wait", self.name))
+
+    monkeypatch.setattr(
+        QMessageBox, "question", staticmethod(lambda *a, **k: QMessageBox.StandardButton.Yes)
+    )
+    window.installer_thread = Running("installer")
+    window.post_build_thread = Running("post_build")
+    window.package_thread = Running("package")
+    event = QCloseEvent()
+    window.closeEvent(event)
+    assert event.isAccepted()
+    assert {n for _, n in log} == {"installer", "post_build", "package"}
+    assert ("cancel", "installer") in log and ("wait", "package") in log
+    window.installer_thread = window.post_build_thread = window.package_thread = None
+
+
+# ── Menus ──────────────────────────────────────────────────────────────────
+
+
+@pytest.mark.parametrize("locale", ["ar", "en"])
+def test_menu_mnemonics_are_present_and_distinct(window, locale):
+    """Each top-level menu has an &-mnemonic, and no two share a letter."""
+    set_locale(locale)
+    window.retranslate(locale)
+    titles = [a.text() for a in window.menuBar().actions() if a.menu() is not None]
+    letters = []
+    for title in titles:
+        assert "&" in title, title
+        letters.append(title[title.index("&") + 1].lower())
+    assert len(letters) == len(set(letters)), titles
+
+
+# ── Fonts: the primary button scales with Ctrl+= ───────────────────────────
+
+
+def test_primary_button_font_follows_the_font_scale(window):
+    from py2exe_gui.styles import base_point_size
+
+    def point_size(button):
+        QApplication.instance().processEvents()
+        return button.fontInfo().pointSize()
+
+    window.zoom_reset()
+    before = point_size(window.convert_btn)
+    assert before == base_point_size("primary")
+    window._set_font_scale(2.0)
+    after = point_size(window.convert_btn)
+    assert after == base_point_size("primary", 2.0) > before
+    assert window.doctor_tab.score_label.fontInfo().pointSize() == base_point_size("score", 2.0)
+    window.zoom_reset()
+
+
+def test_prose_text_views_do_not_use_the_log_font(window):
+    """The monospace log rule used to leak to every QTextEdit."""
+    from py2exe_gui.qt import QFontInfo
+
+    QApplication.instance().processEvents()
+    log_family = QFontInfo(window.main_tab.log_output.font()).family()
+    detail_family = QFontInfo(window.doctor_tab.detail_view.font()).family()
+    body_family = QFontInfo(window.doctor_tab.summary_label.font()).family()
+    assert window.main_tab.log_output.objectName() == "logOutput"
+    assert detail_family == body_family
+    assert window.main_tab.log_output.fontInfo().fixedPitch() or log_family != detail_family

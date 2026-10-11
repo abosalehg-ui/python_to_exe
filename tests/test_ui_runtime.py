@@ -374,7 +374,7 @@ def no_build(window, monkeypatch):
     monkeypatch.setattr("py2exe_gui.ui.main_window.ConversionThread", FakeThread)
     monkeypatch.setattr("py2exe_gui.ui.main_window.DiagnosticThread", FakeThread)
     monkeypatch.setattr("py2exe_gui.ui.main_window.BatchThread", FakeThread)
-    monkeypatch.setattr(window, "_ensure_pyinstaller", lambda python="": True)
+    monkeypatch.setattr(window, "_ensure_pyinstaller", lambda python="", **_kw: True)
     monkeypatch.setattr(window.tray, "show", lambda: None)
     FakeThread.last = None
 

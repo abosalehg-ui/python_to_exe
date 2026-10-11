@@ -73,6 +73,26 @@ def test_escape_iss_strips_newlines():
     assert escape_iss("line1\nline2") == "line1 line2"
 
 
+def test_escape_iss_refuses_a_double_quote():
+    # Inno Setup has no in-string escape for ", so the value cannot be emitted.
+    with pytest.raises(ValueError, match="double quote"):
+        escape_iss('a"b')
+
+
+def test_validate_reports_a_double_quote_instead_of_a_traceback(base_config, exe_path):
+    base_config.app_name = 'My "App"'
+    base_config.readme_file = 'C:\\docs\\read"me.txt'
+    message = validate(base_config, exe_path)
+    assert message is not None and "app_name" in message and "readme_file" in message
+    base_config.app_name = "My App"
+    base_config.readme_file = ""
+    base_config.output_base_filename = 'setup"'
+    assert "output_base_filename" in (validate(base_config, exe_path) or "")
+    base_config.output_base_filename = ""
+    assert validate(base_config, exe_path) is None
+    assert "app_path" in (validate(base_config, exe_path + '"') or "")
+
+
 def test_escape_iss_handles_empty():
     assert escape_iss("") == ""
 
@@ -418,3 +438,24 @@ def test_config_from_dict_tolerates_scalar_languages():
 
 def test_choice_tuples_are_non_empty():
     assert COMPRESSION_CHOICES and ARCH_CHOICES
+
+
+def test_write_iss_script_puts_the_file_next_to_a_onefile_build(tmp_path):
+    from py2exe_gui.core.installer import InstallerConfig, write_iss_script
+
+    exe = tmp_path / "dist" / "app.exe"
+    exe.parent.mkdir()
+    exe.write_bytes(b"")
+    cfg = InstallerConfig(app_name="Demo")
+    path = write_iss_script("[Setup]\n", cfg, str(exe), onefile=True)
+    assert path == str(tmp_path / "dist" / "Demo.iss")
+    assert open(path, encoding="utf-8").read() == "[Setup]\n"
+
+
+def test_write_iss_script_honours_output_dir_and_creates_it(tmp_path):
+    from py2exe_gui.core.installer import InstallerConfig, write_iss_script
+
+    cfg = InstallerConfig(app_name="", output_dir=str(tmp_path / "out" / "deep"))
+    path = write_iss_script("x", cfg, str(tmp_path / "app"), onefile=False)
+    assert path == str(tmp_path / "out" / "deep" / "setup.iss")
+    assert (tmp_path / "out" / "deep" / "setup.iss").read_text() == "x"

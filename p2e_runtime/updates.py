@@ -2,7 +2,8 @@
 
 The developer publishes two files next to the new build:
 
-* ``update.json`` — ``{version, url, sha256, size, notes, min_version}``;
+* ``update.json`` — ``{app, version, url, sha256, size, notes, min_version,
+  issued, expires}``;
 * ``update.json.sig`` — an Ed25519 signature over ``update.json``'s exact
   bytes, as 128 hexadecimal characters.
 
@@ -11,7 +12,12 @@ key embedded in the app *before* reading the JSON, and returns an
 ``UpdateInfo`` when the version is newer. ``apply()`` downloads the file,
 checks its size and SHA-256, and only then swaps it in. Anything unsigned,
 tampered with, served over plain HTTP, or redirected to plain HTTP is
-refused with an ``UpdateError``; nothing unverified is ever run.
+refused with an ``UpdateError``; nothing unverified is ever run. A signed
+manifest is still a signed manifest years later, so each one carries the
+UTC time it was ``issued``: the runtime remembers the newest stamp it
+accepted (in the per-user state folder) and refuses anything older — a
+replayed manifest for a version with a known hole — and refuses a manifest
+past its optional ``expires`` time.
 
 Both calls are synchronous and show nothing: the app decides when to call
 them and how to ask its user, from whatever toolkit it uses.
@@ -24,6 +30,7 @@ manifest points to an installer (``Setup.exe``), which is verified and then
 launched with the arguments the developer configured.
 """
 
+import datetime
 import hashlib
 import hmac
 import json
@@ -43,7 +50,7 @@ from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple
 
 from p2e_runtime import _ed25519, _native
 from p2e_runtime.config import BUILD_ONEDIR, RuntimeConfig, UpdaterConfig
-from p2e_runtime.paths import is_frozen
+from p2e_runtime.paths import is_frozen, user_state_dir
 
 MANIFEST_MAX_BYTES = 64 * 1024
 SIGNATURE_MAX_BYTES = 1024
@@ -52,6 +59,10 @@ _CHUNK = 256 * 1024
 _LOCAL_HOSTS = frozenset({"localhost", "127.0.0.1", "::1"})
 _SHA256 = re.compile(r"^[0-9a-f]{64}$")
 _PUBLIC_KEY = re.compile(r"^[0-9a-f]{64}$")
+#: ``issued`` / ``expires``: UTC, second precision, nothing else accepted.
+_STAMP = re.compile(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$")
+STAMP_FORMAT = "%Y-%m-%dT%H:%M:%SZ"
+STATE_FILE_NAME = "update_state.json"
 
 DEFAULT_PROMPT_TITLE = "{app} — update"
 DEFAULT_PROMPT_MESSAGE = (
@@ -63,7 +74,8 @@ class UpdateError(Exception):
     """Why an update was refused. ``code`` is stable; ``detail`` is for logs.
 
     Codes: ``not_configured``, ``insecure_url``, ``network``, ``too_large``,
-    ``bad_signature``, ``bad_manifest``, ``wrong_app``, ``size_mismatch``,
+    ``bad_signature``, ``bad_manifest`` (also an expired one), ``wrong_app``,
+    ``stale_manifest`` (older than one already accepted), ``size_mismatch``,
     ``hash_mismatch``, ``min_version``, ``not_frozen``, ``write_failed``,
     ``swap_failed``, ``launch_failed``.
     """
@@ -194,6 +206,8 @@ class UpdateInfo:
     notes: str = ""
     min_version: str = ""
     current_version: str = ""
+    issued: str = ""
+    expires: str = ""
 
     @property
     def applicable(self) -> bool:
@@ -228,9 +242,35 @@ def verify_manifest(manifest: bytes, signature: bytes, public_key: str) -> None:
         raise UpdateError("bad_signature", "the manifest is not signed by this app's key")
 
 
-def parse_manifest(data: bytes, app_name: str = "", allow_insecure_localhost: bool = False
-                   ) -> Dict[str, Any]:
-    """Validate a manifest whose signature has *already* been verified."""
+def utc_now() -> datetime.datetime:
+    return datetime.datetime.now(datetime.timezone.utc)
+
+
+def format_stamp(when: datetime.datetime) -> str:
+    """``when`` (any zone) as the manifest's UTC stamp."""
+    return when.astimezone(datetime.timezone.utc).strftime(STAMP_FORMAT)
+
+
+def parse_stamp(text: str, key: str = "issued") -> datetime.datetime:
+    """A manifest time stamp as an aware UTC datetime; ``bad_manifest`` otherwise."""
+    if not isinstance(text, str) or not _STAMP.match(text):
+        raise UpdateError("bad_manifest", f"'{key}' must be a UTC time like 2026-01-31T12:00:00Z")
+    try:
+        parsed = datetime.datetime.strptime(text, STAMP_FORMAT)
+    except ValueError as e:
+        raise UpdateError("bad_manifest", f"'{key}': {e}") from e
+    return parsed.replace(tzinfo=datetime.timezone.utc)
+
+
+def parse_manifest(data: bytes, app_name: str = "", allow_insecure_localhost: bool = False,
+                   now: Optional[datetime.datetime] = None) -> Dict[str, Any]:
+    """Validate a manifest whose signature has *already* been verified.
+
+    ``issued`` is optional only for manifests published before it existed;
+    ``expires`` is optional and, when past, the manifest is refused. When the
+    app has a name, ``app`` is required and must match: a manifest signed
+    with the same key for another of the developer's apps must not install.
+    """
     try:
         manifest = json.loads(data.decode("utf-8"))
     except (UnicodeDecodeError, ValueError) as e:
@@ -263,11 +303,79 @@ def parse_manifest(data: bytes, app_name: str = "", allow_insecure_localhost: bo
     if not isinstance(notes, str):
         raise UpdateError("bad_manifest", "'notes' must be a string")
     app = manifest.get("app")
-    if app is not None and app_name and app != app_name:
-        # A manifest signed with the same key for another of the developer's apps.
-        raise UpdateError("wrong_app", f"manifest is for {app!r}")
+    if app_name:
+        if app is None:
+            raise UpdateError("wrong_app", "manifest names no app")
+        if app != app_name:
+            # A manifest signed with the same key for another of the developer's apps.
+            raise UpdateError("wrong_app", f"manifest is for {app!r}")
+    issued = text("issued", required=False)
+    expires = text("expires", required=False)
+    if issued:
+        parse_stamp(issued, "issued")
+    if expires:
+        when = parse_stamp(expires, "expires")
+        if when <= (now or utc_now()):
+            raise UpdateError("bad_manifest", f"the manifest expired at {expires}")
     return {"version": version, "url": url, "sha256": sha256, "size": size,
-            "notes": notes, "min_version": min_version}
+            "notes": notes, "min_version": min_version, "issued": issued, "expires": expires}
+
+
+# ── Replay protection ──────────────────────────────────────────────────────
+
+
+def state_file(config: RuntimeConfig) -> str:
+    """Where the newest accepted ``issued`` stamp is remembered."""
+    folder = _updater(config).state_dir or user_state_dir(config.app_name)
+    return os.path.join(folder, STATE_FILE_NAME)
+
+
+def last_accepted_issued(config: RuntimeConfig) -> str:
+    """The stamp of the newest manifest accepted so far, or ''.
+
+    A missing or unreadable file means "nothing accepted yet": the stamp is a
+    ratchet against replay, not a secret, and a broken file must not lock the
+    app out of every future update.
+    """
+    try:
+        with open(state_file(config), encoding="utf-8") as f:
+            data = json.load(f)
+    except (OSError, ValueError):
+        return ""
+    stamp = data.get("issued", "") if isinstance(data, dict) else ""
+    return stamp if isinstance(stamp, str) and _STAMP.match(stamp) else ""
+
+
+def remember_issued(config: RuntimeConfig, issued: str) -> None:
+    """Advance the ratchet to ``issued`` (never backwards; '' is ignored)."""
+    if not issued:
+        return
+    previous = last_accepted_issued(config)
+    if previous and parse_stamp(previous) >= parse_stamp(issued):
+        return
+    path = state_file(config)
+    try:
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        temp = path + ".tmp"
+        with open(temp, "w", encoding="utf-8") as f:
+            json.dump({"issued": issued}, f)
+        os.replace(temp, path)
+    except OSError:
+        pass  # the check still succeeded; only the replay guard is weaker
+
+
+def refuse_stale(config: RuntimeConfig, issued: str) -> None:
+    """``stale_manifest`` when ``issued`` is older than one already accepted.
+
+    A manifest without ``issued`` (published by an older converter) is let
+    through unchanged — and never advances the ratchet.
+    """
+    if not issued:
+        return
+    previous = last_accepted_issued(config)
+    if previous and parse_stamp(issued) < parse_stamp(previous):
+        raise UpdateError("stale_manifest",
+                          f"issued {issued}, but a manifest from {previous} was already accepted")
 
 
 # ── Configuration ──────────────────────────────────────────────────────────
@@ -320,6 +428,8 @@ def check(config: Optional[RuntimeConfig] = None, current_version: Optional[str]
 
     verify_manifest(manifest, signature, updater.public_key)
     fields = parse_manifest(manifest, config.app_name, allow)
+    refuse_stale(config, fields["issued"])
+    remember_issued(config, fields["issued"])
     if not is_newer(fields["version"], current):
         return None
     return UpdateInfo(current_version=current, **fields)

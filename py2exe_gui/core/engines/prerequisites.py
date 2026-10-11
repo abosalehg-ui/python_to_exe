@@ -20,6 +20,7 @@ from dataclasses import dataclass, field
 from typing import Callable, Dict, List, Mapping, Optional
 
 from py2exe_gui.core.fixes import SEVERITY_ERROR, SEVERITY_WARNING, Finding
+from py2exe_gui.core.platform_support import resolve as resolve_platform
 
 
 def _which(name: str, path: Optional[str] = None) -> Optional[str]:
@@ -30,7 +31,7 @@ def _which(name: str, path: Optional[str] = None) -> Optional[str]:
 class Toolchain:
     """Facts about the machine a build runs on."""
 
-    platform: str = field(default_factory=lambda: sys.platform)
+    platform: str = field(default_factory=resolve_platform)
     #: "3.12" — the *build* interpreter's version, '' when unknown.
     python_version: str = ""
     #: The build interpreter's folder: a pip-installed ``patchelf`` lives there.

@@ -9,7 +9,7 @@ from py2exe_gui.qt import (
     QLineEdit,
 )
 from py2exe_gui.strings import S
-from py2exe_gui.ui.tabs.base import BaseTab, platform_notice, scrolled_layout
+from py2exe_gui.ui.tabs.base import BaseTab, labelled, platform_notice, scrolled_layout
 
 
 class VersionInfoTab(BaseTab):
@@ -51,7 +51,7 @@ class VersionInfoTab(BaseTab):
             (S.VI_PRODUCT_VERSION, self.vi_product_version),
         ]
         for i, (label, widget) in enumerate(rows, start=1):
-            grid.addWidget(QLabel(label), i, 0)
+            grid.addWidget(labelled(label, widget), i, 0)
             grid.addWidget(widget, i, 1)
 
         layout.addWidget(group)

@@ -6,6 +6,7 @@ new EXE. Running them inline froze the whole window with no indication that
 anything was happening.
 """
 
+import os
 import subprocess
 
 from py2exe_gui.core import (
@@ -75,12 +76,12 @@ class PostBuildThread(QThread):
                 cmd, capture_output=True, text=True, timeout=self.sign_timeout
             )
         except FileNotFoundError:
-            self.log_signal.emit(
-                S.LOG_SIGNING_FAIL.format(error="signtool not found on PATH")
-            )
+            self.log_signal.emit(S.LOG_SIGNING_FAIL.format(
+                error=S.THREAD_ERR_NOT_FOUND_FMT.format(tool="signtool")))
             return False
         except subprocess.TimeoutExpired:
-            self.log_signal.emit(S.LOG_SIGNING_FAIL.format(error="timed out"))
+            self.log_signal.emit(S.LOG_SIGNING_FAIL.format(
+                error=S.THREAD_ERR_TIMED_OUT_FMT.format(tool="signtool")))
             return False
         except OSError as e:
             self.log_signal.emit(S.LOG_SIGNING_FAIL.format(error=str(e)))
@@ -102,11 +103,9 @@ class PostBuildThread(QThread):
         if result.passed:
             self.log_signal.emit(S.LOG_SMOKE_OK)
         else:
-            self.log_signal.emit(
-                S.LOG_SMOKE_FAIL.format(
-                    error=result.error or f"exit={result.returncode}"
-                )
-            )
+            self.log_signal.emit(S.LOG_SMOKE_FAIL.format(
+                error=result.error or S.THREAD_ERR_FAILED_FMT.format(
+                    tool=os.path.basename(self.exe_path), code=result.returncode)))
 
     def cancel(self):
         self.is_cancelled = True

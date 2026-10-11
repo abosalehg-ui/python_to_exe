@@ -106,8 +106,8 @@ class _FakeResponse:
     def __init__(self, payload):
         self._payload = payload
 
-    def read(self):
-        return self._payload
+    def read(self, limit=None):
+        return self._payload if limit is None else self._payload[:limit]
 
     def __enter__(self):
         return self
@@ -163,3 +163,27 @@ def test_fetch_survives_undecodable_bytes(monkeypatch):
         lambda *a, **k: _FakeResponse(b"\xff\xfe\x00garbage"),
     )
     assert fetch_latest_release() is None
+
+
+def test_fetch_caps_the_response_at_one_mebibyte(monkeypatch):
+    from py2exe_gui.core import update_checker
+
+    class Endless(_FakeResponse):
+        """A body that never ends: ``read()`` without a limit would not return."""
+
+        def __init__(self):
+            self.asked = []
+
+        def read(self, limit=None):
+            self.asked.append(limit)
+            assert limit is not None, "read() without a cap buffers the whole body"
+            return b"{" * limit
+
+    endless = Endless()
+    monkeypatch.setattr("py2exe_gui.core.update_checker.urlopen", lambda *a, **k: endless)
+    assert fetch_latest_release() is None
+    assert endless.asked == [update_checker.MAX_RESPONSE_BYTES + 1]
+
+    small = _FakeResponse(b'{"tag_name": "v9.0.0"}')
+    monkeypatch.setattr("py2exe_gui.core.update_checker.urlopen", lambda *a, **k: small)
+    assert fetch_latest_release()["tag_name"] == "v9.0.0"

@@ -98,10 +98,10 @@ class PyInstallerEngine(Engine):
         rather than stored in the config, so no settings file can supply them.
 
         Returns a (command, error) tuple. On success error is None; on failure
-        command is None and error contains a user-facing message.
+        command is None and error is a code ``base.describe_error`` translates.
         """
         if not config.source or not os.path.isfile(config.source):
-            return None, "اختر ملف المصدر أولاً!"
+            return None, base.ERROR_SOURCE_MISSING
 
         py_exe = python_executable or sys.executable
         cmd: List[str] = [py_exe, "-m", "PyInstaller"]

@@ -112,7 +112,8 @@ def build(tmp_path):
 def test_publish_writes_a_signed_manifest(build):
     key = us.new_signing_key()
     result = us.publish_update(str(build), "1.3.0", "https://example.com/Tool-1.3.0.exe", key,
-                               notes="Fixes", min_version="1.0", app_name="Tool")
+                               notes="Fixes", min_version="1.0", app_name="Tool",
+                               issued="2026-10-11T12:00:00Z", expires="2027-10-11T12:00:00Z")
     assert result.manifest_path == str(build.parent / "update.json")
     assert result.signature_path == str(build.parent / "update.json.sig")
     data = open(result.manifest_path, "rb").read()
@@ -120,10 +121,29 @@ def test_publish_writes_a_signed_manifest(build):
     assert manifest == {
         "app": "Tool", "version": "1.3.0", "url": "https://example.com/Tool-1.3.0.exe",
         "sha256": us.file_digest(str(build))[0], "size": 1200, "notes": "Fixes",
-        "min_version": "1.0",
+        "min_version": "1.0", "issued": "2026-10-11T12:00:00Z",
+        "expires": "2027-10-11T12:00:00Z",
     }
     signature = bytes.fromhex(open(result.signature_path).read().strip())
     assert _ed25519.verify(bytes.fromhex(key.public_hex), data, signature)
+
+
+def test_manifest_is_issued_now_and_names_the_app(build):
+    """``issued`` is always present (the runtime's replay guard needs it) and
+    ``app`` whenever the app has a name; ``expires`` only when asked."""
+    import re
+
+    before = us.utc_now().replace(microsecond=0)
+    manifest = us.build_manifest(str(build), "1.0", "https://e.com/x", app_name="Tool")
+    assert manifest["app"] == "Tool" and "expires" not in manifest
+    assert re.fullmatch(r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z", manifest["issued"])
+    assert before <= us.parse_stamp(manifest["issued"]) <= us.utc_now()
+    assert "app" not in us.build_manifest(str(build), "1.0", "https://e.com/x")
+    with pytest.raises(ValueError, match="issued"):
+        us.build_manifest(str(build), "1.0", "https://e.com/x", issued="yesterday")
+    with pytest.raises(ValueError, match="later than"):
+        us.build_manifest(str(build), "1.0", "https://e.com/x", issued="2026-01-02T00:00:00Z",
+                          expires="2026-01-01T00:00:00Z")
 
 
 def test_publish_never_writes_the_private_key(build):

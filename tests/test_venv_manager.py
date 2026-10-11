@@ -266,3 +266,34 @@ def test_python_version_of_this_interpreter():
 )
 def test_quote_command(command, expected):
     assert quote_command(command) == expected
+
+
+# ── Size cache ─────────────────────────────────────────────────────────────
+
+
+def test_env_size_is_cached_until_the_environment_changes(tmp_path, monkeypatch):
+    from py2exe_gui.core import venv_manager
+
+    env = str(tmp_path / "env")
+    fake_env(env, platform=os.sys.platform)
+    venv_manager.clear_size_cache()
+    with open(os.path.join(env, "big.bin"), "wb") as f:
+        f.write(b"x" * 1000)
+    walks = []
+    real = venv_manager.folder_size
+    monkeypatch.setattr(venv_manager, "folder_size",
+                        lambda path: walks.append(path) or real(path))
+    assert env_status(env).size_bytes >= 1000
+    assert env_status(env).size_bytes >= 1000
+    assert len(walks) == 1  # second call served from the cache
+
+    # pip touching the environment (new mtime of pyvenv.cfg) invalidates it.
+    cfg = os.path.join(env, "pyvenv.cfg")
+    stamp = os.path.getmtime(cfg) + 10
+    os.utime(cfg, (stamp, stamp))
+    env_status(env)
+    assert len(walks) == 2
+    venv_manager.clear_size_cache()
+    env_status(env)
+    assert len(walks) == 3
+    assert env_status(env, with_size=False).size_bytes == 0 and len(walks) == 3

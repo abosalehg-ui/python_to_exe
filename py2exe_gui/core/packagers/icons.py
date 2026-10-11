@@ -10,6 +10,7 @@ gets a plain placeholder tile, and the caller reports that it did.
 
 import struct
 import zlib
+from functools import lru_cache
 from typing import List, Optional, Tuple
 
 PNG_SIGNATURE = b"\x89PNG\r\n\x1a\n"
@@ -33,8 +34,13 @@ def encode_png(width: int, height: int, rows: List[bytes], alpha: bool = True) -
             + _chunk(b"IEND", b""))
 
 
+@lru_cache(maxsize=8)
 def placeholder_png(size: int = PLACEHOLDER_SIZE) -> bytes:
-    """A flat tile with a lighter square inside: clearly a stand-in."""
+    """A flat tile with a lighter square inside: clearly a stand-in.
+
+    Memoised: 256x256 pixels are built one byte at a time in Python, and every
+    packager that lacks an icon asks for the same tile.
+    """
     r, g, b = PLACEHOLDER_RGB
     inner = (min(r + 70, 255), min(g + 70, 255), min(b + 70, 255))
     margin = size // 4
@@ -74,8 +80,12 @@ def _ico_entries(data: bytes) -> List[Tuple[int, int, int, int, int]]:
     return entries
 
 
-def _bmp_entry_to_png(blob: bytes, width: int, height: int) -> Optional[bytes]:
-    """A 32-bit BMP icon image (BITMAPINFOHEADER + BGRA pixels) as a PNG."""
+def _bmp_entry_to_png(blob: bytes) -> Optional[bytes]:
+    """A 32-bit BMP icon image (BITMAPINFOHEADER + BGRA pixels) as a PNG.
+
+    The size comes from the BMP header, not the directory entry: the entry
+    stores 256 as 0 and some writers get it wrong, the header never does.
+    """
     if len(blob) < 40:
         return None
     header_size, bi_width, bi_height, _planes, bpp, compression = struct.unpack(
@@ -83,7 +93,9 @@ def _bmp_entry_to_png(blob: bytes, width: int, height: int) -> Optional[bytes]:
     if header_size != 40 or bpp != 32 or compression != 0 or bi_width <= 0:
         return None
     width = bi_width
-    height = abs(bi_height) // 2 if abs(bi_height) == 2 * height else abs(bi_height) // 2
+    # The header's height covers the colour image *and* the AND mask stacked
+    # under it, so the image itself is half of it.
+    height = abs(bi_height) // 2
     if height <= 0:
         return None
     pixels = blob[40:40 + width * height * 4]
@@ -103,11 +115,11 @@ def _bmp_entry_to_png(blob: bytes, width: int, height: int) -> Optional[bytes]:
 def png_from_ico(data: bytes) -> Optional[bytes]:
     """The largest image of an ``.ico`` as a PNG; None when none can be read."""
     entries = sorted(_ico_entries(data), key=lambda e: (e[0] * e[1], e[2]), reverse=True)
-    for width, height, _bpp, size, offset in entries:
+    for _width, _height, _bpp, size, offset in entries:
         blob = data[offset:offset + size]
         if blob.startswith(PNG_SIGNATURE):
             return blob
-        png = _bmp_entry_to_png(blob, width, height)
+        png = _bmp_entry_to_png(blob)
         if png:
             return png
     return None

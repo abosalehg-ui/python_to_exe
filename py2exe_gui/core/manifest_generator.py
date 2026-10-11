@@ -4,6 +4,9 @@ from dataclasses import dataclass, field
 from typing import List
 from xml.sax.saxutils import escape
 
+#: ``escape`` only handles & < >; attribute values need the quote too.
+_ATTR_ESCAPES = {'"': "&quot;"}
+
 # GUIDs for supportedOS entries (Windows assembly manifests).
 SUPPORTED_OS_GUIDS = {
     "vista": "{e2011457-1546-43c5-a5fe-008deee3d3f0}",
@@ -68,9 +71,11 @@ def _uac_level(require_admin: bool) -> str:
 
 def generate_manifest(config: ManifestConfig) -> str:
     """Return the XML body of a Windows assembly manifest."""
-    name = escape(config.name or "MyApp")
-    version = escape(config.version or "1.0.0.0")
-    description = escape(config.description or "")
+    # Every value lands inside a quoted attribute or an element: a " in the
+    # name would otherwise close the attribute and inject attributes of its own.
+    name = escape(config.name or "MyApp", _ATTR_ESCAPES)
+    version = escape(config.version or "1.0.0.0", _ATTR_ESCAPES)
+    description = escape(config.description or "", _ATTR_ESCAPES)
     uac = _uac_level(config.require_admin)
     dpi = _dpi_block(config.dpi_aware)
     os_block = _supported_os_block(config.supported_os)

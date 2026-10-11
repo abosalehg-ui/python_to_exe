@@ -6,6 +6,7 @@ Building the packages and writing the workflow are the window's job (through
 can build and what the generated workflow will build elsewhere.
 """
 
+from py2exe_gui.bidi import bidi
 from py2exe_gui.core.ci_generator import DEFAULT_TOOL_REQUIREMENT, SECRET_NAMES
 from py2exe_gui.core.platform_support import PACKAGE_FORMATS
 from py2exe_gui.core.project_file import CiSettings, PackagingSettings
@@ -19,25 +20,18 @@ from py2exe_gui.qt import (
     QLineEdit,
     QPushButton,
     Qt,
-    QVBoxLayout,
-    QWidget,
 )
 from py2exe_gui.strings import S
-from py2exe_gui.ui.tabs.base import BaseTab, platform_notice, scrollable
-from py2exe_gui.ui.tabs.runtime_tab import _ltr_line, _muted, bidi
+from py2exe_gui.ui.tabs.base import BaseTab, platform_notice, scrolled_layout
+from py2exe_gui.ui.tabs.base import muted_label as _muted
+from py2exe_gui.ui.tabs.runtime_tab import _ltr_line
 
 
 class PlatformsTab(BaseTab):
     """Packages for the other platforms, and a workflow that builds them all."""
 
     def _build(self):
-        outer = QVBoxLayout(self)
-        outer.setContentsMargins(0, 0, 0, 0)
-        content = QWidget()
-        layout = QVBoxLayout(content)
-        layout.setContentsMargins(6, 14, 6, 6)
-        layout.setSpacing(14)
-        outer.addWidget(scrollable(content))
+        layout = scrolled_layout(self, spacing=14)
 
         layout.addWidget(_muted(S.PLATFORMS_HINT))
         layout.addWidget(self._build_packages_group())

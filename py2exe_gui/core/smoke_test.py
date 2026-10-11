@@ -4,10 +4,11 @@ import os
 import shutil
 import subprocess
 import tempfile
+import threading
 from dataclasses import dataclass
-from typing import Optional
+from typing import List, Optional
 
-from py2exe_gui.core.process_tree import group_kwargs, kill_tree
+from py2exe_gui.core.process_tree import group_kwargs, kill_tree, read_tail
 
 
 @dataclass
@@ -83,8 +84,19 @@ def _combined(stdout, stderr) -> str:
     return "\n".join(parts)[-MAX_OUTPUT_CHARS:]
 
 
+def _capped_reader(stream, into: List[str]) -> threading.Thread:
+    """A thread draining ``stream`` into ``into[0]``, keeping the tail only."""
+    def run():
+        into[0] = read_tail(stream, MAX_OUTPUT_CHARS)
+
+    thread = threading.Thread(target=run, daemon=True)
+    thread.start()
+    return thread
+
+
 def run_smoke_test(
-    exe_path: str, timeout: float = 5.0, cwd: Optional[str] = None
+    exe_path: str, timeout: float = 5.0, cwd: Optional[str] = None,
+    popen=subprocess.Popen,
 ) -> SmokeResult:
     """Launch ``exe_path`` and report whether it stays alive without crashing.
 
@@ -94,6 +106,11 @@ def run_smoke_test(
     ``cwd`` sets the folder the EXE starts in. Running it from somewhere other
     than its own folder is what a desktop shortcut does, and it is what
     exposes relative paths that only worked because of where it was built.
+
+    Output is read by two threads that keep only the last
+    ``MAX_OUTPUT_CHARS`` of each stream: ``communicate()`` buffered everything
+    a chatty app printed until the timeout, which for a server logging in a
+    loop was hundreds of MB.
     """
     if not exe_path or not os.path.isfile(exe_path):
         return SmokeResult(
@@ -106,7 +123,7 @@ def run_smoke_test(
     try:
         # Its own process group: a timeout must also end what the EXE started
         # (a one-file EXE's app runs as a child of the bootloader).
-        process = subprocess.Popen(
+        process = popen(
             [exe_path], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True,
             encoding="utf-8", errors="replace", stdin=subprocess.DEVNULL,
             cwd=cwd, env=env, **group_kwargs(),
@@ -116,18 +133,25 @@ def run_smoke_test(
             ran=False, exited_cleanly=False, returncode=None,
             error=str(e),
         )
+    out, err = [""], [""]
+    readers = [_capped_reader(process.stdout, out), _capped_reader(process.stderr, err)]
     try:
-        stdout, stderr = process.communicate(timeout=timeout)
+        process.wait(timeout=timeout)
     except subprocess.TimeoutExpired:
         kill_tree(process)
         try:
-            stdout, stderr = process.communicate(timeout=5)
+            process.wait(timeout=5)
         except subprocess.TimeoutExpired:
-            stdout, stderr = "", ""
+            pass
+        for reader in readers:
+            reader.join(5)
         return SmokeResult(
             ran=True, exited_cleanly=False, returncode=None,
-            error="", output=_combined(stdout, stderr),
+            error="", output=_combined(out[0], err[0]),
         )
+    for reader in readers:
+        reader.join(5)
+    stdout, stderr = out[0], err[0]
     return SmokeResult(
         ran=True,
         exited_cleanly=True,

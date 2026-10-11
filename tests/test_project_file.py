@@ -338,6 +338,31 @@ def test_untrusted_flags_include_extra_args_and_upx_dir():
     assert untrusted_flags(both) == ["--upx-dir"]
 
 
+def test_untrusted_flags_mark_extra_files_outside_the_project(tmp_path):
+    project = tmp_path / "proj"
+    (project / "data").mkdir(parents=True)
+    (project / "app.py").write_text("print(1)\n")
+    secret = tmp_path / "elsewhere" / "id_rsa"
+    secret.parent.mkdir()
+    secret.write_text("key")
+    inside = [str(project / "data"), "data/a.csv", "./config.json"]
+    assert untrusted_flags(BuildConfig(source=str(project / "app.py"), extra_files=inside)) == []
+    build = BuildConfig(source=str(project / "app.py"),
+                        extra_files=[str(project / "data"), str(secret), "../elsewhere",
+                                     os.path.join("..", "proj", "data")])
+    flags = untrusted_flags(build)
+    assert flags == [f"extra_files:{secret}", "extra_files:../elsewhere"]
+    assert pf.split_untrusted_flags(flags) == ([], [str(secret), "../elsewhere"])
+    # Flags and paths are reported together, in that order.
+    build.extra_args = "--runtime-hook h.py"
+    flags = untrusted_flags(build)
+    assert flags[0] == "--runtime-hook" and len(flags) == 3
+    assert pf.split_untrusted_flags(flags)[0] == ["--runtime-hook"]
+    # Without a source only absolute entries can be judged.
+    assert untrusted_flags(BuildConfig(extra_files=["data", str(secret)])) == [
+        f"extra_files:{secret}"]
+
+
 # ── JSON form: settings files, presets, history ───────────────────────────
 
 

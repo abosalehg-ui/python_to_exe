@@ -24,6 +24,8 @@ RELEASES_API_URL = (
 RELEASES_PAGE_URL = "https://github.com/abosalehg-ui/python_to_exe/releases"
 
 DEFAULT_TIMEOUT = 6.0
+#: The most of a release record that is read (1 MiB); the real one is ~5 KB.
+MAX_RESPONSE_BYTES = 1024 * 1024
 
 _VERSION_PART = re.compile(r"\d+")
 
@@ -72,9 +74,14 @@ def fetch_latest_release(
     request = Request(url, headers={"Accept": "application/vnd.github+json"})
     try:
         with urlopen(request, timeout=timeout) as response:  # noqa: S310 - fixed https URL
-            payload = response.read().decode("utf-8", errors="replace")
+            # A release record is a few KB; a redirect to something else must
+            # not fill memory. Over the cap the JSON is cut and fails to parse.
+            raw = response.read(MAX_RESPONSE_BYTES + 1)
     except (URLError, OSError, ValueError):
         return None
+    if len(raw) > MAX_RESPONSE_BYTES:
+        return None
+    payload = raw.decode("utf-8", errors="replace")
     try:
         data = json.loads(payload)
     except ValueError:

@@ -54,6 +54,18 @@ def test_format_html_wraps_in_span_with_color():
     assert "done" in out
 
 
+def test_format_html_makes_each_line_a_block_with_its_own_direction():
+    """An Arabic line and an English line each align the way they read."""
+    out = format_html("Building EXE", level="info")
+    assert out.startswith('<div dir="auto">') and out.endswith("</div>")
+    assert format_html("جارٍ البناء", level="info").startswith('<div dir="auto">')
+
+
+def test_format_html_keeps_leading_indentation():
+    out = format_html("  indented", level="info")
+    assert "&nbsp;&nbsp;indented" in out
+
+
 def test_format_html_escapes_html_metacharacters():
     out = format_html("<script>evil</script>", level="info")
     assert "<script>" not in out

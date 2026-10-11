@@ -28,6 +28,7 @@ from py2exe_gui.core.fixes import (
     flag_fix,
     localize_findings,
 )
+from py2exe_gui.core.fsutil import file_size, folder_size
 from py2exe_gui.core.knowledge import import_name_for_dist
 from py2exe_gui.core.project_doctor import local_module_names
 
@@ -170,11 +171,8 @@ def group_for(entry: Entry, local_modules: Iterable[str] = ()) -> str:
     return head
 
 
-def _file_size(path: str) -> int:
-    try:
-        return os.path.getsize(path)
-    except OSError:
-        return 0
+#: Kept under its old name: ``nuitka_report`` imports it from here.
+_file_size = file_size
 
 
 def output_path_for(config: BuildConfig) -> str:
@@ -184,17 +182,8 @@ def output_path_for(config: BuildConfig) -> str:
     return engine_for(config).locate_output(config)
 
 
-def path_size(path: str) -> int:
-    """Bytes on disk; symlinks are skipped so shared libraries count once."""
-    if os.path.isfile(path):
-        return _file_size(path)
-    total = 0
-    for root, _dirs, files in os.walk(path):
-        for name in files:
-            full = os.path.join(root, name)
-            if not os.path.islink(full):
-                total += _file_size(full)
-    return total
+#: Bytes on disk of a build (an EXE or a folder); the old name of ``fsutil.folder_size``.
+path_size = folder_size
 
 
 def analyze(config: BuildConfig, local_modules: Optional[Iterable[str]] = None) -> SizeReport:
