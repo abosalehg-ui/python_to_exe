@@ -4,10 +4,10 @@
 
 ### أداة احترافية لتحويل تطبيقات بايثون إلى ملفات تنفيذية
 
-![Version](https://img.shields.io/badge/الإصدار-1.5.0-blue?style=for-the-badge)
+![Version](https://img.shields.io/badge/الإصدار-2.0.0-blue?style=for-the-badge)
 ![Python](https://img.shields.io/badge/Python-3.8+-green?style=for-the-badge&logo=python&logoColor=white)
-![PyQt5](https://img.shields.io/badge/PyQt5-GUI-orange?style=for-the-badge&logo=qt&logoColor=white)
-![Tests](https://img.shields.io/badge/الاختبارات-943_passing-brightgreen?style=for-the-badge)
+![PySide6](https://img.shields.io/badge/PySide6-Qt_6-orange?style=for-the-badge&logo=qt&logoColor=white)
+![Tests](https://img.shields.io/badge/الاختبارات-1974_passing-brightgreen?style=for-the-badge)
 ![Languages](https://img.shields.io/badge/اللغات-عربي_+_English-purple?style=for-the-badge)
 ![License](https://img.shields.io/badge/الرخصة-All%20Rights%20Reserved-red?style=for-the-badge)
 
@@ -283,7 +283,7 @@ Manager، macOS Keychain، Secret Service) ثبّت الإضافة الاختي�
 | المتطلب | الإصدار | الوصف |
 |---------|---------|-------|
 | Python | 3.8+ | لغة البرمجة |
-| PyQt5 | 5.15+ | الواجهة الرسومية |
+| PySide6 | 6.5+ (أقل من 6.12 على Python أقدم من 3.12) | الواجهة الرسومية (LGPL). بديل اختياري: PyQt5 5.15+ عبر `pip install py2exe-gui[pyqt5]` ثم إزالة PySide6، أو `QT_API=pyqt5` |
 | PyInstaller | 6.0+ | محرك التحويل (يُعرض عليك تثبيته عند الحاجة) |
 
 ---
@@ -397,7 +397,7 @@ python_version = "3.12"
 
 ## ⌨️ سطر الأوامر
 
-`py2exe-gui` بلا وسائط يفتح الواجهة؛ ومع أمر يعمل بلا واجهة ولا يستورد PyQt5.
+`py2exe-gui` بلا وسائط يفتح الواجهة؛ ومع أمر يعمل بلا واجهة ولا يستورد Qt (لا PySide6 ولا PyQt5).
 كل أمر يقبل `--project PATH` (الافتراضي `./p2e.toml`) و`--lang ar|en`.
 
 | الأمر | ماذا يفعل |
@@ -435,7 +435,7 @@ python_version = "3.12"
 `.github/workflows/p2e-release.yml` في جذر مستودعك:
 
 - مهمة `build` على `windows-latest` و`macos-latest` و`ubuntu-latest`: تثبّت سطر أوامر
-  هذه الأداة بـ `pip install --no-deps` (بلا PyQt5) ثم PyInstaller (وNuitka إن كان محرك
+  هذه الأداة بـ `pip install --no-deps` (بلا Qt) ثم PyInstaller (وNuitka إن كان محرك
   المشروع)، ومتطلبات مشروعك إن وُجد `requirements.txt`، وتشغّل
   `py2exe-gui release --yes --no-tag --no-publish --allow-downloads` على `p2e.toml`
   فتخرج الملف التنفيذي والـ ZIP والحزم و`SHA256SUMS.txt`، وترفع مجلد الإصدار كـ artifact.
@@ -693,7 +693,8 @@ python_to_exe/
 │
 ├── py2exe_gui/                 # الحزمة الرئيسية
 │   ├── app.py                  # bootstrap (الواجهة، أو سطر الأوامر مع أمر)
-│   ├── cli.py                  # ⌨️ init/doctor/build/size/env/release (بلا PyQt5)
+│   ├── cli.py                  # ⌨️ init/doctor/build/size/env/release (بلا Qt)
+│   ├── qt.py                   # طبقة الربط: PySide6 أولاً ثم PyQt5 (2.0)
 │   ├── texts.py                # نصوص خطوات الإصدار حسب اللغة (بلا Qt)
 │   ├── constants.py
 │   ├── paths.py                # مسارات الإعدادات لكل مستخدم
@@ -701,7 +702,7 @@ python_to_exe/
 │   ├── styles.py               # السمات + ألوان السجل + مجموعات الخطوط
 │   ├── templates.py            # 11 قالب
 │   │
-│   ├── core/                   # النواة (بلا PyQt5، قابلة للاختبار)
+│   ├── core/                   # النواة (بلا Qt بأي ربط، قابلة للاختبار)
 │   │   ├── engines/                  # ⚙️ محركات البناء خلف واجهة Engine واحدة (2.0)
 │   │   │   ├── base.py               #    الواجهة، مصفوفة الميزات، متتبّع المراحل
 │   │   │   ├── pyinstaller.py        #    الأمر، المراحل، مكان المخرجات، أنماط السجل
@@ -752,7 +753,7 @@ python_to_exe/
 │   ├── knowledge/
 │   │   └── packages.json       # ما تحتاجه كل مكتبة لتنجو من التحويل
 │   │
-│   └── ui/                     # واجهة PyQt5
+│   └── ui/                     # الواجهة (Qt عبر py2exe_gui/qt.py)
 │       ├── main_window.py            # التنسيق فقط (~1050 سطر)
 │       ├── conversion_thread.py      # PyInstaller في خيط منفصل
 │       ├── batch_thread.py           # التحويل الدفعي (تسلسلي)
@@ -885,7 +886,7 @@ else:
 - ✅ **المرحلة 9:** وضع مبسّط، 4 سمات، تكبير الخط، إشعارات، تصفية السجل،
   شريط تقدم حقيقي، تحويل دفعي، Presets، فحص التحديثات
 - ⏳ **المستقبل:** إدارة venv، مشاريع متعددة الملفات، مثبّتات Linux/macOS،
-  محرر `.spec`، VirusTotal، الانتقال إلى PySide6 —
+  محرر `.spec`، VirusTotal —
   التفاصيل في [UI_IMPROVEMENT_PLAN.md](UI_IMPROVEMENT_PLAN.md)
 - ✅ **الإصدار 1.3:** طبيب المشروع، تشخيص أعطال البناء والتشغيل مع الإصلاح
   بنقرة، التشغيل التشخيصي، قاعدة معرفة المكتبات، استوديو الأيقونات
@@ -895,11 +896,11 @@ else:
   بـ Ed25519، مُبلِّغ انهيار، نسخة واحدة، `resource_path()`، سجل للتطبيق بلا Console
 - ✅ **الإصدار 1.6:** ملف المشروع `p2e.toml` نموذجاً واحداً للإعدادات، سطر أوامر
   بلا واجهة، إصدار بنقرة (GitHub Releases، بصمات SHA-256، ملف تحديث موقَّع، winget)
-- 🚧 **الإصدار 2.0 (قيد التنفيذ):** ✅ طبقة المحركات `core/engines/` (المرحلة 1)،
-  ✅ محرك Nuitka (المرحلة 2)، ✅ وضع المقارنة وقياس الإقلاع (المرحلة 3)،
-  ✅ مولّد CI وحزم AppImage/.deb/.dmg (المرحلة 4)، ✅ الترخيص دون إنترنت (المرحلة 5)،
-  ✅ مساحة المشاريع (المرحلة 6) — ثم الانتقال إلى PySide6 — التفاصيل في
-  [PRODUCT_ROADMAP.md](PRODUCT_ROADMAP.md)
+- ✅ **الإصدار 2.0:** طبقة المحركات `core/engines/` (المرحلة 1)،
+  محرك Nuitka (المرحلة 2)، وضع المقارنة وقياس الإقلاع (المرحلة 3)،
+  مولّد CI وحزم AppImage/.deb/.dmg (المرحلة 4)، الترخيص دون إنترنت (المرحلة 5)،
+  مساحة المشاريع (المرحلة 6)، والانتقال إلى PySide6 مع الإبقاء على PyQt5
+  بديلاً (المرحلة 7) — التفاصيل في [PRODUCT_ROADMAP.md](PRODUCT_ROADMAP.md)
 
 ---
 
@@ -908,7 +909,7 @@ else:
 نرحّب بالمساهمات! انظر [CONTRIBUTING.md](CONTRIBUTING.md) للتفاصيل:
 
 - إعداد بيئة التطوير
-- قواعد بنية الكود (لا PyQt5 في `core/`)
+- قواعد بنية الكود (لا Qt في `core/`، وكل استيراد Qt عبر `py2exe_gui/qt.py`)
 - كيفية إضافة قالب أو لغة جديدة
 - إرشادات commit و pull request
 

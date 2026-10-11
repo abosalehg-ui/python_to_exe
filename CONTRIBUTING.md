@@ -27,7 +27,11 @@ pytest tests/ -m slow               # بناءات PyInstaller حقيقية (د�
 ### إرشادات قبل فتح Pull Request
 
 1. **اكتب اختباراً** لأي وظيفة نواة جديدة (في `py2exe_gui/core/`).
-2. **حافظ على فصل النواة عن الواجهة**: لا تستورد `PyQt5` داخل `py2exe_gui/core/`.
+2. **حافظ على فصل النواة عن الواجهة**: لا تستورد Qt (لا `PySide6` ولا `PyQt5` ولا
+   `py2exe_gui.qt`) داخل `py2exe_gui/core/`. وخارج النواة، كل استيراد Qt يمر عبر
+   `py2exe_gui/qt.py` (`from py2exe_gui.qt import QLabel, Qt, Signal`): تعدادات كاملة
+   النطاق (`Qt.AlignmentFlag.AlignLeft`)، و`exec()` لا `exec_()`، حتى يعمل الكود على
+   PySide6 وPyQt5 معاً. اختبارات `tests/test_qt_isolation.py` تحرس ذلك.
 3. **استعمل النصوص من `strings.py`** — لا تكتب نصوص عربية أو إنجليزية مباشرة في الكود.
 4. **عند إضافة نص جديد**: أضفه في `class Ar` و `class En` معاً. الاختبارات ستفشل إن نقص أحدهما.
 5. **شغّل `pytest` و `ruff`** قبل الـ commit. CI يفشل بدونهما.
@@ -35,8 +39,8 @@ pytest tests/ -m slow               # بناءات PyInstaller حقيقية (د�
 7. **`p2e_runtime/` يعمل داخل برامج المستخدمين**: المكتبة القياسية فقط، Python 3.8+،
    ولا يستورد `py2exe_gui` ولا أي واجهة. الخدمات تُستورد بالاسم، ولا شيء يُفعَّل
    أو يتصل بالشبكة دون إعداد صريح.
-8. **سطر الأوامر (`py2exe_gui/cli.py`) لا يستورد PyQt5** أبداً، ولا أي وحدة تستورده:
-   مهمة CI الأساسية تشغّله بلا PyQt5. وأي خطوة تصل للشبكة أو تثبّت أو تحذف
+8. **سطر الأوامر (`py2exe_gui/cli.py`) لا يستورد Qt** أبداً، ولا أي وحدة تستورده:
+   مهمة CI الأساسية تشغّله بلا أي ربط Qt. وأي خطوة تصل للشبكة أو تثبّت أو تحذف
    تمر عبر `Console.confirm` (موافقة أو `--yes`).
 
 ### إضافة قالب جديد
@@ -97,7 +101,12 @@ pytest tests/ -m slow               # real PyInstaller builds (minutes)
 ### Guidelines Before Opening a PR
 
 1. **Write a test** for any new core function (in `py2exe_gui/core/`).
-2. **Keep UI and core separate** — never `import PyQt5` from `py2exe_gui/core/`.
+2. **Keep UI and core separate** — never import Qt (`PySide6`, `PyQt5` or
+   `py2exe_gui.qt`) from `py2exe_gui/core/`. Outside core, every Qt import goes
+   through `py2exe_gui/qt.py` (`from py2exe_gui.qt import QLabel, Qt, Signal`):
+   fully scoped enums (`Qt.AlignmentFlag.AlignLeft`) and `exec()`, never
+   `exec_()`, so the code runs on PySide6 and PyQt5 alike.
+   `tests/test_qt_isolation.py` guards this.
 3. **Use strings from `strings.py`** — no hard-coded Arabic or English in the code.
 4. **When adding a new string**: add it to both `class Ar` and `class En`. Tests fail if either is missing.
 5. **Run `pytest` and `ruff`** before committing. CI rejects either failure.
@@ -106,8 +115,8 @@ pytest tests/ -m slow               # real PyInstaller builds (minutes)
    Python 3.8+, and it never imports `py2exe_gui` or a GUI toolkit. Services
    are imported by name, and nothing turns on or reaches the network without
    explicit configuration.
-8. **The command line (`py2exe_gui/cli.py`) never imports PyQt5**, directly or
-   through another module: the core CI job runs it without Qt. Any step that
+8. **The command line (`py2exe_gui/cli.py`) never imports Qt**, directly or
+   through another module: the core CI job runs it with no binding installed. Any step that
    reaches the network, installs or deletes goes through `Console.confirm`
    (a yes, or `--yes`).
 

@@ -193,6 +193,38 @@ def test_arabic_window_is_right_to_left_and_about_names_the_binding(window):
     assert qt.API in window.about_tab.qt_label.text()
 
 
+# ── Binding health ─────────────────────────────────────────────────────────
+
+
+def test_thousands_of_signal_emissions_do_not_corrupt_the_interpreter(tmp_path):
+    """Why PySide6 6.12.0 is excluded below Python 3.12 (pyproject.toml).
+
+    That release releases True/False once too often per emission; a build
+    that logs a few thousand lines then aborts with "bool_dealloc". A
+    subprocess, so a bad binding kills only this test.
+    """
+    code = (
+        "from py2exe_gui.qt import QApplication, QObject, QPlainTextEdit, Signal\n"
+        "app = QApplication([])\n"
+        "class M(QObject):\n"
+        "    text = Signal(str)\n"
+        "    flag = Signal(bool)\n"
+        "m = M(); box = QPlainTextEdit(); seen = []\n"
+        "m.text.connect(box.appendPlainText); m.flag.connect(seen.append)\n"
+        "for i in range(20000):\n"
+        "    m.text.emit('line %d' % i); m.flag.emit(i % 2 == 0)\n"
+        "    if i % 2000 == 0: app.processEvents()\n"
+        "assert box.document().blockCount() == 20000 and len(seen) == 20000\n"
+        "print('ok')\n"
+    )
+    env = {**os.environ, "PYTHONPATH": ROOT, "QT_QPA_PLATFORM": "offscreen",
+           qt.API_VARIABLE: qt.API.lower()}
+    result = subprocess.run([sys.executable, "-c", code], cwd=str(tmp_path), env=env,
+                            capture_output=True, text=True, timeout=300)
+    assert result.returncode == 0, f"{qt.describe()}: {result.stderr[-2000:]}"
+    assert result.stdout.strip() == "ok"
+
+
 # ── High DPI ───────────────────────────────────────────────────────────────
 
 

@@ -28,7 +28,12 @@ dependencies = [
     # The GUI's Qt binding (LGPL-3.0). PyQt5 (GPL-3.0 or commercial) is the
     # optional fallback below; py2exe_gui/qt.py picks whichever is installed.
     # 6.5 is the first line with wheels for every Python this project supports.
-    "PySide6>=6.5",
+    # 6.12.0 is excluded below Python 3.12: it over-releases True/False on
+    # every signal emission and aborts the process ("bool_dealloc") after a
+    # few thousand emissions (a build log is enough); 3.12+ has immortal
+    # bools and is unaffected. Measured on 6.10.3, 6.11.2 (fine) and 6.12.0.
+    "PySide6>=6.5,<6.12; python_version < '3.12'",
+    "PySide6>=6.5; python_version >= '3.12'",
     # 6.0 is the floor: --optimize only exists from 6.0 onwards, and 6.0 also
     # carries the fix for the onefile temp-dir privilege issue in earlier lines.
     "pyinstaller>=6.0",

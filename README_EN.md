@@ -2,7 +2,7 @@
 
 > Convert Python scripts to Windows executables with a professional bilingual GUI.
 
-A PyQt5 wrapper around PyInstaller that turns one-click .py → .exe into a
+A Qt (PySide6) wrapper around PyInstaller and Nuitka that turns one-click .py → .exe into a
 real workflow: a beginner-friendly simple mode, batch conversion, 4 accessible
 themes, 11 built-in templates, full Arabic and English UIs, code signing,
 version metadata, build history, and a Windows manifest editor.
@@ -26,7 +26,7 @@ version metadata, build history, and a Windows manifest editor.
 | **Signed self-updater** *(1.5)* | `update.json` signed with **Ed25519** (pure-Python verifier that passes the RFC 8032 test vectors); HTTPS only, redirects to HTTP refused, size and SHA-256 checked before anything is replaced. One-file EXEs swap in place and restart; folder builds launch a verified installer. Key pair and a *Create signed update.json* helper in the app |
 | **Nuitka engine** *(2.0)* | Choose **PyInstaller** or **Nuitka** (`engine` in `p2e.toml`, or `build --engine nuitka`). Nuitka compiles your modules to C: typically fewer antivirus false positives and extraction made **harder, not impossible**; builds are slower because a C compiler runs. What an engine cannot do (Runtime Kit, manifest...) is named before building; fixes are translated to Nuitka's options or marked as having no equivalent — no engine ever gets an option it does not have. The doctor checks the C compiler (MSVC/MinGW on Windows, gcc/clang elsewhere), the Python version and, on Linux, `patchelf`/`readelf`. **No download without your consent**: if Nuitka asks to download a tool, you are asked, for that build only. The size lab reads Nuitka's compilation report |
 | **Project file** *(1.6)* | One `p2e.toml` in your repository describes the whole project — build, Version Info, manifest, installer, signing (never the password), Runtime Kit and release settings. Paths are relative to the file, so a fresh checkout builds the same way. The GUI, presets, history and the command line all use this one model |
-| **Command line** *(1.6)* | `py2exe-gui init / doctor / build / size / compare / env / release / package / ci / license`, headless, no PyQt5 needed — for CI and scripts. Build logs stream with stage markers |
+| **Command line** *(1.6)* | `py2exe-gui init / doctor / build / size / compare / env / release / package / ci / license`, headless, no Qt needed — for CI and scripts. Build logs stream with stage markers |
 | **Linux and macOS packages** *(2.0)* | An **AppImage** (`appimagetool`), a **`.deb`** (`dpkg-deb`, with `control`, a `.desktop` entry and an icon) and a **`.dmg`** (`hdiutil`, an `.app` bundle) from the same build, from the Platforms tab or `py2exe-gui package`; uploaded with the release. `appimagetool` and its runtime file are downloaded **only after you say yes**, and the tool runs with `--runtime-file` so it never goes online during a build |
 | **CI generator** *(2.0)* | `py2exe-gui ci` writes `.github/workflows/p2e-release.yml` into your repository — a Windows/macOS/Linux matrix that installs this command line (no Qt) and runs `release` against `p2e.toml`, pip and build caching, artifact uploads, and a GitHub Release on a `v*` tag — after showing you the whole file. Certificates and passwords are referenced as `${{ secrets.NAME }}` only; a test checks that secret-looking values never reach the file |
 | **Offline licensing** *(2.0)* | **Ed25519-signed licence keys** (name, email, product, optional expiry, features) in grouped base32 (`XXXXX-XXXXX-…`, tolerant of case, spaces, dashes and O/0, I/1, B/8 mix-ups). Your app checks them **with no connection at all** against the public key embedded in the build: `p2e_runtime.license.check(key)` returns `None` for a forged, expired, tampered or other product's key and never raises. A generator dialog and `py2exe-gui license issue\|key\|verify`. The private key stays in your config folder; a test proves it reaches neither the build nor `p2e.toml`. **Plainly:** a check inside a distributed program deters casual copying only — whoever holds the program can patch it out; there is no server and no stronger promise |
@@ -49,7 +49,8 @@ version metadata, build history, and a Windows manifest editor.
 ## Requirements
 
 - Python 3.8+
-- PyQt5 >= 5.15
+- PySide6 >= 6.5 (below 6.12 on Python older than 3.12; LGPL). Optional fallback:
+  PyQt5 >= 5.15 (`pip install py2exe-gui[pyqt5]`, then remove PySide6, or `QT_API=pyqt5`)
 - PyInstaller >= 6.0 (offered for install on first build, with consent)
 
 ## Installation
@@ -170,7 +171,7 @@ python_version = "3.12"
 ## Command line
 
 `py2exe-gui` with no arguments opens the window. With a command it runs
-headless and never imports PyQt5. Every command takes `--project PATH`
+headless and never imports Qt (neither PySide6 nor PyQt5). Every command takes `--project PATH`
 (default `./p2e.toml`) and `--lang ar|en`.
 
 | Command | What it does |
@@ -216,7 +217,7 @@ py2exe-gui build --strict --yes
 tab) writes `.github/workflows/p2e-release.yml` at the root of your repository:
 
 - A `build` job on `windows-latest`, `macos-latest` and `ubuntu-latest`: installs
-  this tool's command line with `pip install --no-deps` (no PyQt5), then
+  this tool's command line with `pip install --no-deps` (no Qt), then
   PyInstaller (and Nuitka when the project's engine is Nuitka) and your
   `requirements.txt` if there is one, and runs
   `py2exe-gui release --yes --no-tag --no-publish --allow-downloads` against
@@ -585,7 +586,8 @@ p2e_runtime/              # Runtime Kit embedded in EXEs (stdlib only, 3.8+)
 └── _ed25519.py           # verify-only Ed25519 (RFC 8032)
 py2exe_gui/
 ├── app.py                # Application bootstrap (GUI, or the CLI with a command)
-├── cli.py                # py2exe-gui init/doctor/build/size/env/release (no PyQt5)
+├── cli.py                # py2exe-gui init/doctor/build/size/env/release (no Qt)
+├── qt.py                 # The Qt binding: PySide6 first, PyQt5 as fallback (2.0)
 ├── texts.py              # Qt-free locale text for release steps (CLI + GUI)
 ├── constants.py
 ├── strings.py            # All UI strings (Ar/En) + locale proxy
@@ -675,13 +677,13 @@ See [IDEAS.md](IDEAS.md) for the full roadmap. Currently:
 - ✅ **1.6:** `p2e.toml` project file as the single settings model, headless
   command line, one-click release (GitHub Releases, checksums, signed
   update manifest, winget manifests)
-- 🚧 **2.0 (in progress):** ✅ engine layer `core/engines/` (milestone 1),
-  ✅ Nuitka engine (milestone 2), ✅ compare mode and start-up benchmark (milestone 3),
-  ✅ CI generator and AppImage/.deb/.dmg packagers (milestone 4), ✅ offline licensing
-  (milestone 5), ✅ projects workspace (milestone 6); next PySide6 — see
-  [PRODUCT_ROADMAP.md](PRODUCT_ROADMAP.md)
+- ✅ **2.0:** engine layer `core/engines/` (milestone 1), Nuitka engine
+  (milestone 2), compare mode and start-up benchmark (milestone 3), CI generator
+  and AppImage/.deb/.dmg packagers (milestone 4), offline licensing (milestone 5),
+  projects workspace (milestone 6), and the move to PySide6 with PyQt5 kept as
+  a fallback (milestone 7) — see [PRODUCT_ROADMAP.md](PRODUCT_ROADMAP.md)
 - ⏳ **Next:** venv management, multi-file projects, Linux/macOS installers,
-  `.spec` editor, VirusTotal, PySide6 migration —
+  `.spec` editor, VirusTotal —
   see [UI_IMPROVEMENT_PLAN.md](UI_IMPROVEMENT_PLAN.md)
 
 ## Contributing

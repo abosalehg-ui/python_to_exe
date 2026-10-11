@@ -5,9 +5,139 @@ follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
-### 2.0.0-dev — Every platform, every engine (milestone 6: projects workspace)
+### 2.0.0 — Every platform, every engine
 
-#### Added
+The 2.0 release of [PRODUCT_ROADMAP.md](PRODUCT_ROADMAP.md), built as seven
+milestones, each merged on its own (`2.0.0-dev` while it was in progress):
+the engine layer, Nuitka, compare mode, the CI generator and the Linux/macOS
+packagers, offline licensing, the projects workspace, and the move to
+PySide6. Newest first.
+
+#### Milestone 7 — PySide6 and the 2.0.0 release
+
+**Added**
+- **`py2exe_gui/qt.py`**, the one place that imports a Qt binding. It
+  prefers **PySide6** and falls back to **PyQt5**: `QT_API=pyside6|pyqt5`
+  forces one, a binding already loaded in the process wins (two are never
+  loaded side by side), then PySide6, then PyQt5. It exports `Signal`,
+  `Slot`, `Property` (PyQt5's `pyqtSignal`/`pyqtSlot`/`pyqtProperty` under
+  PySide6's names), `QAction` and `QShortcut` (`QtGui` in Qt 6, `QtWidgets`
+  in Qt 5), and any other Qt class by name (module `__getattr__`, searched
+  in `QtWidgets`, `QtGui`, `QtCore`); plus `describe()` ("PySide6 6.11.2
+  (Qt 6.11.2)", shown in the About tab), `configure_high_dpi()` and
+  `application_font()`. Without a binding it raises a `ModuleNotFoundError`
+  naming both.
+- **PySide6 6.12.0 is excluded on Python < 3.12** (`PySide6>=6.5,<6.12`
+  there, `>=6.5` from 3.12): that release releases `True`/`False` once
+  too often on every signal emission and the process aborts with
+  `bool_dealloc` after a few thousand emissions, which a build log reaches
+  ([PYSIDE-3477](https://bugreports.qt.io/browse/PYSIDE-3477), reported
+  2026-10-09, no fix version yet). Measured here: 6.10.3 and 6.11.2 fine on
+  3.11, 6.12.0 aborts on 3.10 and 3.11 and is fine on 3.12 (immortal
+  bools). A test emits 20,000 signals in a subprocess and documents it.
+- **PySide6 is the default dependency**; PyQt5 is the optional extra
+  `py2exe-gui[pyqt5]`. CI runs the whole GUI suite twice, once per binding
+  (the PyQt5 job removes PySide6 first, as a user of the extra would have
+  it), and the Qt-less core job is unchanged.
+- **`tests/test_qt_leak.py`** (a real build, marked `slow`, with a CI job
+  of its own): from a process that has the converter's binding loaded, a
+  standard-library-only program is built through the application's own
+  isolated environment (`plan_environment` → `prepare_build` → `run_build`,
+  one-folder). The test proves the environment's interpreter cannot import
+  PySide6 or PyQt5, that no file under `dist/` and no line of PyInstaller's
+  `*.toc` and `warn-*.txt` names PySide6, PyQt5, shiboken or a Qt library,
+  and that the program runs. The converter's binding never reaches the
+  user's program: PyInstaller runs in the project's own interpreter and
+  only bundles what the program imports.
+- **`tests/test_qt_isolation.py`** (no Qt needed; runs in the core job):
+  static scans that nothing in `core/`, the command line's modules and
+  `p2e_runtime/` imports Qt, that only `qt.py` imports a binding directly,
+  and a subprocess that blocks both bindings and imports every core module,
+  the command line and the Runtime Kit.
+- **`tests/test_qt_compat.py`** (both bindings): the binding policy, the
+  exported names, scoped enums, a signal across threads, the Arabic
+  rendering of the application font (shaped glyphs with ink, not
+  missing-glyph boxes, and a wider advance than Latin), the window in
+  Arabic (right-to-left, the binding named in About), and a 150 % display
+  (`QT_SCALE_FACTOR=1.5` in a subprocess: a widget's device pixel ratio
+  follows under Qt 5 and Qt 6, with `PassThrough` rounding on Qt 6).
+- About tab: the Qt binding and version (`ABOUT_QT_FMT`, Arabic and
+  English, the version wrapped in `ltr()`).
+
+**Changed**
+- Every Qt import in `app.py`, `ui/` and the tests goes through
+  `py2exe_gui.qt`; `core/` still imports no Qt, whichever binding is used.
+- What both bindings accept, everywhere: **fully scoped enums**
+  (`Qt.AlignmentFlag.AlignLeft`, `QMessageBox.StandardButton.Yes`,
+  `QFrame.Shape.HLine`, ...; PyQt5 ≥ 5.11 and PySide6 both have them),
+  **`exec()`** instead of the Qt 5-only `exec_()` (dialogs, menus, the
+  application), and `QFont.setBold()` instead of a weight in the `QFont`
+  constructor.
+- **High DPI**: the Qt 5 attributes (`AA_EnableHighDpiScaling`,
+  `AA_UseHighDpiPixmaps`) are set on Qt 5 only — Qt 6 scales by default
+  and warns about them — and the `PassThrough` rounding policy on both, so
+  a 150 % display scales by 1.5 rather than 2.
+- **Fonts**: the application font is still "Segoe UI" 10 pt, now with
+  Arabic-capable fallbacks (`Noto Sans Arabic`, `Noto Naskh Arabic`, `Noto
+  Sans`, `DejaVu Sans`, `Geeza Pro`, `Arial`) through `QFont.setFamilies`,
+  so a Linux or macOS machine without Segoe UI gets a real Arabic face
+  before Qt's own fallback.
+- `pyproject.toml`: version **2.0.0**, the description no longer says
+  PyQt5, the `gui` marker says "a Qt binding".
+- The CHANGELOG's six `2.0.0-dev` milestone entries are this one section.
+
+**Decisions**
+- A compat module rather than `qtpy`: the application uses a few dozen
+  classes and three differences; a dependency to hide them is more than
+  it hides, and `qtpy` would also have to be excluded from users' builds.
+- PySide6 first because of its licence (LGPL-3.0, see the pull request),
+  its wheels for every Python this project supports, and Qt 6; PyQt5 kept
+  because 1.x users have it installed and the code costs nothing to keep
+  on both. PyQt6 and PySide2 are not supported: `qt.py` names them only to
+  block them in the isolation tests.
+- The GUI tests patch `exec` (not `exec_`) on the dialogs: under PySide6
+  the old patch of `exec_` left the real modal dialog open and the suite
+  hung on the first dialog.
+- **PySide6 findings, worked around rather than waited out:**
+  the session `QApplication` is now torn down in order at the end of the
+  suite (windows closed, top-level widgets deleted, posted deletions
+  flushed, the application shut down) — a widget destroyed after Qt's
+  statics made PySide6 crash the interpreter *after* "N passed"; and the
+  Project menu is kept by reference on the window — PySide6 6.10 hands the
+  `QMenuBar.addMenu()` result to Python and deletes the menu with its
+  wrapper (6.12 and PyQt5 leave it with the bar).
+
+**Verified**
+- Linux container, offscreen (`QT_QPA_PLATFORM=offscreen`), Python
+  3.11.17: the non-slow suite under **PySide6 6.11.2 (Qt 6.11.2)** and under
+  **PyQt5 5.15.11 (Qt 5.15.14)**: 1975 passed, 3 skipped each, exit code 0;
+  with both bindings blocked (`sys.modules[...] = None`): 1689 passed,
+  14 skipped (the GUI modules); on **Python 3.9.25 with PySide6 6.10.3**:
+  1975 passed.
+  `ruff check` clean.
+- The leak test under PySide6: the isolated environment (uv, PyInstaller
+  6.22.3) cannot import either binding; the one-folder build of the sample
+  is 19 MB, 10 files under `_internal/` (`libpython3.11`, `libsqlite3`,
+  `base_library.zip`, ...), none of them Qt; the program ran and printed
+  its JSON.
+- `docs/screenshots/2.0/m7_main_{ar,en}.png` and `m7_about_{ar,en}.png`:
+  the main window and the About tab under PySide6, Arabic and English,
+  1080×1050 offscreen; the same at `QT_SCALE_FACTOR=2` rendered at
+  2160×2100 with a device pixel ratio of 2 (not committed).
+- **Not executed:** Windows and macOS (Segoe UI and Geeza Pro, the system
+  tray, the native high-DPI path, the `.exe` build of the leak test);
+  PyQt6 and PySide2 (unsupported by design); a real high-DPI monitor
+  (the check uses `QT_SCALE_FACTOR`).
+
+**Not done**
+- No `qtpy`-style support for PyQt6 or PySide2.
+- The 1.x templates still name `PyQt5` in the GUI template's hidden
+  imports: they describe the *user's* program, and PyQt5 is still the
+  common case there.
+
+#### Milestone 6 — Projects workspace
+
+**Added**
 - **`core/workspace.py`** (no Qt): one `ProjectSummary` per recent
   `p2e.toml` — name and version from the file; the last build (result, time,
   size) and the output sizes of the successful builds from the build history
@@ -34,7 +164,7 @@ follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Strings in Arabic and English (`TAB_HOME`, `HOME_*`, `BTN_HOME_*`,
   `LOG_HOME_*`); a `projectCard` style in every theme.
 
-#### Decisions
+**Decisions**
 - No new persistence: the last release is read from the folders on disk.
   Nothing records what was published on GitHub, so the card says "last
   release" of the local pipeline, never "published".
@@ -46,7 +176,7 @@ follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   has at most that many points and usually far fewer; the view says how many
   builds it counts.
 
-#### Verified
+**Verified**
 - Real PyInstaller 6.22.3 builds on Linux (Python 3.11, PyQt5 5.15.11)
   through the window's own `start_conversion`: three builds of one project
   with growing imports (6.9 MB, 7.7 MB, 8.1 MB; 7.6–8.0 s each), one failing
@@ -58,13 +188,13 @@ follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - 20 core tests (`tests/test_workspace.py`) and 24 headless GUI tests
   (`tests/test_ui_home.py`). **Not executed:** Windows and macOS.
 
-#### Not done
+**Not done**
 - No `projects` command on the command line, and no cross-machine list:
   the recent list is the one in the per-user settings file.
 
-### 2.0.0-dev — Every platform, every engine (milestone 5: offline licensing)
+#### Milestone 5 — Offline licensing
 
-#### Added
+**Added**
 - **`p2e_runtime.license`** (ships inside the user's app; standard library
   plus the kit's existing Ed25519 verifier, no new dependency): a licence is
   a JSON payload `{name, email, product, expiry (optional), features[]}`
@@ -100,14 +230,14 @@ follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   (errors that stop the build) and `kit_license_client_side` (info, shown
   whenever licensing is on).
 
-#### Honesty
+**Honesty**
 - The UI, the doctor, the command line and the docs (Arabic and English)
   say the same thing: a check inside a distributed program deters casual
   copying and makes keys impossible to forge without the private key, but
   can be patched out by whoever holds the program, and the expiry relies on
   the customer's clock. No server, no stronger promise anywhere.
 
-#### Verified
+**Verified**
 - Real PyInstaller 6.22.3 build on Linux (Python 3.11) with licensing on
   (`tests/test_runtime_license_e2e.py`, marked `slow`): built in 8.0 s,
   7.3 MB; the program accepted a valid key (also typed in lower case with
@@ -118,9 +248,9 @@ follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   under `dist/` and `build/` was scanned: the private key is in none, the
   public key is. **Not executed:** the build on Windows or macOS.
 
-### 2.0.0-dev — Every platform, every engine (milestone 4: CI generator and Linux/macOS packagers)
+#### Milestone 4 — CI generator and Linux/macOS packagers
 
-#### Added
+**Added**
 - **Packagers** (`core/packagers/`): one `Packager` interface for an
   **AppImage** (`appimagetool`), a **`.deb`** (`dpkg-deb`, with
   `DEBIAN/control`, a `.desktop` entry and a hicolor icon) and a **`.dmg`**
@@ -158,7 +288,7 @@ follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   a `.ico` holding a PNG or a 32-bit BMP converted, otherwise a plain
   placeholder tile (reported as a warning).
 
-#### Verified
+**Verified**
 - Real `.deb` and AppImage built in a Linux container from a PyInstaller
   one-file build, inspected (`dpkg-deb -I/-c`, `--appimage-extract`) and run;
   the full CI command `release --yes --no-tag --no-publish --allow-downloads`
@@ -166,9 +296,9 @@ follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   `actionlint` 1.7.7 accepts the generated workflow. The `.dmg`, Windows
   signing and macOS notarization steps were **not** executed (no such host).
 
-### 2.0.0-dev — Every platform, every engine (milestone 3: compare mode)
+#### Milestone 3 — Compare mode
 
-#### Added
+**Added**
 - **Compare mode** (`core/compare.py`): builds the same project with
   PyInstaller and Nuitka into `<output>/p2e_compare/<engine>` and shows size,
   build time, start-up time, smoke result and unsupported features side by
@@ -178,7 +308,7 @@ follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   one method: process exit, the Runtime Kit probe (`P2E_RUNTIME_PROBE=1`),
   first output, or "still running after N s". The method is always shown.
 
-#### Fixed
+**Fixed**
 - The smoke test and the benchmark now end the whole process group on a
   timeout; PyInstaller onefile children were left running before.
 - `kill_tree` only signals a process group the program itself leads. A test
@@ -188,9 +318,9 @@ follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   ran locally.
 - Engines create the output folder before building.
 
-### 2.0.0-dev — Every platform, every engine (milestone 2: Nuitka)
+#### Milestone 2 — Nuitka
 
-#### Added
+**Added**
 - **Nuitka engine** (`core/engines/nuitka.py`), chosen in the main tab, with
   `engine = "nuitka"` in `p2e.toml`, or `py2exe-gui build --engine nuitka`.
   Every option was mapped from the installed Nuitka's own `--help`
@@ -232,7 +362,7 @@ follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   and the Python runtime".
 - The build report names the engine and its version.
 
-#### Security
+**Security**
 - Nuitka options that run code or tools named by the settings
   (`--user-plugin`, `--user-package-configuration-file`, `--upx-binary`,
   `--force-runtime-environment-variable`, ...) and `--assume-yes-for-downloads`
@@ -240,14 +370,14 @@ follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Nuitka's update check is off (`--update-check=never`,
   `NUITKA_UPDATE_CHECK=never`): its `--version` otherwise goes online.
 
-### 2.0.0-dev — Every platform, every engine (milestone 1: engine abstraction)
+#### Milestone 1 — Engine abstraction
 
 First milestone of the 2.0 release of [PRODUCT_ROADMAP.md](PRODUCT_ROADMAP.md)
 (pillar 4, architectural requirement 1). A pure refactor: no build changes.
 Every test that existed before passes unchanged, and so do the real
 PyInstaller builds (`pytest -m slow`).
 
-#### Added
+**Added**
 - **`core/engines/`**: the `Engine` interface (`base.py`) — `name`,
   `is_available(python)`/`version(python)`, `build_command(config, python)`,
   a stage tracker for progress, `locate_output(config)`/`locate_executable`,
@@ -266,7 +396,7 @@ PyInstaller builds (`pytest -m slow`).
 - **`BuildConfig.engine`** (default `"pyinstaller"`), in settings, presets,
   history and `p2e.toml`.
 
-#### Changed
+**Changed**
 - `p2e.toml` is now **schema 2**. A 1.6 file (schema 1) is migrated on load
   with `build.engine = "pyinstaller"`; the bump makes 1.6 refuse a 2.0 file
   ("written by a newer version") instead of silently building a project meant
