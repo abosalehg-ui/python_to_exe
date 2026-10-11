@@ -66,9 +66,13 @@ class BaseTab(QWidget):
     the few actions that span tabs.
     """
 
-    def __init__(self, window=None, parent=None):
+    def __init__(self, window=None, parent=None, embedded=False):
         super().__init__(parent)
         self.window = window
+        # An embedded tab is one section of a larger scrolling page (the Build
+        # page): it must not bring a scroll area of its own, or the page would
+        # scroll inside a page.
+        self.embedded = bool(embedded)
         self._build()
 
     def _build(self):  # pragma: no cover - abstract
@@ -154,6 +158,10 @@ def scrolled_layout(tab: QWidget) -> QVBoxLayout:
     their content (the default 1080x800 window, any 1366x768 laptop) Qt
     squeezed the fields to a couple of pixels instead of scrolling.
     """
+    if getattr(tab, "embedded", False):
+        layout = QVBoxLayout(tab)
+        layout.setContentsMargins(0, 0, 0, 0)
+        return layout
     outer = QVBoxLayout(tab)
     outer.setContentsMargins(0, 0, 0, 0)
     content = QWidget()

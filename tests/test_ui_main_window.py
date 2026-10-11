@@ -18,7 +18,7 @@ from py2exe_gui.qt import (
     Qt,  # noqa: E402
 )
 from py2exe_gui.strings import set_locale  # noqa: E402
-from py2exe_gui.ui.main_window import SIMPLE_MODE_TABS  # noqa: E402
+from py2exe_gui.ui.main_window import BUILD_SECTIONS, NAV_SECTIONS  # noqa: E402
 from tests.conftest import MemoryKeyring  # noqa: E402
 
 pytestmark = pytest.mark.gui
@@ -72,39 +72,65 @@ def test_default_size_is_still_comfortable(window):
     assert window.width() >= 1000
 
 
-def test_simple_mode_is_the_default_for_a_new_user(window):
-    """Nine tabs at once is the barrier simple mode exists to remove."""
-    assert window.simple_mode is True
-    assert window.tabs.count() == len(SIMPLE_MODE_TABS)
-
-
-def test_advanced_mode_shows_every_tab(window):
-    window.set_simple_mode(False)
+def test_every_former_tab_is_reachable_from_six_sections(window):
+    """Fifteen tabs in a row overflowed the window; six sections never do."""
+    assert window.tabs.sections() == list(NAV_SECTIONS)
     assert window.tabs.count() == len(window._all_tabs)
+    for _key, widget, _title in window._all_tabs:
+        assert window.section_of(widget) in NAV_SECTIONS
 
 
-def test_switching_modes_preserves_field_contents(window):
-    """Hidden tabs are detached from the bar, not destroyed."""
-    window.set_simple_mode(False)
+def test_a_new_user_lands_on_the_build_page_with_the_extras_folded(window):
+    """Progressive disclosure replaced the simple/advanced modes."""
+    assert window.tabs.current_section() == "build"
+    assert window.tabs.currentWidget() is window.main_tab
+    assert window.build_page.expanded_keys() == []
+    assert set(window.build_page.sections) == set(BUILD_SECTIONS)
+
+
+def test_navigating_to_a_folded_tab_opens_its_section(window):
+    window.tabs.setCurrentWidget(window.deploy_tab)
+    assert window.tabs.current_section() == "build"
+    assert window.build_page.expanded_keys() == ["deploy"]
+    assert window.settings["build_sections"] == ["deploy"]
+
+
+def test_switching_sections_preserves_field_contents(window):
+    """Pages are stacked, never rebuilt, when the person moves around."""
+    window.tabs.setCurrentWidget(window.deploy_tab)
     window.deploy_tab.splash_input.setText("splash.png")
-    window.set_simple_mode(True)
-    window.set_simple_mode(False)
+    window.tabs.setCurrentWidget(window.doctor_tab)
+    window.tabs.setCurrentWidget(window.home_tab)
+    window.tabs.setCurrentWidget(window.deploy_tab)
     assert window.deploy_tab.splash_input.text() == "splash.png"
 
 
-def test_mode_choice_is_persisted(window):
-    window.set_simple_mode(False)
-    assert window.settings["simple_mode"] is False
-    window.set_simple_mode(True)
-    assert window.settings["simple_mode"] is True
+def test_advanced_sections_can_be_opened_together_from_the_view_menu(window):
+    window.set_advanced_sections_open(True)
+    assert sorted(window.build_page.expanded_keys()) == sorted(BUILD_SECTIONS)
+    assert window.advanced_sections_action.isChecked()
+    window.set_advanced_sections_open(False)
+    assert window.build_page.expanded_keys() == []
+    assert not window.advanced_sections_action.isChecked()
 
 
-def test_mode_button_offers_the_other_mode(window):
-    from py2exe_gui.strings import S
+def test_a_previous_advanced_mode_choice_opens_the_sections(qapp, tmp_path, monkeypatch):
+    """settings['simple_mode'] from 1.x is honoured as the default state."""
+    import json
 
-    assert window.mode_btn.text() == S.BTN_MODE_TO_ADVANCED
-    window.set_simple_mode(False)
-    assert window.mode_btn.text() == S.BTN_MODE_TO_SIMPLE
+    settings = tmp_path / "s.json"
+    settings.write_text(json.dumps({"simple_mode": False}), encoding="utf-8")
+    monkeypatch.setattr("py2exe_gui.ui.main_window.SETTINGS_FILE", str(settings))
+    monkeypatch.setattr("py2exe_gui.ui.main_window.HISTORY_FILE", str(tmp_path / "h.json"))
+    monkeypatch.setattr("py2exe_gui.ui.main_window.PRESETS_FILE", str(tmp_path / "p.json"))
+    monkeypatch.setattr("py2exe_gui.ui.main_window.KEYRING", MemoryKeyring())
+    from py2exe_gui.ui.main_window import MainWindow
+
+    win = MainWindow()
+    try:
+        assert sorted(win.build_page.expanded_keys()) == sorted(BUILD_SECTIONS)
+    finally:
+        win.close()
 
 
 def test_log_receives_startup_messages(window):
@@ -612,7 +638,8 @@ def test_theme_change_recolours_existing_log_lines(window):
 
 def test_theme_selector_reflects_the_active_theme(window):
     window.apply_theme("nord")
-    assert window.templates_tab.selected_theme() == "nord"
+    assert window.settings_tab.selected_theme() == "nord"
+    assert window.theme_actions["nord"].isChecked()
 
 
 # ── Log filtering (Phase 9) ────────────────────────────────────────────────

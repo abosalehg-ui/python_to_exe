@@ -19,7 +19,6 @@ from py2exe_gui.core.update_signing import (  # noqa: E402
 )
 from py2exe_gui.qt import QFileDialog, QMessageBox  # noqa: E402
 from py2exe_gui.strings import Ar, En, S, set_locale  # noqa: E402
-from py2exe_gui.ui.main_window import SIMPLE_MODE_TABS  # noqa: E402
 from tests.conftest import MemoryKeyring  # noqa: E402
 
 pytestmark = pytest.mark.gui
@@ -81,7 +80,7 @@ def set_updater(window, key=None):
 
 
 def test_tab_is_shown_and_everything_is_off(window):
-    assert "runtime" in SIMPLE_MODE_TABS
+    assert window.section_of(window.runtime_tab) == "distribute"
     shown = [window.tabs.widget(i) for i in range(window.tabs.count())]
     assert window.runtime_tab in shown
     assert window._current_config().runtime_kit == RuntimeKitConfig()

@@ -2,27 +2,23 @@
 
 import os
 
-from py2exe_gui.core import classify_line, format_html
 from py2exe_gui.core.engines import engine_names, get_engine
 from py2exe_gui.qt import (
     QCheckBox,
     QComboBox,
-    QFileDialog,
     QGridLayout,
     QGroupBox,
     QHBoxLayout,
     QIcon,
     QLabel,
     QLineEdit,
-    QMessageBox,
     QPushButton,
     QSize,
     Qt,
-    QTextEdit,
-    QTimer,
     QVBoxLayout,
 )
 from py2exe_gui.strings import S
+from py2exe_gui.ui.log_panel import LogPanel
 from py2exe_gui.ui.tabs.base import BaseTab, browse_button, scrolled_layout
 
 # The sizes Windows actually pulls out of a multi-resolution .ico. Showing all
@@ -160,60 +156,11 @@ class MainTab(BaseTab):
         options_layout.addLayout(row2)
         layout.addWidget(options_group)
 
-        log_group = QGroupBox(S.GROUP_LOG)
-        log_layout = QVBoxLayout(log_group)
-
-        self.log_output = QTextEdit()
-        self.log_output.setReadOnly(True)
-        self.log_output.setMinimumHeight(150)
-
-        search_row = QHBoxLayout()
-        self.log_search = QLineEdit()
-        self.log_search.setPlaceholderText(S.LOG_SEARCH_PLACEHOLDER)
-        self.log_search.setAccessibleName(S.LOG_SEARCH_PLACEHOLDER)
-        self.log_search.returnPressed.connect(self._search_log_next)
-        # Debounced: searching on every keystroke made the cursor jump around.
-        self._log_search_timer = QTimer(self)
-        self._log_search_timer.setSingleShot(True)
-        self._log_search_timer.setInterval(300)
-        self._log_search_timer.timeout.connect(self._search_log_next)
-        self.log_search.textChanged.connect(self._log_search_timer.start)
-        search_row.addWidget(self.log_search, stretch=3)
-
-        # Severity filter. Text search alone could not answer "just show me
-        # the errors" — the word "error" does not appear in every failure.
-        search_row.addWidget(QLabel(S.LOG_FILTER_LABEL))
-        self.log_filter = QComboBox()
-        self.log_filter.setAccessibleName(S.LOG_FILTER_LABEL)
-        for label, level in (
-            (S.LOG_FILTER_ALL, ""),
-            (S.LOG_FILTER_ERRORS, "error"),
-            (S.LOG_FILTER_WARNINGS, "warning"),
-            (S.LOG_FILTER_SUCCESS, "success"),
-        ):
-            self.log_filter.addItem(label, level)
-        self.log_filter.currentIndexChanged.connect(self._apply_log_filter)
-        search_row.addWidget(self.log_filter, stretch=1)
-
-        log_btn_row = QHBoxLayout()
-        clear_log_btn = QPushButton(S.CLEAR_LOG)
-        clear_log_btn.setAccessibleName(S.CLEAR_LOG)
-        clear_log_btn.clicked.connect(self.clear_log)
-        export_log_btn = QPushButton(S.BTN_EXPORT_LOG)
-        export_log_btn.setAccessibleName(S.BTN_EXPORT_LOG)
-        export_log_btn.clicked.connect(self.export_log)
-        log_btn_row.addWidget(clear_log_btn)
-        log_btn_row.addWidget(export_log_btn)
-
-        log_layout.addLayout(search_row)
-        log_layout.addWidget(self.log_output)
-        log_layout.addLayout(log_btn_row)
-        layout.addWidget(log_group)
-
-        # Every line ever appended, with its severity. The filter re-renders
-        # from this rather than trying to un-hide text already in the widget.
-        self._log_lines = []
-        self._log_theme = "dark"
+        # The log is a panel under every page (2.1), not a box in this tab.
+        # The tab still owns the widget so it can be built and tested alone;
+        # the window moves it into the bottom of the window.
+        self.log_panel = LogPanel(self)
+        self.log_panel.setVisible(False)
 
 
     def set_readiness(self, score):
@@ -303,104 +250,40 @@ class MainTab(BaseTab):
             if not self.output_dir.text():
                 self.output_dir.setText(os.path.dirname(text))
 
-    # ── Log ────────────────────────────────────────────────────────────────
+    # ── Log (delegated to the panel) ──────────────────────────────────────
+
+    @property
+    def log_output(self):
+        return self.log_panel.log_output
+
+    @property
+    def log_filter(self):
+        return self.log_panel.log_filter
+
+    @property
+    def log_search(self):
+        return self.log_panel.log_search
 
     def append_log(self, line: str, theme: str = "dark"):
-        """Append one line, coloured by severity for the active theme."""
-        if line is None:
-            return
-        text = str(line)
-        self._log_theme = theme
-
-        if text.strip() == "":
-            self._log_lines.append((text, None))
-            if not self.active_log_filter():
-                self.log_output.append("")
-            return
-
-        level = classify_line(text)
-        self._log_lines.append((text, level))
-        if self._passes_filter(level):
-            self.log_output.append(format_html(text, level=level, theme=theme))
+        self.log_panel.append_log(line, theme=theme)
 
     def active_log_filter(self) -> str:
-        """The severity currently selected, or '' for no filtering."""
-        return self.log_filter.currentData() or ""
-
-    def _passes_filter(self, level) -> bool:
-        active = self.active_log_filter()
-        return not active or level == active
-
-    def _apply_log_filter(self, _index=None):
-        """Re-render the log from the buffer under the current filter."""
-        self.log_output.clear()
-        active = self.active_log_filter()
-        shown = 0
-        for text, level in self._log_lines:
-            if level is None:
-                if not active:
-                    self.log_output.append("")
-                continue
-            if self._passes_filter(level):
-                self.log_output.append(
-                    format_html(text, level=level, theme=self._log_theme)
-                )
-                shown += 1
-        if active and shown == 0:
-            self.log_output.append(
-                format_html(S.LOG_FILTER_EMPTY, level="muted", theme=self._log_theme)
-            )
+        return self.log_panel.active_log_filter()
 
     def clear_log(self):
-        """Clear the widget and the buffer behind it."""
-        self._log_lines = []
-        self.log_output.clear()
+        self.log_panel.clear_log()
 
     def log_text(self) -> str:
-        """The full log as plain text, filter or no filter.
-
-        Exporting has to write everything: exporting only the lines that
-        happened to be on screen would silently drop the rest.
-        """
-        return "\n".join(text for text, _level in self._log_lines)
+        return self.log_panel.log_text()
 
     def restore_log(self, lines):
-        """Repopulate the buffer after the UI is rebuilt for a new locale."""
-        self._log_lines = list(lines)
-        self._apply_log_filter()
+        self.log_panel.restore_log(lines)
 
     def log_lines(self):
-        """The buffer, for snapshotting across a rebuild."""
-        return list(self._log_lines)
-
-    def _search_log_next(self):
-        """Find the next occurrence of the search query in the log."""
-        query = self.log_search.text().strip()
-        if not query:
-            return
-        if not self.log_output.find(query):
-            cursor = self.log_output.textCursor()
-            cursor.movePosition(cursor.Start)
-            self.log_output.setTextCursor(cursor)
-            self.log_output.find(query)
+        return self.log_panel.log_lines()
 
     def export_log(self):
-        """Save the whole log to a text file — not just what the filter shows."""
-        contents = self.log_text()
-        if not contents.strip():
-            return
-        path, _ = QFileDialog.getSaveFileName(
-            self, S.DIALOG_EXPORT_LOG, "py2exe_log.txt", S.DIALOG_FILTER_LOG
-        )
-        if not path:
-            return
-        try:
-            with open(path, "w", encoding="utf-8") as f:
-                f.write(contents)
-        except OSError as e:
-            QMessageBox.critical(self, S.MSG_ERROR, S.LOG_EXPORT_FAIL.format(error=str(e)))
-            return
-        self.log(S.LOG_EXPORT_OK.format(path=path))
+        self.log_panel.export_log()
 
     # ── Engine ─────────────────────────────────────────────────────────────
 

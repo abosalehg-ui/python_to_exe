@@ -535,6 +535,131 @@ QFrame#aboutSeparator {{
     max-height: 1px;
     border: none;
 }}
+/* 2.1: side navigation, page bar, build-page sections, log panel, action bar. */
+QListWidget#sideNav {{
+    background-color: {statusbar_bg};
+    border: none;
+    border-right: 1px solid {border};
+    padding: 8px 6px;
+    font-size: {pt_group};
+}}
+QListWidget#sideNav::item {{
+    padding: 0 12px;
+    border-radius: 6px;
+    color: {text};
+}}
+QListWidget#sideNav::item:hover {{
+    background-color: {surface};
+}}
+QListWidget#sideNav::item:selected {{
+    background-color: {accent};
+    color: {on_accent};
+    font-weight: bold;
+}}
+QFrame#pageBar {{
+    background-color: {statusbar_bg};
+    border-bottom: 1px solid {border};
+}}
+QLabel#pageTitle {{
+    font-size: {pt_group};
+    font-weight: bold;
+    color: {text};
+}}
+QLabel#pageFile {{
+    font-size: {pt_small};
+    color: {muted};
+}}
+QTabWidget#subTabs::pane {{
+    border: none;
+    border-top: 1px solid {border};
+    border-radius: 0;
+    background-color: transparent;
+}}
+QTabWidget#subTabs > QTabBar::tab {{
+    background-color: transparent;
+    padding: 8px 16px;
+    margin: 0;
+    border-radius: 0;
+    border-bottom: 2px solid transparent;
+    color: {muted};
+}}
+QTabWidget#subTabs > QTabBar::tab:selected {{
+    color: {accent};
+    border-bottom: 2px solid {accent};
+    font-weight: bold;
+}}
+QTabWidget#subTabs > QTabBar::tab:hover {{
+    color: {text};
+}}
+QToolButton#sectionHeader {{
+    background-color: transparent;
+    border: 1px solid {border};
+    border-radius: 6px;
+    padding: 6px 10px;
+    text-align: left;
+    font-weight: bold;
+    font-size: {pt_group};
+    color: {text};
+}}
+QToolButton#sectionHeader:hover {{
+    background-color: {surface};
+}}
+QToolButton#sectionHeader:checked {{
+    border-bottom-left-radius: 0;
+    border-bottom-right-radius: 0;
+    color: {accent};
+}}
+QLabel#sectionSubtitle {{
+    font-size: {pt_small};
+    color: {muted};
+    padding: 0 8px;
+}}
+QFrame#sectionBody {{
+    border: 1px solid {border};
+    border-top: none;
+    border-bottom-left-radius: 6px;
+    border-bottom-right-radius: 6px;
+}}
+QWidget#logPanel {{
+    border-top: 1px solid {border};
+}}
+QFrame#logHeader {{
+    background-color: {statusbar_bg};
+}}
+QToolButton#logToggle {{
+    background-color: transparent;
+    border: none;
+    padding: 4px 8px;
+    font-weight: bold;
+    color: {text};
+}}
+QLabel#logLastLine {{
+    font-family: 'Consolas', 'Courier New', monospace;
+    font-size: {pt_log};
+    color: {muted};
+}}
+QTextEdit#logOutput {{
+    border: none;
+    border-radius: 0;
+}}
+QFrame#actionBar {{
+    background-color: {statusbar_bg};
+    border-top: 1px solid {border};
+}}
+QPushButton#flatBtn {{
+    background-color: transparent;
+    color: {text};
+    border: 1px solid {border};
+    font-weight: normal;
+}}
+QPushButton#flatBtn:hover {{
+    background-color: {surface};
+    border-color: {accent};
+}}
+QProgressBar#buildProgress {{
+    font-size: {pt_small};
+    font-weight: normal;
+}}
 /* 2.0: one card per recent project in the projects workspace. */
 QFrame#projectCard {{
     background-color: {input_bg};

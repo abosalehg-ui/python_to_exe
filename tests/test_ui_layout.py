@@ -44,11 +44,18 @@ def test_content_fits_the_declared_minimum_size(window):
 
 
 def test_every_tab_scrolls_instead_of_squeezing(window):
+    """Every page scrolls: standalone tabs on their own, the Build page as one."""
     for _key, widget, _title in window._all_tabs:
+        if getattr(widget, "embedded", False):
+            continue
         layout = widget.layout()
         assert layout is not None and layout.count() >= 1, widget
         first = layout.itemAt(0).widget()
         assert isinstance(first, QScrollArea), f"{type(widget).__name__} is not scrollable"
+    page_layout = window.build_page.layout()
+    assert isinstance(page_layout.itemAt(0).widget(), QScrollArea)
+    embedded = [w for _k, w, _t in window._all_tabs if getattr(w, "embedded", False)]
+    assert embedded and all(not w.findChildren(QScrollArea) for w in embedded)
 
 
 @pytest.mark.parametrize("size", [(900, 600), (1080, 800), (1366, 700)])

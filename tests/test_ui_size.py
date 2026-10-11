@@ -15,7 +15,6 @@ from py2exe_gui.qt import (
     Qt,  # noqa: E402
 )
 from py2exe_gui.strings import En, S, set_locale  # noqa: E402
-from py2exe_gui.ui.main_window import SIMPLE_MODE_TABS  # noqa: E402
 from tests.conftest import MemoryKeyring  # noqa: E402
 from tests.test_size_analyzer import make_build  # noqa: E402
 
@@ -76,8 +75,8 @@ def doctor_codes(window):
 # ── Tab and settings ───────────────────────────────────────────────────────
 
 
-def test_size_tab_is_in_simple_mode(window):
-    assert "size" in SIMPLE_MODE_TABS
+def test_size_tab_is_in_the_check_section(window):
+    assert window.section_of(window.size_tab) == "check"
     shown = [window.tabs.widget(i) for i in range(window.tabs.count())]
     assert window.size_tab in shown
 

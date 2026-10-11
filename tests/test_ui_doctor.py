@@ -17,7 +17,6 @@ from py2exe_gui.qt import (  # noqa: E402
     Qt,  # noqa: E402
 )
 from py2exe_gui.strings import En, set_locale  # noqa: E402
-from py2exe_gui.ui.main_window import SIMPLE_MODE_TABS  # noqa: E402
 from tests.conftest import MemoryKeyring  # noqa: E402
 
 pytestmark = pytest.mark.gui
@@ -56,11 +55,10 @@ def list_codes(window):
 # ── Tab and badge ──────────────────────────────────────────────────────────
 
 
-def test_doctor_tab_is_part_of_simple_mode(window):
-    assert "doctor" in SIMPLE_MODE_TABS
+def test_doctor_tab_is_in_the_check_section(window):
     shown = [window.tabs.widget(i) for i in range(window.tabs.count())]
     assert window.doctor_tab in shown
-    assert len(shown) == len(SIMPLE_MODE_TABS)
+    assert window.section_of(window.doctor_tab) == "check"
 
 
 def test_without_a_source_the_badge_is_hidden(window):

@@ -6,6 +6,7 @@ live in ``py2exe_gui.ui.tabs`` and own their own widgets — before that split
 this file was ~1,900 lines and held every control in the application.
 """
 
+import functools
 import json
 import os
 import subprocess
@@ -18,8 +19,6 @@ from dataclasses import replace
 from py2exe_gui.constants import (
     APP_NAME,
     APP_VERSION,
-    COPYRIGHT,
-    DEVELOPER,
     HISTORY_FILE,
     PRESETS_FILE,
     PYINSTALLER_REQUIREMENT,
@@ -154,10 +153,10 @@ from py2exe_gui.core.workspace import summarize_projects
 from py2exe_gui.paths import envs_dir, license_key_path, signing_key_path
 from py2exe_gui.qt import (
     QAction,
+    QActionGroup,
     QDesktopServices,
     QFileDialog,
     QFrame,
-    QGroupBox,
     QHBoxLayout,
     QKeySequence,
     QLabel,
@@ -166,8 +165,9 @@ from py2exe_gui.qt import (
     QProgressBar,
     QPushButton,
     QShortcut,
+    QSizePolicy,
+    QSplitter,
     Qt,
-    QTabWidget,
     QTimer,
     QUrl,
     QVBoxLayout,
@@ -177,6 +177,7 @@ from py2exe_gui.qt import (
 from py2exe_gui.strings import (
     LOCALE_LAYOUT,
     S,
+    available_locales,
     current_locale,
     set_locale,
 )
@@ -191,6 +192,7 @@ from py2exe_gui.styles import (
 from py2exe_gui.templates import TEMPLATES, template_name
 from py2exe_gui.texts import notes_titles, project_error_text, runtime_texts
 from py2exe_gui.ui.batch_thread import BatchThread
+from py2exe_gui.ui.build_page import BuildPage
 from py2exe_gui.ui.compare_thread import CompareThread
 from py2exe_gui.ui.conversion_thread import ConversionThread
 from py2exe_gui.ui.diagnostic_thread import DiagnosticThread
@@ -199,13 +201,14 @@ from py2exe_gui.ui.dialogs import (
     CommandPreviewDialog,
     PresetNameDialog,
     ReleaseConfirmDialog,
-    WelcomeDialog,
+    ShortcutsDialog,
 )
 from py2exe_gui.ui.env_thread import EnvThread
 from py2exe_gui.ui.finding_text import finding_detail, finding_title, fix_label, service_label
 from py2exe_gui.ui.icon_studio_dialog import IconStudioDialog
 from py2exe_gui.ui.installer_thread import InstallerThread
 from py2exe_gui.ui.license_dialog import LicenseGeneratorDialog
+from py2exe_gui.ui.navigation import SectionView
 from py2exe_gui.ui.package_thread import PackageThread
 from py2exe_gui.ui.post_build_thread import PostBuildThread
 from py2exe_gui.ui.release_thread import ReleaseThread
@@ -222,16 +225,22 @@ from py2exe_gui.ui.tabs import (
     PlatformsTab,
     ReleaseTab,
     RuntimeTab,
+    SettingsTab,
     SizeTab,
     TemplatesTab,
     VersionInfoTab,
 )
+from py2exe_gui.ui.tabs.settings_tab import THEME_LABEL_KEYS
 from py2exe_gui.ui.tabs.size_tab import ltr, size_text
 from py2exe_gui.ui.tray import BuildTray
 
-# Tabs shown in simple mode. Eight tabs at once is a lot to meet when all you
-# want is one .exe; the rest stay one button away.
-SIMPLE_MODE_TABS = ("home", "main", "doctor", "size", "runtime", "release", "templates", "about")
+# The side navigation (2.1): six sections, in the order the work happens.
+# Each holds one or more of the former tabs; "build" is one composed page.
+NAV_SECTIONS = ("projects", "build", "check", "distribute", "tools", "settings")
+#: The former tabs that are sections of the Build page, with their titles.
+BUILD_SECTIONS = ("advanced", "version_info", "deploy")
+#: Height the log takes when it opens (the handle lets the person change it).
+LOG_OPEN_HEIGHT = 220
 
 # Where isolated build environments are created. A module global so tests can
 # point it at a temporary folder.
@@ -275,7 +284,6 @@ class MainWindow(QMainWindow):
         self.settings = {}
         self.current_theme = "dark"
         self.font_scale = DEFAULT_FONT_SCALE
-        self.simple_mode = True
         self._build_start_time = 0.0
         self._build_config_snapshot = {}
         self._temp_version_file = ""
@@ -325,7 +333,6 @@ class MainWindow(QMainWindow):
         self.load_settings()
         self.current_theme = self.settings.get("theme", "dark")
         self.font_scale = clamp_scale(self.settings.get("font_scale", DEFAULT_FONT_SCALE))
-        self.simple_mode = bool(self.settings.get("simple_mode", True))
         self.init_ui()
         self._register_shortcuts()
         self.setAcceptDrops(True)
@@ -356,7 +363,7 @@ class MainWindow(QMainWindow):
         self._apply_stylesheet()
         self.setCentralWidget(self._build_central_widget())
         self._build_menu()
-        self.statusBar().showMessage(f"{COPYRIGHT} | {DEVELOPER}")
+        self._build_status_bar()
 
     def _apply_stylesheet(self):
         """Repaint the window for the active theme, locale and font scale."""
@@ -372,47 +379,63 @@ class MainWindow(QMainWindow):
         )
 
     def _build_central_widget(self) -> QWidget:
-        central = QWidget()
-        layout = QVBoxLayout(central)
-        layout.setSpacing(15)
-        layout.setContentsMargins(20, 20, 20, 20)
+        """Side navigation | page bar, the pages, the log panel, the action bar.
 
-        layout.addWidget(self._create_header())
-
+        The header banner (86px repeating the title bar), the always-visible
+        progress box (77px) and the row of six equal buttons are gone: what
+        is left of the fixed chrome is one 40px page bar, the folded log
+        (one line) and one 48px action bar.
+        """
         self.home_tab = HomeTab(self)
-        self.main_tab = MainTab(self)
+        self.main_tab = MainTab(self, embedded=True)
         self.doctor_tab = DoctorTab(self)
         self.size_tab = SizeTab(self)
         self.runtime_tab = RuntimeTab(self)
         self.release_tab = ReleaseTab(self)
         self.platforms_tab = PlatformsTab(self)
-        self.advanced_tab = AdvancedTab(self)
-        self.version_info_tab = VersionInfoTab(self)
-        self.deploy_tab = DeployTab(self)
+        self.advanced_tab = AdvancedTab(self, embedded=True)
+        self.version_info_tab = VersionInfoTab(self, embedded=True)
+        self.deploy_tab = DeployTab(self, embedded=True)
         self.installer_tab = InstallerTab(self)
         self.batch_tab = BatchTab(self)
         self.templates_tab = TemplatesTab(self)
         self.history_tab = HistoryTab(self)
+        self.settings_tab = SettingsTab(self)
         self.about_tab = AboutTab(self)
+        # The log is built by the main tab (so the tab works alone) and shown
+        # under every page here.
+        self.log_panel = self.main_tab.log_panel
 
-        # Keyed so simple mode can pick a subset by name rather than by index.
+        # Every former tab, keyed, in reading order: this is the order
+        # ``tabs.widget(i)`` follows, and the order the shortcuts list uses.
         self._all_tabs = (
             ("home", self.home_tab, S.TAB_HOME),
+            ("history", self.history_tab, S.TAB_HISTORY),
             ("main", self.main_tab, S.TAB_MAIN),
+            ("advanced", self.advanced_tab, S.BUILD_SECTION_FILES),
+            ("version_info", self.version_info_tab, S.BUILD_SECTION_IDENTITY),
+            ("deploy", self.deploy_tab, S.BUILD_SECTION_PRE_POST),
             ("doctor", self.doctor_tab, S.TAB_DOCTOR),
             ("size", self.size_tab, S.TAB_SIZE),
+            ("installer", self.installer_tab, S.TAB_INSTALLER),
+            ("platforms", self.platforms_tab, S.TAB_PLATFORMS),
             ("runtime", self.runtime_tab, S.TAB_RUNTIME),
             ("release", self.release_tab, S.TAB_RELEASE),
-            ("platforms", self.platforms_tab, S.TAB_PLATFORMS),
-            ("advanced", self.advanced_tab, S.TAB_ADVANCED),
-            ("version_info", self.version_info_tab, S.TAB_VERSION_INFO),
-            ("deploy", self.deploy_tab, S.TAB_DEPLOY),
-            ("installer", self.installer_tab, S.TAB_INSTALLER),
             ("batch", self.batch_tab, S.TAB_BATCH),
             ("templates", self.templates_tab, S.TAB_TEMPLATES),
-            ("history", self.history_tab, S.TAB_HISTORY),
+            ("settings", self.settings_tab, S.TAB_SETTINGS),
             ("about", self.about_tab, S.TAB_ABOUT),
         )
+        # Which section each former tab lives in.
+        self._tab_sections = {
+            "home": "projects", "history": "projects",
+            "main": "build", "advanced": "build", "version_info": "build", "deploy": "build",
+            "doctor": "check", "size": "check",
+            "installer": "distribute", "platforms": "distribute",
+            "runtime": "distribute", "release": "distribute",
+            "batch": "tools", "templates": "tools",
+            "settings": "settings", "about": "settings",
+        }
 
         # The tabs that hold a part of the project, in the order they are read.
         self._project_tabs = (
@@ -421,11 +444,62 @@ class MainWindow(QMainWindow):
             self.platforms_tab,
         )
 
-        self.tabs = QTabWidget()
-        self._populate_tabs()
-        layout.addWidget(self.tabs)
+        self.build_page = BuildPage(
+            self.main_tab,
+            [
+                ("advanced", S.BUILD_SECTION_FILES, self.advanced_tab, self._summary_files),
+                ("version_info", S.BUILD_SECTION_IDENTITY, self.version_info_tab,
+                 self._summary_identity),
+                ("deploy", S.BUILD_SECTION_PRE_POST, self.deploy_tab, self._summary_pre_post),
+            ],
+            expanded=not bool(self.settings.get("simple_mode", True)),
+        )
+        self.build_page.set_expanded_keys(
+            self.settings.get("build_sections", self.build_page.expanded_keys()))
+        for section in self.build_page.sections.values():
+            section.toggled.connect(self._remember_build_sections)
 
-        self.templates_tab.set_theme(self.settings.get("theme", "dark"))
+        self.tabs = SectionView()
+        self._populate_tabs()
+        self.tabs.sectionChanged.connect(self._on_section_changed)
+        self.tabs.set_collapsed(bool(self.settings.get("nav_collapsed", False)))
+
+        # ── The right-hand column: page bar, pages, log, actions ──
+        column = QWidget()
+        column_layout = QVBoxLayout(column)
+        column_layout.setContentsMargins(0, 0, 0, 0)
+        column_layout.setSpacing(0)
+        column_layout.addWidget(self._create_page_bar())
+        # Pages above, log below, with a handle between them while the log is
+        # open; folded, the log is one header line and the handle is locked.
+        self.log_splitter = QSplitter(Qt.Orientation.Vertical)
+        self.log_splitter.setObjectName("logSplitter")
+        self.log_splitter.setChildrenCollapsible(False)
+        self.log_splitter.addWidget(self.tabs.stack)
+        self.log_panel.setParent(self.log_splitter)
+        self.log_panel.setVisible(True)
+        self.log_splitter.addWidget(self.log_panel)
+        self.log_splitter.setStretchFactor(0, 1)
+        self.log_splitter.setStretchFactor(1, 0)
+        column_layout.addWidget(self.log_splitter, 1)
+        self.log_panel.toggled.connect(self._on_log_toggled)
+        self.log_panel.set_expanded(bool(self.settings.get("log_open", False)))
+        self._on_log_toggled(self.log_panel.is_expanded())
+        column_layout.addWidget(self._create_action_bar())
+
+        central = QWidget()
+        layout = QHBoxLayout(central)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(0)
+        layout.addWidget(self.tabs.nav)
+        layout.addWidget(column, 1)
+        # The SectionView itself is not shown: its nav and stack are placed
+        # separately so the log and action bar sit under the pages only.
+        self.tabs.setParent(central)
+        self.tabs.setVisible(False)
+
+        self.settings_tab.set_theme(self.settings.get("theme", "dark"))
+        self.settings_tab.set_font_scale(self.font_scale)
 
         # Re-examine whenever something the doctor's checks depend on changes.
         main = self.main_tab
@@ -433,6 +507,7 @@ class MainWindow(QMainWindow):
         main.icon_input.textChanged.connect(self._schedule_doctor)
         main.windowed_check.toggled.connect(self._schedule_doctor)
         main.noconsole_check.toggled.connect(self._schedule_doctor)
+        main.source_input.textChanged.connect(self._refresh_page_bar)
         # The Runtime Kit preview names the app and its build kind.
         main.source_input.textChanged.connect(self.refresh_runtime_preview)
         main.output_name.textChanged.connect(self.refresh_runtime_preview)
@@ -460,64 +535,161 @@ class MainWindow(QMainWindow):
         )
         self._watch_project_fields()
         self.refresh_token_status()
-
-        layout.addWidget(self._create_progress_group())
-        layout.addLayout(self._create_action_buttons())
+        self._refresh_page_bar()
         return central
 
     def _populate_tabs(self):
-        """Fill the tab bar with the set the current mode calls for.
-
-        Tabs not shown are only detached from the bar, never destroyed — their
-        widgets still hold state, so switching modes mid-setup loses nothing.
-        """
+        """Register the six sections and place every former tab in one."""
         self.tabs.clear()
+        titles = {
+            "projects": S.SECTION_PROJECTS, "build": S.SECTION_BUILD, "check": S.SECTION_CHECK,
+            "distribute": S.SECTION_DISTRIBUTE, "tools": S.SECTION_TOOLS,
+            "settings": S.SECTION_SETTINGS,
+        }
+        for key in NAV_SECTIONS:
+            if key == "build":
+                self.tabs.add_section(key, titles[key], page=self.build_page)
+            else:
+                self.tabs.add_section(key, titles[key], tabbed=True)
         for key, widget, title in self._all_tabs:
-            if self.simple_mode and key not in SIMPLE_MODE_TABS:
-                continue
-            self.tabs.addTab(widget, title)
+            section = self._tab_sections[key]
+            reveal = None
+            if key in BUILD_SECTIONS:
+                reveal = functools.partial(self.build_page.reveal, widget)
+            self.tabs.add_page(section, widget, title, reveal=reveal)
+        self.tabs.finish()
 
-    def _create_header(self):
-        header = QFrame()
-        header_layout = QVBoxLayout(header)
-        header_layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
+    def section_of(self, widget) -> str:
+        """The navigation section a former tab lives in."""
+        return self.tabs.section_of(widget)
 
-        title = QLabel(S.HEADER_TITLE)
-        title.setObjectName("titleLabel")
-        title.setAlignment(Qt.AlignmentFlag.AlignCenter)
+    # ── Page bar ───────────────────────────────────────────────────────────
 
-        subtitle = QLabel(S.HEADER_SUBTITLE)
-        subtitle.setObjectName("subtitleLabel")
-        subtitle.setAlignment(Qt.AlignmentFlag.AlignCenter)
+    def _create_page_bar(self) -> QWidget:
+        bar = QFrame()
+        bar.setObjectName("pageBar")
+        row = QHBoxLayout(bar)
+        row.setContentsMargins(16, 6, 16, 6)
+        row.setSpacing(12)
+        self.page_title = QLabel("")
+        self.page_title.setObjectName("pageTitle")
+        row.addWidget(self.page_title)
+        self.page_file = QLabel("")
+        self.page_file.setObjectName("pageFile")
+        self.page_file.setTextFormat(Qt.TextFormat.PlainText)
+        self.page_file.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Preferred)
+        row.addWidget(self.page_file, 1)
+        return bar
 
-        header_layout.addWidget(title)
-        header_layout.addWidget(subtitle)
-        return header
+    def _on_section_changed(self, _key: str):
+        self._refresh_page_bar()
 
-    def _create_progress_group(self):
-        group = QGroupBox(S.PROGRESS_GROUP)
-        group_layout = QVBoxLayout(group)
-        self.progress_bar = QProgressBar()
-        self.progress_bar.setMinimum(0)
-        self.progress_bar.setMaximum(100)
-        self.progress_bar.setValue(0)
-        self.progress_bar.setFormat(S.PROGRESS_READY)
-        group_layout.addWidget(self.progress_bar)
-        return group
+    def _refresh_page_bar(self, *_args):
+        if not hasattr(self, "page_title"):
+            return
+        self.page_title.setText(self.tabs.section_title(self.tabs.current_section()))
+        source = self.main_tab.source_input.text().strip()
+        self.page_file.setText(ltr(source) if source else S.PAGE_FILE_NONE)
+        self.page_file.setToolTip(source)
 
-    def _create_action_buttons(self):
-        row = QHBoxLayout()
+    # ── Build page summaries ───────────────────────────────────────────────
+
+    def _summary_files(self) -> str:
+        files = len(self.advanced_tab.extra_files())
+        imports = len(self.advanced_tab.hidden_imports())
+        if not files and not imports:
+            return S.BUILD_SUMMARY_NONE
+        return S.BUILD_SUMMARY_FILES_FMT.format(files=ltr(str(files)), imports=ltr(str(imports)))
+
+    def _summary_identity(self) -> str:
+        info = self.version_info_tab.version_info()
+        parts = [p for p in (info.product_name, info.file_version) if p]
+        return ltr(" ".join(parts)) if parts else S.BUILD_SUMMARY_IDENTITY_NONE
+
+    def _summary_pre_post(self) -> str:
+        tab = self.deploy_tab
+        enabled = []
+        if tab.splash_input.text().strip():
+            enabled.append(S.BUILD_SUMMARY_SPLASH)
+        if tab.manifest_enable.isChecked():
+            enabled.append(S.BUILD_SUMMARY_MANIFEST)
+        if tab.signing_enable.isChecked():
+            enabled.append(S.BUILD_SUMMARY_SIGNING)
+        if tab.smoke_enable.isChecked():
+            enabled.append(S.BUILD_SUMMARY_SMOKE)
+        return S.LIST_SEPARATOR.join(enabled) if enabled else S.BUILD_SUMMARY_PRE_POST_NONE
+
+    def _remember_build_sections(self, *_args):
+        self.settings["build_sections"] = self.build_page.expanded_keys()
+        if hasattr(self, "advanced_sections_action"):
+            # Reflect, don't act: setChecked would otherwise fire the action's
+            # handler and open every section because one opened.
+            self.advanced_sections_action.blockSignals(True)
+            self.advanced_sections_action.setChecked(self.build_page.any_expanded())
+            self.advanced_sections_action.blockSignals(False)
+
+    def set_advanced_sections_open(self, opened: bool):
+        """Open or close every folded section of the Build page at once."""
+        self.build_page.set_all_expanded(bool(opened))
+        self._remember_build_sections()
+
+    def _on_log_toggled(self, opened: bool):
+        """Give the open log its share of the column; lock the handle when folded."""
+        self._remember_log_open(opened)
+        splitter = getattr(self, "log_splitter", None)
+        if splitter is None:
+            return
+        handle = splitter.handle(1)
+        if handle is not None:
+            handle.setEnabled(bool(opened))
+        total = max(splitter.height(), 1)
+        if opened:
+            log_height = min(max(LOG_OPEN_HEIGHT, int(total * 0.3)), max(total - 200, 120))
+            splitter.setSizes([max(total - log_height, 1), log_height])
+        else:
+            header = self.log_panel.sizeHint().height()
+            splitter.setSizes([max(total - header, 1), header])
+
+    def _remember_log_open(self, opened: bool):
+        self.settings["log_open"] = bool(opened)
+        if hasattr(self, "show_log_action"):
+            self.show_log_action.blockSignals(True)
+            self.show_log_action.setChecked(bool(opened))
+            self.show_log_action.blockSignals(False)
+
+    def toggle_log_panel(self):
+        self.log_panel.set_expanded(not self.log_panel.is_expanded())
+
+    def toggle_nav(self):
+        collapsed = not self.tabs.nav.is_collapsed()
+        self.tabs.set_collapsed(collapsed)
+        self.settings["nav_collapsed"] = collapsed
+
+    # ── Action bar ─────────────────────────────────────────────────────────
+
+    def _create_action_bar(self) -> QWidget:
+        """One primary action, two quiet ones, and the progress of a build.
+
+        Build and Cancel share one slot: only one of them is ever shown. The
+        progress bar appears when a build starts and names its stage.
+        """
+        bar = QFrame()
+        bar.setObjectName("actionBar")
+        row = QHBoxLayout(bar)
+        row.setContentsMargins(12, 6, 12, 6)
+        row.setSpacing(8)
 
         def action(text, handler, object_name="", primary=False):
             button = QPushButton(text)
             if object_name:
                 button.setObjectName(object_name)
-            button.setMinimumHeight(50)
+            button.setMinimumHeight(36)
             button.setAccessibleName(text)
             if primary:
-                font = application_font(14)
+                font = application_font(11)
                 font.setBold(True)
                 button.setFont(font)
+                button.setMinimumWidth(160)
             button.clicked.connect(handler)
             row.addWidget(button)
             return button
@@ -525,33 +697,52 @@ class MainWindow(QMainWindow):
         self.convert_btn = action(
             S.BTN_CONVERT, self.start_conversion, "successBtn", primary=True
         )
-        self.cancel_btn = action(S.BTN_CANCEL, self.cancel_conversion, "dangerBtn")
-        # Cancel takes the Build button's place while a build runs: a red
-        # button that is almost always disabled is noise, not an affordance.
+        self.cancel_btn = action(S.BTN_CANCEL, self.cancel_conversion, "dangerBtn", primary=True)
         self.cancel_btn.setEnabled(False)
         self.cancel_btn.setVisible(False)
-        self.preview_btn = action(S.BTN_PREVIEW_CMD, self.preview_command)
-        self.open_folder_btn = action(S.BTN_OPEN_FOLDER, self.open_output_folder)
-        self.theme_btn = action(S.BTN_TOGGLE_THEME, self.toggle_theme)
-        self.mode_btn = action(self._mode_button_label(), self.toggle_mode)
-        self.mode_btn.setToolTip(
-            S.MODE_ADVANCED_TIP if self.simple_mode else S.MODE_SIMPLE_TIP
-        )
-        return row
+        self.preview_btn = action(S.BTN_PREVIEW_CMD, self.preview_command, "flatBtn")
+        self.open_folder_btn = action(S.BTN_OPEN_FOLDER, self.open_output_folder, "flatBtn")
+        row.addStretch(1)
 
-    def _mode_button_label(self) -> str:
-        """The button offers the *other* mode, so its label is the target."""
-        return S.BTN_MODE_TO_ADVANCED if self.simple_mode else S.BTN_MODE_TO_SIMPLE
+        self.progress_bar = QProgressBar()
+        self.progress_bar.setObjectName("buildProgress")
+        self.progress_bar.setMinimum(0)
+        self.progress_bar.setMaximum(100)
+        self.progress_bar.setValue(0)
+        self.progress_bar.setFormat(S.PROGRESS_READY)
+        self.progress_bar.setTextVisible(True)
+        self.progress_bar.setFixedWidth(260)
+        self.progress_bar.setMinimumHeight(22)
+        self.progress_bar.setAccessibleName(S.PROGRESS_READY)
+        self.progress_bar.setVisible(False)
+        row.addWidget(self.progress_bar)
+        return bar
+
+    # ── Status bar ─────────────────────────────────────────────────────────
+
+    def _build_status_bar(self):
+        """What is happening now; the copyright moved to About."""
+        bar = self.statusBar()
+        if not hasattr(self, "status_versions"):
+            self.status_versions = QLabel("")
+            self.status_versions.setObjectName("statusVersions")
+            bar.addPermanentWidget(self.status_versions)
+        bar.showMessage(S.STATUS_READY)
+
+    def set_status(self, text: str):
+        self.statusBar().showMessage(text)
 
     # ─── Startup checks ─────────────────────────────────────────────────
 
     def check_dependencies(self):
         self._append_log(S.LOG_CHECKING_DEPS)
+        python_version, engine_version = "", ""
         try:
             result = subprocess.run(
                 [sys.executable, "--version"], capture_output=True, text=True
             )
-            self._append_log(S.LOG_PYTHON_FOUND.format(version=result.stdout.strip()))
+            python_version = result.stdout.strip()
+            self._append_log(S.LOG_PYTHON_FOUND.format(version=python_version))
         except OSError:
             self._append_log(S.LOG_PYTHON_MISSING)
 
@@ -562,14 +753,20 @@ class MainWindow(QMainWindow):
                 text=True,
             )
             if result.returncode == 0:
+                engine_version = result.stdout.strip()
                 self._append_log(
-                    S.LOG_PYINSTALLER_FOUND.format(version=result.stdout.strip())
+                    S.LOG_PYINSTALLER_FOUND.format(version=engine_version)
                 )
             else:
                 self._append_log(S.LOG_PYINSTALLER_MISSING)
         except OSError:
             self._append_log(S.LOG_PYINSTALLER_MISSING)
 
+        if hasattr(self, "status_versions"):
+            python_short = python_version.replace("Python", "").strip()
+            engine_short = f"PyInstaller {engine_version}" if engine_version else ""
+            self.status_versions.setText(ltr(S.STATUS_VERSIONS_FMT.format(
+                python=python_short or "?", engine=engine_short or "—")))
         self._append_log("─" * 50)
         self._append_log(S.LOG_READY)
 
@@ -1188,6 +1385,9 @@ class MainWindow(QMainWindow):
         self._set_building(True)
         self.progress_bar.setValue(0)
         self.progress_bar.setFormat(S.PROGRESS_CONVERTING)
+        self.progress_bar.setVisible(True)
+        self.log_panel.set_expanded(True)
+        self.set_status(S.STATUS_BUILDING)
 
         self.conversion_thread = ConversionThread(
             cmd, work_dir, stages=engine.stages,
@@ -1209,6 +1409,7 @@ class MainWindow(QMainWindow):
         label = getattr(S, f"STAGE_{stage_key.upper()}", "")
         if label:
             self.progress_bar.setFormat(S.PROGRESS_STAGE_FMT.format(stage=label))
+            self.set_status(S.STATUS_BUILDING_STAGE_FMT.format(stage=label))
 
     def _notify_build_result(self, success: bool, name: str):
         """Raise a desktop notification, unless the window is already focused."""
@@ -1297,9 +1498,12 @@ class MainWindow(QMainWindow):
 
         if success:
             self.progress_bar.setFormat(S.PROGRESS_DONE)
+            self.set_status(S.STATUS_DONE_FMT.format(duration=ltr(f"{duration:.0f}s")))
             QMessageBox.information(self, S.MSG_SUCCESS, message)
         else:
             self.progress_bar.setFormat(S.PROGRESS_FAILED)
+            self.set_status(S.STATUS_CANCELLED if message == S.CONV_CANCELLED
+                            else S.STATUS_FAILED)
             declined = [f for f in diagnosed if f.code == "nuitka_download_declined"]
             if declined:
                 # The engine stopped to ask for a download; only a person says yes.
@@ -1347,10 +1551,10 @@ class MainWindow(QMainWindow):
 
     def _append_log(self, line: str):
         """Append a single line to the log, coloured for the active theme."""
-        self.main_tab.append_log(line, theme=self.current_theme)
+        self.log_panel.append_log(line, theme=self.current_theme)
 
     def export_log(self):
-        self.main_tab.export_log()
+        self.log_panel.export_log()
 
     def toggle_theme(self):
         """Ctrl+T: flip between dark and light, the two most-used themes.
@@ -1370,16 +1574,21 @@ class MainWindow(QMainWindow):
         self.current_theme = resolve_theme(theme)
         self._apply_stylesheet()
         self._repaint_log()
-        if hasattr(self, "templates_tab"):
-            self.templates_tab.set_theme(theme)
+        if hasattr(self, "settings_tab"):
+            self.settings_tab.set_theme(theme)
+        self._check_theme_action(theme)
         self.refresh_home()
         self._append_log(S.LOG_THEME_CHANGED.format(theme=theme))
 
     def _on_theme_changed(self, index=None):
-        """Handler for the Templates tab's theme selector."""
-        selected = self.templates_tab.selected_theme()
+        """Handler for the Settings page's theme selector."""
+        selected = self.settings_tab.selected_theme()
         if selected != self.settings.get("theme"):
             self.apply_theme(selected)
+
+    def _check_theme_action(self, theme: str):
+        for action in getattr(self, "theme_actions", {}).values():
+            action.setChecked(action.data() == theme)
 
     def _repaint_log(self):
         """Re-render buffered log lines in the new theme's palette.
@@ -1388,8 +1597,7 @@ class MainWindow(QMainWindow):
         leaves earlier lines in the old palette — which is exactly the bug the
         light theme's log had before per-theme palettes existed.
         """
-        self.main_tab._log_theme = self.current_theme
-        self.main_tab._apply_log_filter()
+        self.log_panel.set_theme(self.current_theme)
 
     # ── Font zoom ───────────────────────────────────────────────────────────
 
@@ -1410,43 +1618,20 @@ class MainWindow(QMainWindow):
         self.font_scale = new_scale
         self.settings["font_scale"] = new_scale
         self._apply_stylesheet()
+        if hasattr(self, "settings_tab"):
+            self.settings_tab.set_font_scale(new_scale)
         self._append_log(S.LOG_ZOOM_FMT.format(percent=round(new_scale * 100)))
-
-    # ── Simple / advanced mode ─────────────────────────────────────────────
-
-    def toggle_mode(self):
-        self.set_simple_mode(not self.simple_mode)
-
-    def set_simple_mode(self, simple: bool):
-        """Show either the essential tabs or all of them, and remember which."""
-        self.simple_mode = bool(simple)
-        self.settings["simple_mode"] = self.simple_mode
-        self._populate_tabs()
-        self.mode_btn.setText(self._mode_button_label())
-        self.mode_btn.setAccessibleName(self.mode_btn.text())
-        self.mode_btn.setToolTip(
-            S.MODE_ADVANCED_TIP if self.simple_mode else S.MODE_SIMPLE_TIP
-        )
-        self._append_log(S.LOG_MODE_SIMPLE if self.simple_mode else S.LOG_MODE_ADVANCED)
 
     def run_startup_tasks(self):
         """Anything that blocks, run after the window is visible.
 
         Called by ``app.main`` rather than from ``__init__`` so that
-        constructing a MainWindow stays non-blocking and testable.
+        constructing a MainWindow stays non-blocking and testable. The
+        first-run mode dialog is gone with the modes (2.1); the Build page's
+        folded sections do its job without asking.
         """
-        self._maybe_show_welcome()
+        self.settings.setdefault("welcomed", True)
         self._maybe_check_for_updates()
-
-    def _maybe_show_welcome(self):
-        """Ask which mode to start in, once, on the very first run."""
-        if self.settings.get("welcomed"):
-            return
-        self.settings["welcomed"] = True
-        dialog = WelcomeDialog(self)
-        dialog.exec()
-        self.set_simple_mode(dialog.simple_mode)
-        self.save_settings()
 
     # ── Update check ───────────────────────────────────────────────────────
 
@@ -1482,7 +1667,11 @@ class MainWindow(QMainWindow):
 
     def _on_language_changed(self, index):
         """Switch locale and rebuild the UI in place."""
-        code = self.templates_tab.language_combo.itemData(index)
+        code = self.settings_tab.language_combo.itemData(index)
+        self.set_language(code)
+
+    def set_language(self, code: str):
+        """Switch the UI language (from the Settings page or the View menu)."""
         if not code or code == current_locale():
             return
         self.settings["locale"] = code
@@ -1503,9 +1692,15 @@ class MainWindow(QMainWindow):
         notes = self.release_tab.notes_edit.toPlainText()
         # Snapshot the buffer, not the rendered HTML: the filter re-renders
         # from the buffer, so restoring HTML alone would lose the severities.
-        log_lines = self.main_tab.log_lines()
+        log_lines = self.log_panel.log_lines()
+        log_open = self.log_panel.is_expanded()
         batch_sources = self.batch_tab.sources()
         publish_fields = self.runtime_tab.publish_fields()
+        current = self.tabs.currentWidget()
+        # The widgets are rebuilt below, so remember the page by key.
+        current_key = next((k for k, w, _t in self._all_tabs if w is current), "")
+        status = self.statusBar().currentMessage()
+        versions = self.status_versions.text()
 
         set_locale(locale_code)
         self._apply_layout_direction()
@@ -1514,7 +1709,10 @@ class MainWindow(QMainWindow):
         )
         self.setCentralWidget(self._build_central_widget())
         self._build_menu()
-        self.statusBar().showMessage(f"{COPYRIGHT} | {DEVELOPER}")
+        self._build_status_bar()
+        self.status_versions.setText(versions)
+        if status and status != S.STATUS_READY:
+            self.set_status(status)
 
         # Rebuilding the widgets loses nothing: the project model carries the
         # form across (before 1.6 the deploy and installer tabs were reset).
@@ -1525,7 +1723,8 @@ class MainWindow(QMainWindow):
             self._saved_snapshot = self._project_snapshot()
         self._update_modified()
 
-        self.main_tab.restore_log(log_lines)
+        self.log_panel.restore_log(log_lines)
+        self.log_panel.set_expanded(log_open)
         self.main_tab.refresh_icon_preview()
         self._refresh_doctor_view()
         self._refresh_size_view()
@@ -1535,11 +1734,14 @@ class MainWindow(QMainWindow):
         self.runtime_tab.set_publish_fields(publish_fields)
         self.refresh_signing_key()
         self.refresh_runtime_preview()
-        self.mode_btn.setText(self._mode_button_label())
         self._refresh_history_list()
         self._refresh_presets_list()
         self.refresh_home()
         self._register_shortcuts()
+        for key, widget, _title in self._all_tabs:
+            if key == current_key:
+                self.tabs.setCurrentWidget(widget)
+        self._refresh_page_bar()
 
     # ─── Version info / manifest temp files ─────────────────────────────
 
@@ -2645,32 +2847,145 @@ class MainWindow(QMainWindow):
     # ─── Project file (p2e.toml) ────────────────────────────────────────
 
     def _build_menu(self):
-        """The Project menu. Rebuilt on a language switch, like the widgets."""
+        """Project, View, Tools and Help. Rebuilt on a language switch.
+
+        Until 2.1 there was one menu; the theme, the language and the font
+        size were reachable only from the bottom of the Templates tab or by
+        shortcuts nobody could discover from the window.
+        """
         bar = self.menuBar()
         bar.clear()
         # Kept on self: PySide6 6.10 hands the new menu to Python, and an
         # unreferenced one is deleted with its wrapper (6.12 and PyQt5 leave
         # it with the bar). A reference is harmless on every binding.
-        self.project_menu = menu = bar.addMenu(S.MENU_PROJECT)
+        self._menu_actions = []
 
-        def item(text, handler, keys=""):
+        def item(menu, text, handler, keys="", checkable=False, checked=False):
             # The shortcut is shown in the menu but bound once, as a
             # QShortcut: binding it here too would make it ambiguous.
             action = QAction(f"{text}\t{keys}" if keys else text, self)
-            action.triggered.connect(lambda _checked=False: handler())
+            if checkable:
+                action.setCheckable(True)
+                action.setChecked(bool(checked))
+                action.toggled.connect(lambda on: handler(on))
+            else:
+                action.triggered.connect(lambda _checked=False: handler())
             menu.addAction(action)
+            self._menu_actions.append(action)
             return action
 
-        self.new_project_action = item(S.MENU_NEW_PROJECT, self.new_project, "Ctrl+N")
-        self.open_project_action = item(S.MENU_OPEN_PROJECT, self.open_project_dialog,
+        # ── Project ──
+        self.project_menu = menu = bar.addMenu(S.MENU_PROJECT)
+        self.new_project_action = item(menu, S.MENU_NEW_PROJECT, self.new_project, "Ctrl+N")
+        self.open_project_action = item(menu, S.MENU_OPEN_PROJECT, self.open_project_dialog,
                                         "Ctrl+Shift+O")
         self.recent_menu = menu.addMenu(S.MENU_RECENT_PROJECTS)
         menu.addSeparator()
-        self.save_project_action = item(S.MENU_SAVE_PROJECT, self.save_project, "Ctrl+S")
-        self.save_as_action = item(S.MENU_SAVE_PROJECT_AS, self.save_project_as, "Ctrl+Shift+S")
+        self.save_project_action = item(menu, S.MENU_SAVE_PROJECT, self.save_project, "Ctrl+S")
+        self.save_as_action = item(menu, S.MENU_SAVE_PROJECT_AS, self.save_project_as,
+                                   "Ctrl+Shift+S")
         menu.addSeparator()
-        self.init_project_action = item(S.MENU_INIT_PROJECT, self.init_project_from_script)
+        self.init_project_action = item(menu, S.MENU_INIT_PROJECT, self.init_project_from_script)
         self._refresh_recent_menu()
+
+        # ── View ──
+        self.view_menu = view = bar.addMenu(S.MENU_VIEW)
+        self.theme_menu = view.addMenu(S.MENU_THEME)
+        self.theme_actions = {}
+        theme_group = QActionGroup(self)
+        theme_group.setExclusive(True)
+        stored_theme = self.settings.get("theme", "dark")
+        for code, label_key in THEME_LABEL_KEYS:
+            action = QAction(getattr(S, label_key), self)
+            action.setCheckable(True)
+            action.setData(code)
+            action.setChecked(code == stored_theme)
+            action.triggered.connect(lambda _c=False, c=code: self.apply_theme(c))
+            theme_group.addAction(action)
+            self.theme_menu.addAction(action)
+            self.theme_actions[code] = action
+        self._menu_actions.append(theme_group)
+        self.language_menu = view.addMenu(S.MENU_LANGUAGE)
+        self.language_actions = {}
+        language_group = QActionGroup(self)
+        language_group.setExclusive(True)
+        for code, native in available_locales().items():
+            action = QAction(native, self)
+            action.setCheckable(True)
+            action.setData(code)
+            action.setChecked(code == current_locale())
+            action.triggered.connect(lambda _c=False, c=code: self.set_language(c))
+            language_group.addAction(action)
+            self.language_menu.addAction(action)
+            self.language_actions[code] = action
+        self._menu_actions.append(language_group)
+        view.addSeparator()
+        item(view, S.MENU_ZOOM_IN, self.zoom_in, "Ctrl++")
+        item(view, S.MENU_ZOOM_OUT, self.zoom_out, "Ctrl+-")
+        item(view, S.MENU_ZOOM_RESET, self.zoom_reset, "Ctrl+0")
+        view.addSeparator()
+        self.show_log_action = item(
+            view, S.MENU_SHOW_LOG, self.log_panel.set_expanded, "Ctrl+`",
+            checkable=True, checked=self.log_panel.is_expanded())
+        self.advanced_sections_action = item(
+            view, S.MENU_ADVANCED_SECTIONS, self.set_advanced_sections_open,
+            checkable=True, checked=self.build_page.any_expanded())
+        self.collapse_nav_action = item(
+            view, S.MENU_COLLAPSE_NAV, lambda on: self._set_nav_collapsed(on),
+            checkable=True, checked=self.tabs.nav.is_collapsed())
+        view.addSeparator()
+        item(view, S.MENU_SETTINGS,
+             lambda: self.tabs.setCurrentWidget(self.settings_tab), "Ctrl+,")
+
+        # ── Tools ──
+        self.tools_menu = tools = bar.addMenu(S.MENU_TOOLS)
+        item(tools, S.MENU_DETECT_IMPORTS, self.detect_imports_action, "F5")
+        item(tools, S.MENU_IMPORT_REQUIREMENTS, self.import_requirements_file)
+        tools.addSeparator()
+        item(tools, S.MENU_PREVIEW_COMMAND, self.preview_command, "Ctrl+P")
+        item(tools, S.MENU_OPEN_OUTPUT, self.open_output_folder)
+        item(tools, S.MENU_ICON_STUDIO, self.open_icon_studio)
+        tools.addSeparator()
+        item(tools, S.MENU_BATCH, lambda: self.tabs.setCurrentWidget(self.batch_tab))
+        item(tools, S.MENU_CHECK_UPDATES, self.check_for_updates)
+
+        # ── Help ──
+        self.help_menu = help_menu = bar.addMenu(S.MENU_HELP)
+        item(help_menu, S.MENU_SHORTCUTS, self.show_shortcuts, "F1")
+        item(help_menu, S.MENU_ABOUT, lambda: self.tabs.setCurrentWidget(self.about_tab))
+
+    def _set_nav_collapsed(self, collapsed: bool):
+        self.tabs.set_collapsed(bool(collapsed))
+        self.settings["nav_collapsed"] = bool(collapsed)
+
+    def shortcut_table(self):
+        """(keys, description) for every binding, for the Help dialog."""
+        rows = [
+            ("Ctrl+O", S.SHORTCUT_OPEN_SOURCE),
+            ("Ctrl+B", S.SHORTCUT_BUILD),
+            ("Ctrl+Shift+B", S.SHORTCUT_CANCEL),
+            ("Ctrl+P", S.SHORTCUT_PREVIEW),
+            ("F5", S.SHORTCUT_DETECT),
+            ("Ctrl+N", S.SHORTCUT_NEW),
+            ("Ctrl+Shift+O", S.SHORTCUT_OPEN_PROJECT),
+            ("Ctrl+S", S.SHORTCUT_SAVE),
+            ("Ctrl+Shift+S", S.SHORTCUT_SAVE_AS),
+            ("Ctrl+`", S.SHORTCUT_TOGGLE_LOG),
+            ("Ctrl+F", S.SHORTCUT_FIND_LOG),
+            ("Ctrl+L", S.SHORTCUT_CLEAR_LOG),
+            ("Ctrl+E", S.SHORTCUT_EXPORT_LOG),
+            ("Ctrl+T", S.SHORTCUT_THEME),
+            ("Ctrl++ / Ctrl+=", S.SHORTCUT_ZOOM_IN),
+            ("Ctrl+-", S.SHORTCUT_ZOOM_OUT),
+            ("Ctrl+0", S.SHORTCUT_ZOOM_RESET),
+        ]
+        for number, key in enumerate(NAV_SECTIONS, start=1):
+            rows.append((f"Ctrl+{number}", S.SHORTCUT_SECTION_FMT.format(
+                section=self.tabs.section_title(key))))
+        return rows
+
+    def show_shortcuts(self):
+        ShortcutsDialog(self.shortcut_table(), parent=self).exec()
 
     def recent_projects(self):
         recent = self.settings.get("recent_projects", [])
@@ -2803,6 +3118,8 @@ class MainWindow(QMainWindow):
         self.setWindowModified(bool(self.project_path) and self.is_project_modified())
         self.release_tab.show_mismatches(version_mismatches(self._current_project()))
         self._update_title()
+        if hasattr(self, "build_page"):
+            self.build_page.refresh_summaries()
 
     def _update_title(self):
         base = S.WINDOW_TITLE_FMT.format(name=APP_NAME, version=APP_VERSION)
@@ -3248,16 +3565,18 @@ class MainWindow(QMainWindow):
             ("Ctrl+B", self.start_conversion),
             ("Ctrl+Shift+B", self.cancel_conversion),
             ("Ctrl+P", self.preview_command),
-            ("Ctrl+L", self.main_tab.clear_log),
-            ("Ctrl+E", self.main_tab.export_log),
+            ("Ctrl+L", self.log_panel.clear_log),
+            ("Ctrl+E", self.log_panel.export_log),
             ("Ctrl+S", self.save_shortcut),
             ("Ctrl+Shift+S", self.save_project_as),
             ("Ctrl+N", self.new_project),
             ("Ctrl+Shift+O", self.open_project_dialog),
             ("Ctrl+T", self.toggle_theme),
             ("F5", self.detect_imports_action),
-            ("Ctrl+F", self.main_tab.log_search.setFocus),
-            ("Ctrl+M", self.toggle_mode),
+            ("F1", self.show_shortcuts),
+            ("Ctrl+F", self.focus_log_search),
+            ("Ctrl+`", self.toggle_log_panel),
+            ("Ctrl+,", lambda: self.tabs.setCurrentWidget(self.settings_tab)),
             # Zoom. Ctrl+= is bound too because reaching Ctrl++ on most
             # layouts means pressing shift, which many apps do not require.
             ("Ctrl++", self.zoom_in),
@@ -3265,10 +3584,17 @@ class MainWindow(QMainWindow):
             ("Ctrl+-", self.zoom_out),
             ("Ctrl+0", self.zoom_reset),
         ]
+        for number, key in enumerate(NAV_SECTIONS, start=1):
+            bindings.append((f"Ctrl+{number}", lambda k=key: self.tabs.set_current_section(k)))
         for sequence, slot in bindings:
             shortcut = QShortcut(QKeySequence(sequence), self)
             shortcut.activated.connect(slot)
             self._shortcuts.append(shortcut)
+
+    def focus_log_search(self):
+        """Ctrl+F: open the log if it is folded, then focus its search box."""
+        self.log_panel.set_expanded(True)
+        self.log_panel.log_search.setFocus()
 
     # ─── Drag & drop ────────────────────────────────────────────────────
 
