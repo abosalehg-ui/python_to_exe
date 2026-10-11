@@ -43,6 +43,7 @@ version metadata, build history, and a Windows manifest editor.
 | **Progress** | Progress bar follows the phase PyInstaller announces, and names it; desktop notification when a build finishes |
 | **i18n** | Full Arabic (RTL) and English (LTR) translations, switchable live without a restart |
 | **History** | Persistent log of last 20 builds with one-click restore |
+| **Projects** | 2.0: a home tab with one card per recent `p2e.toml` — last build and its result, a size sparkline across successful builds, the last release — and open/build/release from the card through the same paths as the tabs |
 | **Updates** | Optional, off by default: reports a newer GitHub release. Never downloads or runs anything |
 
 ## Requirements
@@ -105,8 +106,8 @@ optional extra: `pip install -e ".[release]"`. Without it, the release reads
 
 ## Simple and Advanced Modes
 
-A first run shows five tabs — Main, Project Doctor, Size & Environment, Templates, About —
-because eleven tabs of
+A first run shows eight tabs — Projects, Main, Project Doctor, Size & Environment,
+Runtime Kit, Release, Templates, About — because fifteen tabs of
 PyInstaller options is a lot to meet when all you want is one `.exe`. The mode
 button (or `Ctrl+M`) reveals the rest, and the choice is remembered. Hidden
 tabs keep their contents: switching modes mid-setup loses nothing.
@@ -311,6 +312,22 @@ release again reuses the tag, the GitHub release and the assets already
 uploaded.
 
 ## Tabs Overview
+
+### 🏠 Projects (2.0)
+The projects workspace: one card per recent `p2e.toml` (the last 8 opened)
+with its name, version and path; the last build and its result (when, and
+the output size) from the build history; a sparkline of the output size
+across successful builds with the change since the previous one; and the
+last release found in the `release/<version>/` folders the release pipeline
+writes (version, when, file count, whether `SHA256SUMS.txt` is there). *Open*,
+*Build* and *Release* on a card are the window's own actions, so a build
+started here is the Convert button's build and a release still goes through
+the dry run and the confirmation. A file that is missing or refused is shown
+with the reason and only a *Remove from list* button; it never takes the view
+down. The window starts on this tab when there are recent projects. The
+summaries come from `core/workspace.py` (no Qt); the tab only draws them.
+The sparkline runs in the reading direction: newest on the right in English,
+on the left in Arabic.
 
 ### ⚙️ Main Settings
 File pickers for source, output directory, icon (with a live preview at
@@ -551,7 +568,7 @@ migrated once on first run.
 
 ```bash
 pip install -r requirements-dev.txt
-pytest tests/ -m "not slow"                  # 1519 tests
+pytest tests/ -m "not slow"                  # 1950 tests
 ruff check py2exe_gui/ p2e_runtime/ tests/   # lint
 ```
 
@@ -611,6 +628,7 @@ py2exe_gui/
 │   ├── project_file.py       # ProjectConfig + p2e.toml (schema, paths, refusals)
 │   ├── toml_writer.py        # the TOML writer (the stdlib only reads TOML)
 │   ├── build_runner.py       # headless build: prepare, stream, clean up
+│   ├── workspace.py          # per-project summaries for the home tab (2.0)
 │   ├── release/              # versioning, changelog, git, artifacts,
 │   │                         # credentials, github, winget, pipeline
 │   ├── build_history.py
@@ -618,7 +636,8 @@ py2exe_gui/
 └── ui/
     ├── main_window.py
     ├── conversion_thread.py
-    └── dialogs.py
+    ├── dialogs.py
+    └── tabs/                 # one widget per tab (home_tab.py: the projects workspace)
 ```
 
 ### Running Tests
@@ -659,7 +678,7 @@ See [IDEAS.md](IDEAS.md) for the full roadmap. Currently:
 - 🚧 **2.0 (in progress):** ✅ engine layer `core/engines/` (milestone 1),
   ✅ Nuitka engine (milestone 2), ✅ compare mode and start-up benchmark (milestone 3),
   ✅ CI generator and AppImage/.deb/.dmg packagers (milestone 4), ✅ offline licensing
-  (milestone 5); next projects workspace, PySide6 — see
+  (milestone 5), ✅ projects workspace (milestone 6); next PySide6 — see
   [PRODUCT_ROADMAP.md](PRODUCT_ROADMAP.md)
 - ⏳ **Next:** venv management, multi-file projects, Linux/macOS installers,
   `.spec` editor, VirusTotal, PySide6 migration —

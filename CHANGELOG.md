@@ -5,6 +5,63 @@ follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### 2.0.0-dev — Every platform, every engine (milestone 6: projects workspace)
+
+#### Added
+- **`core/workspace.py`** (no Qt): one `ProjectSummary` per recent
+  `p2e.toml` — name and version from the file; the last build (result, time,
+  size) and the output sizes of the successful builds from the build history
+  (`size_bytes`, kept since 1.4); the last release from the
+  `release/<version>/` folders the 1.6 pipeline writes (version, folder
+  time, file count, whether `SHA256SUMS.txt` is there); and
+  `sparkline_points()`, the size line as plain coordinates, mirrored for a
+  right-to-left layout so time runs in the reading direction. A file that is
+  gone is `missing`, one that cannot be used (bad TOML, a refused secret, a
+  newer schema, an unknown engine) is `unreadable` with the error's code;
+  `summarize_project` never raises.
+- **Home tab** (`ui/tabs/home_tab.py`, "🏠 Projects"), first in both modes:
+  one card per recent project with the name, version, path, last build line,
+  a painted sparkline (`SizeSparkline`, sizes also in its tooltip and
+  accessible name), the size change since the previous build, the last
+  release line, and *Open · Build · Release · Remove from list*. The buttons
+  forward to the window's existing `open_project_path`, `start_conversion`
+  and `start_release`: a build from a card is the Convert button's build, a
+  release still goes through the dry run and the confirmation. A missing or
+  unreadable file shows the reason and only *Remove*. The window starts on
+  this tab when there are recent projects, on Main otherwise, and the cards
+  are rebuilt after a project is opened or saved, a build or a release
+  finishes, and on a theme or language switch.
+- Strings in Arabic and English (`TAB_HOME`, `HOME_*`, `BTN_HOME_*`,
+  `LOG_HOME_*`); a `projectCard` style in every theme.
+
+#### Decisions
+- No new persistence: the last release is read from the folders on disk.
+  Nothing records what was published on GitHub, so the card says "last
+  release" of the local pipeline, never "published".
+- *Build* on the project that is already open does not reopen the file, so
+  unsaved edits in the form are built as they are and no save question is
+  asked first; on another project the usual open (with its untrusted-flags
+  check) runs first and a declined open starts nothing.
+- The history keeps 20 builds for every project together, so a sparkline
+  has at most that many points and usually far fewer; the view says how many
+  builds it counts.
+
+#### Verified
+- Real PyInstaller 6.22.3 builds on Linux (Python 3.11, PyQt5 5.15.11)
+  through the window's own `start_conversion`: three builds of one project
+  with growing imports (6.9 MB, 7.7 MB, 8.1 MB; 7.6–8.0 s each), one failing
+  build of a project with a syntax error (4.2 s), and a full release of the
+  first project with `py2exe-gui release --no-tag --no-publish` (EXE,
+  portable ZIP, `SHA256SUMS.txt`, notes). `docs/screenshots/2.0/m6_home_ar.png`
+  and `m6_home_en.png` show that workspace, plus a project whose file was
+  deleted after it was opened.
+- 20 core tests (`tests/test_workspace.py`) and 24 headless GUI tests
+  (`tests/test_ui_home.py`). **Not executed:** Windows and macOS.
+
+#### Not done
+- No `projects` command on the command line, and no cross-machine list:
+  the recent list is the one in the per-user settings file.
+
 ### 2.0.0-dev — Every platform, every engine (milestone 5: offline licensing)
 
 #### Added

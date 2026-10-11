@@ -512,6 +512,25 @@ QFrame#aboutSeparator {{
     max-height: 1px;
     border: none;
 }}
+/* 2.0: one card per recent project in the projects workspace. */
+QFrame#projectCard {{
+    background-color: {input_bg};
+    border: 2px solid {input_border};
+    border-radius: 10px;
+}}
+QFrame#projectCard QLabel {{
+    background: transparent;
+}}
+QLabel#projectName {{
+    font-size: {pt_about_sub};
+    font-weight: bold;
+    color: {accent};
+}}
+QLabel#projectCurrent {{
+    font-size: {pt_small};
+    font-weight: bold;
+    color: {success};
+}}
 """
 
 

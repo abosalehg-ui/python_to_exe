@@ -169,6 +169,7 @@ from py2exe_gui.core.venv_manager import (
     quote_command,
     write_metadata,
 )
+from py2exe_gui.core.workspace import summarize_projects
 from py2exe_gui.paths import envs_dir, license_key_path, signing_key_path
 from py2exe_gui.strings import (
     LOCALE_LAYOUT,
@@ -179,6 +180,7 @@ from py2exe_gui.strings import (
 from py2exe_gui.styles import (
     DEFAULT_FONT_SCALE,
     FONT_SCALE_STEP,
+    PALETTES,
     clamp_scale,
     resolve_theme,
     themed_stylesheet,
@@ -211,6 +213,7 @@ from py2exe_gui.ui.tabs import (
     DeployTab,
     DoctorTab,
     HistoryTab,
+    HomeTab,
     InstallerTab,
     MainTab,
     PlatformsTab,
@@ -225,7 +228,7 @@ from py2exe_gui.ui.tray import BuildTray
 
 # Tabs shown in simple mode. Eight tabs at once is a lot to meet when all you
 # want is one .exe; the rest stay one button away.
-SIMPLE_MODE_TABS = ("main", "doctor", "size", "runtime", "release", "templates", "about")
+SIMPLE_MODE_TABS = ("home", "main", "doctor", "size", "runtime", "release", "templates", "about")
 
 # Where isolated build environments are created. A module global so tests can
 # point it at a temporary folder.
@@ -327,6 +330,10 @@ class MainWindow(QMainWindow):
         self.check_dependencies()
         self._refresh_history_list()
         self._refresh_presets_list()
+        self.refresh_home()
+        if not self.recent_projects():
+            # Nothing to list yet: start where the first build is made.
+            self.tabs.setCurrentWidget(self.main_tab)
         self._saved_snapshot = self._project_snapshot()
         self._update_title()
         # The first-run dialog and the update check are NOT started here:
@@ -369,6 +376,7 @@ class MainWindow(QMainWindow):
 
         layout.addWidget(self._create_header())
 
+        self.home_tab = HomeTab(self)
         self.main_tab = MainTab(self)
         self.doctor_tab = DoctorTab(self)
         self.size_tab = SizeTab(self)
@@ -386,6 +394,7 @@ class MainWindow(QMainWindow):
 
         # Keyed so simple mode can pick a subset by name rather than by index.
         self._all_tabs = (
+            ("home", self.home_tab, S.TAB_HOME),
             ("main", self.main_tab, S.TAB_MAIN),
             ("doctor", self.doctor_tab, S.TAB_DOCTOR),
             ("size", self.size_tab, S.TAB_SIZE),
@@ -1240,6 +1249,7 @@ class MainWindow(QMainWindow):
                     S.LOG_HISTORY_SAVE_FAIL.format(error=self.history.last_error)
                 )
             self._refresh_history_list()
+            self.refresh_home()
 
         diagnosed = []
         if snapshot and message != S.CONV_CANCELLED:
@@ -1349,6 +1359,7 @@ class MainWindow(QMainWindow):
         self._repaint_log()
         if hasattr(self, "templates_tab"):
             self.templates_tab.set_theme(theme)
+        self.refresh_home()
         self._append_log(S.LOG_THEME_CHANGED.format(theme=theme))
 
     def _on_theme_changed(self, index=None):
@@ -1514,6 +1525,7 @@ class MainWindow(QMainWindow):
         self.mode_btn.setText(self._mode_button_label())
         self._refresh_history_list()
         self._refresh_presets_list()
+        self.refresh_home()
         self._register_shortcuts()
 
     # ─── Version info / manifest temp files ─────────────────────────────
@@ -2655,6 +2667,7 @@ class MainWindow(QMainWindow):
         self.settings["recent_projects"] = [path] + recent[: RECENT_PROJECTS_MAX - 1]
         self.save_settings()
         self._refresh_recent_menu()
+        self.refresh_home()
 
     def _refresh_recent_menu(self):
         if not hasattr(self, "recent_menu"):
@@ -2668,6 +2681,61 @@ class MainWindow(QMainWindow):
         for path in recent:
             action = self.recent_menu.addAction(path)
             action.triggered.connect(lambda _c=False, p=path: self.open_project_path(p))
+
+    # ─── Home: the projects workspace (2.0) ─────────────────────────────
+
+    def refresh_home(self):
+        """Rebuild the project cards from the recent list and the history.
+
+        Cheap enough to call after every event that changes what they show:
+        a project opened or saved, a build or a release finished, a theme or
+        language switch (the cards are rebuilt with the new strings).
+        """
+        if not hasattr(self, "home_tab"):
+            return
+        summaries = summarize_projects(self.recent_projects(), self.history.records)
+        colors = PALETTES.get(self.current_theme) or PALETTES["dark"]
+        self.home_tab.show_projects(summaries, self.project_path, colors)
+
+    def _ensure_project_open(self, path: str) -> bool:
+        """Open ``path`` unless it is already the project in the form."""
+        if self.project_path and os.path.normcase(os.path.normpath(path)) == os.path.normcase(
+                os.path.normpath(self.project_path)):
+            return True
+        return self.open_project_path(path)
+
+    def build_project(self, path: str):
+        """From a card: open the project and run the Convert button's build."""
+        if self._build_in_progress():
+            QMessageBox.warning(self, S.MSG_WARNING, S.MSG_DIAG_BUSY)
+            return
+        if not self._ensure_project_open(path):
+            return
+        self._append_log(S.LOG_HOME_BUILD.format(path=path))
+        self.tabs.setCurrentWidget(self.main_tab)
+        self.start_conversion()
+
+    def release_project(self, path: str):
+        """From a card: open the project and start the Release tab's release
+        (the dry run, then the confirmation, exactly as from that tab)."""
+        if self._build_in_progress():
+            QMessageBox.warning(self, S.MSG_WARNING, S.MSG_DIAG_BUSY)
+            return
+        if not self._ensure_project_open(path):
+            return
+        self._append_log(S.LOG_HOME_RELEASE.format(path=path))
+        self.tabs.setCurrentWidget(self.release_tab)
+        self.start_release()
+
+    def forget_project(self, path: str):
+        """Drop ``path`` from the recent list (the file itself is not touched)."""
+        key = os.path.normcase(os.path.normpath(path))
+        self.settings["recent_projects"] = [
+            p for p in self.recent_projects() if os.path.normcase(os.path.normpath(p)) != key]
+        self.save_settings()
+        self._refresh_recent_menu()
+        self.refresh_home()
+        self._append_log(S.LOG_HOME_FORGOTTEN.format(path=path))
 
     def _project_snapshot(self) -> dict:
         return self._current_project().to_settings_dict()
@@ -2787,6 +2855,7 @@ class MainWindow(QMainWindow):
                 self.settings["recent_projects"] = [
                     p for p in self.recent_projects() if p != path]
                 self._refresh_recent_menu()
+                self.refresh_home()
             return False
         # A project file is shared content: someone else may have written it.
         if not self._confirm_untrusted_config(loaded.project.build):
@@ -3006,6 +3075,7 @@ class MainWindow(QMainWindow):
             return
 
         self._last_release_dir = context.out_dir if os.path.isdir(context.out_dir) else ""
+        self.refresh_home()
         version_step = results[0]
         if version_step.status == DONE and version_step.actions:
             # Show the bumped version everywhere; the pipeline saved the file.

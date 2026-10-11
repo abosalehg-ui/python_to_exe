@@ -479,7 +479,9 @@ def test_retranslate_switches_locale_without_restart(window):
     set_locale("ar")
     window.retranslate("en")
     assert current_locale() == "en"
-    assert window.tabs.tabText(0) == En.TAB_MAIN
+    # 2.0: the projects workspace is the first tab; Main follows it.
+    assert window.tabs.tabText(0) == En.TAB_HOME
+    assert window.tabs.tabText(window.tabs.indexOf(window.main_tab)) == En.TAB_MAIN
     assert window.layoutDirection() == Qt.LeftToRight
 
 
