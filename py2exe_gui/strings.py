@@ -1862,7 +1862,7 @@ class Ar:
     HOME_DELTA_DOWN_FMT = "−{size}"
     HOME_DELTA_SAME = "بلا تغيير"
     HOME_SPARKLINE_NAME_FMT = "مخطط الحجم عبر البناءات: {sizes}"
-    HOME_LAST_RELEASE_FMT = "🚀 آخر إصدار: {version} في {time} — {files} ملفاً في {path}"
+    HOME_LAST_RELEASE_FMT = "🚀 آخر إصدار: {version} في {time} — عدد الملفات {files} في {path}"
     HOME_RELEASE_NO_CHECKSUMS = "⚠️ بلا ملف SHA256SUMS"
     HOME_NO_RELEASE = "🚀 لا إصدار بعد."
     HOME_REPOSITORY_FMT = "GitHub: {repository}"
