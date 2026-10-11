@@ -94,8 +94,10 @@ def test_strip_marks_removes_everything_the_module_inserts():
     assert strip_marks(text) == "a — bc"
 
 
+@pytest.mark.gui
 def test_the_old_copies_are_gone():
     """Every former helper now resolves to the one in ``bidi``."""
+    pytest.importorskip("py2exe_gui.qt", reason="the tab modules need a Qt binding")
     from py2exe_gui import texts
     from py2exe_gui.ui import dialogs
     from py2exe_gui.ui.tabs import home_tab, release_tab, runtime_tab, size_tab
