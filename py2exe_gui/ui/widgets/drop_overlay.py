@@ -6,7 +6,7 @@ while a drag is over it, with a dashed border and one line saying where the
 file will go.
 """
 
-from py2exe_gui.qt import QLabel, Qt, QVBoxLayout, QWidget
+from py2exe_gui.qt import QEvent, QLabel, Qt, QVBoxLayout, QWidget
 
 
 class DropOverlay(QWidget):
@@ -43,6 +43,16 @@ class DropOverlay(QWidget):
         frame_layout.addWidget(self.hint_label)
         layout.addWidget(self.frame)
         self.hide()
+        # Follow the parent's size at all times: showing the overlay makes
+        # Qt 5 relayout the central widget by a pixel *before* the overlay
+        # counts as visible, so the geometry must track every resize.
+        if parent is not None:
+            parent.installEventFilter(self)
+
+    def eventFilter(self, watched, event):
+        if event.type() == QEvent.Type.Resize and watched is self.parentWidget():
+            self.setGeometry(watched.rect())
+        return super().eventFilter(watched, event)
 
     def set_texts(self, title: str, hint: str):
         self.text_label.setText(title)

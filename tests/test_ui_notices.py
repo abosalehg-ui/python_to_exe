@@ -127,6 +127,10 @@ def test_drag_shows_the_overlay_and_leaving_hides_it(window, tmp_path):
     window.dragEnterEvent(_drag_event(window, str(tmp_path / "x.py")))
     assert not window.drop_overlay.isHidden()
     assert window.drop_overlay.text_label.text() == S.DROP_TITLE
+    QApplication.instance().processEvents()  # Qt 5 settles the bars a frame later
+    assert window.drop_overlay.geometry() == window.centralWidget().rect()
+    window.resize(1000, 700)
+    QApplication.instance().processEvents()
     assert window.drop_overlay.geometry() == window.centralWidget().rect()
     window.dragLeaveEvent(QDragLeaveEvent())
     assert window.drop_overlay.isHidden()
