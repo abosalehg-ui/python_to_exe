@@ -576,3 +576,17 @@ def installer_output_path(config: "InstallerConfig", fallback_dir: str = "") -> 
     """Absolute path of the Setup.exe that ``generate_iss_script`` will produce."""
     out_dir = config.output_dir or fallback_dir
     return os.path.join(out_dir, default_output_basename(config) + ".exe")
+
+
+def write_iss_script(script: str, inst_cfg: "InstallerConfig", app_path: str,
+                     onefile: bool) -> str:
+    """Write ``script`` next to the build (or in ``inst_cfg.output_dir``); the path.
+
+    Raises ``OSError`` when the folder cannot be created or written.
+    """
+    target_dir = inst_cfg.output_dir or (app_path if not onefile else os.path.dirname(app_path))
+    iss_path = os.path.join(target_dir, f"{inst_cfg.app_name or 'setup'}.iss")
+    os.makedirs(target_dir, exist_ok=True)
+    with open(iss_path, "w", encoding="utf-8") as f:
+        f.write(script)
+    return iss_path

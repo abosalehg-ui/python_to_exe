@@ -438,3 +438,24 @@ def test_config_from_dict_tolerates_scalar_languages():
 
 def test_choice_tuples_are_non_empty():
     assert COMPRESSION_CHOICES and ARCH_CHOICES
+
+
+def test_write_iss_script_puts_the_file_next_to_a_onefile_build(tmp_path):
+    from py2exe_gui.core.installer import InstallerConfig, write_iss_script
+
+    exe = tmp_path / "dist" / "app.exe"
+    exe.parent.mkdir()
+    exe.write_bytes(b"")
+    cfg = InstallerConfig(app_name="Demo")
+    path = write_iss_script("[Setup]\n", cfg, str(exe), onefile=True)
+    assert path == str(tmp_path / "dist" / "Demo.iss")
+    assert open(path, encoding="utf-8").read() == "[Setup]\n"
+
+
+def test_write_iss_script_honours_output_dir_and_creates_it(tmp_path):
+    from py2exe_gui.core.installer import InstallerConfig, write_iss_script
+
+    cfg = InstallerConfig(app_name="", output_dir=str(tmp_path / "out" / "deep"))
+    path = write_iss_script("x", cfg, str(tmp_path / "app"), onefile=False)
+    assert path == str(tmp_path / "out" / "deep" / "setup.iss")
+    assert (tmp_path / "out" / "deep" / "setup.iss").read_text() == "x"
