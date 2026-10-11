@@ -135,3 +135,29 @@ def test_every_fix_kind_has_a_label(locale):
 
     for kind in FIX_KINDS:
         assert getattr(locale, f"FIX_LABEL_{kind.upper()}", ""), kind
+
+
+def test_apply_fixes_tokenizes_extra_args_once(monkeypatch):
+    from py2exe_gui.core import fixes as fixes_module
+    from py2exe_gui.core.config import BuildConfig
+
+    calls = []
+    real = fixes_module.split_extra_args
+
+    def counting(raw, platform=None):
+        calls.append(raw)
+        return real(raw, platform)
+
+    monkeypatch.setattr(fixes_module, "split_extra_args", counting)
+    config = BuildConfig(extra_args="--collect-data docx --noupx")
+    wanted = [fixes_module.flag_fix("--collect-data", "docx"),   # already there
+              fixes_module.flag_fix("--collect-all", "numpy"),
+              fixes_module.flag_fix("--collect-all", "numpy"),   # a duplicate
+              fixes_module.flag_fix("--collect-data", "pandas")]
+    new, applied = fixes_module.apply_fixes(config, wanted)
+    assert new.extra_args == "--collect-data docx --noupx --collect-all numpy --collect-data pandas"
+    assert [f.value for f in applied] == ["--collect-all numpy", "--collect-data pandas"]
+    # One split of the original args, plus one of each appended flag text —
+    # not one per fix checked.
+    assert calls == ["--collect-data docx --noupx", "--collect-all numpy",
+                     "--collect-data pandas"]

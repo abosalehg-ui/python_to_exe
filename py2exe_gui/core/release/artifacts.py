@@ -6,7 +6,6 @@ and sorted entries, so rebuilding it from the same build gives the same bytes
 and the same checksum.
 """
 
-import hashlib
 import os
 import re
 import shutil
@@ -15,6 +14,7 @@ from typing import Dict, List, Optional, Sequence
 
 from py2exe_gui.core.config import BuildConfig
 from py2exe_gui.core.diagnostics import build_name, build_root
+from py2exe_gui.core.fsutil import sha256_of as _sha256_of
 from py2exe_gui.core.smoke_test import locate_built_executable
 
 CHECKSUMS_NAME = "SHA256SUMS.txt"
@@ -99,12 +99,8 @@ def make_portable_zip(source: str, target: str) -> str:
     return target
 
 
-def sha256_of(path: str) -> str:
-    digest = hashlib.sha256()
-    with open(path, "rb") as f:
-        for chunk in iter(lambda: f.read(1024 * 1024), b""):
-            digest.update(chunk)
-    return digest.hexdigest()
+# One chunked SHA-256 for the whole code base; kept importable under this name.
+sha256_of = _sha256_of
 
 
 def render_checksums(paths: Sequence[str]) -> str:

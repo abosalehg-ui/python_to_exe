@@ -32,6 +32,12 @@ NEW_BINARY = b"\x7fELF-pretend-new-version" * 200
 
 
 @pytest.fixture(autouse=True)
+def private_state_dir(monkeypatch, tmp_path):
+    """The replay ratchet must never touch the developer's real state folder."""
+    monkeypatch.setattr(updates, "user_state_dir", lambda _app: str(tmp_path / "state"))
+
+
+@pytest.fixture(autouse=True)
 def no_proxy(monkeypatch):
     # The local server must be reached directly, whatever the environment says.
     for name in ("http_proxy", "https_proxy", "HTTP_PROXY", "HTTPS_PROXY", "all_proxy",
@@ -216,6 +222,92 @@ def test_manifest_fields_are_validated(overrides, code):
     with pytest.raises(UpdateError) as e:
         updates.parse_manifest(data, app_name="Tool")
     assert e.value.code == code
+
+
+def test_app_is_required_once_the_app_has_a_name():
+    data, _sig = signed(good_manifest())
+    with pytest.raises(UpdateError) as e:
+        updates.parse_manifest(data, app_name="Tool")
+    assert e.value.code == "wrong_app"
+    assert updates.parse_manifest(data)["version"] == "2.0.0"  # no name configured
+    data, _sig = signed(good_manifest(app="Tool"))
+    assert updates.parse_manifest(data, app_name="Tool")["issued"] == ""
+
+
+def test_issued_and_expires_are_validated():
+    import datetime
+
+    now = datetime.datetime(2026, 10, 11, 12, 0, 0, tzinfo=datetime.timezone.utc)
+    fields = updates.parse_manifest(signed(good_manifest(
+        issued="2026-10-11T11:00:00Z", expires="2026-10-11T13:00:00Z"))[0], now=now)
+    assert fields["issued"] == "2026-10-11T11:00:00Z"
+    assert fields["expires"] == "2026-10-11T13:00:00Z"
+    for overrides in ({"issued": "2026-10-11 11:00"}, {"issued": "2026-13-01T00:00:00Z"},
+                      {"issued": 5}, {"expires": "soon"},
+                      {"expires": "2026-10-11T12:00:00Z"}, {"expires": "2020-01-01T00:00:00Z"}):
+        with pytest.raises(UpdateError) as e:
+            updates.parse_manifest(signed(good_manifest(**overrides))[0], now=now)
+        assert e.value.code == "bad_manifest", overrides
+    # The default clock is the real one: a manifest from the far future is fine.
+    updates.parse_manifest(signed(good_manifest(expires="2999-01-01T00:00:00Z"))[0])
+
+
+def test_expired_manifest_is_refused_by_check():
+    with UpdateServer() as server:
+        cfg = runtime_config(offer(server, issued="2026-01-01T00:00:00Z",
+                                   expires="2026-01-02T00:00:00Z"))
+        with pytest.raises(UpdateError) as e:
+            updates.check(cfg)
+    assert e.value.code == "bad_manifest" and "expired" in e.value.detail
+
+
+def test_older_manifest_than_the_last_accepted_is_stale(tmp_path):
+    """Replay protection: once a manifest issued at T2 was accepted, a signed
+    manifest from T1 < T2 (a version with a known hole) is refused."""
+    with UpdateServer() as server:
+        cfg = runtime_config(offer(server, issued="2026-05-01T00:00:00Z"))
+        assert updates.check(cfg).issued == "2026-05-01T00:00:00Z"
+        assert updates.last_accepted_issued(cfg) == "2026-05-01T00:00:00Z"
+        assert os.path.isfile(os.path.join(str(tmp_path / "state"), "update_state.json"))
+        # The same manifest again (the user declined last time) is fine.
+        assert updates.check(cfg) is not None
+        # A newer one advances the ratchet.
+        cfg = runtime_config(offer(server, version="2.1.0", issued="2026-06-01T00:00:00Z"))
+        assert updates.check(cfg).version == "2.1.0"
+        assert updates.last_accepted_issued(cfg) == "2026-06-01T00:00:00Z"
+        # Older: refused, and the ratchet stays.
+        cfg = runtime_config(offer(server, version="2.2.0", issued="2026-05-15T00:00:00Z"))
+        with pytest.raises(UpdateError) as e:
+            updates.check(cfg)
+        assert e.value.code == "stale_manifest"
+        assert updates.last_accepted_issued(cfg) == "2026-06-01T00:00:00Z"
+        # A manifest without ``issued`` (an older converter) is accepted as
+        # before and leaves the ratchet alone.
+        cfg = runtime_config(offer(server, version="2.3.0"))
+        assert updates.check(cfg).version == "2.3.0"
+        assert updates.last_accepted_issued(cfg) == "2026-06-01T00:00:00Z"
+        # A manifest that is not newer still counts as accepted.
+        cfg = runtime_config(offer(server, version="0.1", issued="2026-07-01T00:00:00Z"))
+        assert updates.check(cfg) is None
+        assert updates.last_accepted_issued(cfg) == "2026-07-01T00:00:00Z"
+
+
+def test_state_dir_from_the_config_and_a_broken_state_file(tmp_path):
+    state = tmp_path / "custom"
+    with UpdateServer() as server:
+        cfg = runtime_config(offer(server, issued="2026-05-01T00:00:00Z"),
+                             state_dir=str(state))
+        updates.check(cfg)
+        assert (state / "update_state.json").read_text().startswith("{")
+        (state / "update_state.json").write_text("garbage")
+        assert updates.last_accepted_issued(cfg) == ""
+        updates.check(cfg)  # a broken file never locks updates out
+        assert updates.last_accepted_issued(cfg) == "2026-05-01T00:00:00Z"
+        # An unwritable location weakens the guard but never fails the check.
+        cfg = runtime_config(offer(server, issued="2026-05-02T00:00:00Z"),
+                             state_dir=str(tmp_path / "file-not-dir" / "x"))
+        (tmp_path / "file-not-dir").write_text("")
+        assert updates.check(cfg) is not None
 
 
 @pytest.mark.parametrize("data", [b"not json", b"[1, 2]", b"\xff\xfe"])

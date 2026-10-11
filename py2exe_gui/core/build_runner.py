@@ -15,8 +15,10 @@ from typing import Callable, Dict, List, Optional
 from py2exe_gui.core.build_stages import BuildStageTracker
 from py2exe_gui.core.diagnostics import build_name, build_root
 from py2exe_gui.core.engines import engine_for, get_engine
+from py2exe_gui.core.engines.base import describe_error
 from py2exe_gui.core.fixes import SEVERITY_ERROR, Finding
 from py2exe_gui.core.manifest_generator import generate_manifest
+from py2exe_gui.core.process_tree import group_kwargs, kill_tree, terminate_tree
 from py2exe_gui.core.runtime_kit import write_kit
 from py2exe_gui.core.version_info import generate_version_file
 
@@ -99,7 +101,8 @@ def prepare_build(project, python: str, texts: Optional[Dict[str, str]] = None,
     command, error = engine.build_command(config, python_executable=python,
                                           platform=platform, extra_options=native)
     if error:
-        prepared.error = error
+        # The engine hands back a code; ``PreparedBuild.error`` is shown as is.
+        prepared.error = describe_error(error)
         prepared.cleanup()
         return prepared
     options, kit_errors = write_kit(config, texts, rtl=rtl, platform=platform)
@@ -151,10 +154,12 @@ def stream_command(command: List[str], cwd: str, on_line: Callable[[str], None],
     """
     tracker = BuildStageTracker(get_engine(engine).stages)
     last = tracker.stage
+    # Its own process group: an interrupted build must also take down what
+    # the engine started (Nuitka's C compiler, PyInstaller's helper runs).
     process = (popen or subprocess.Popen)(
         command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True,
         encoding="utf-8", errors="replace", bufsize=1, cwd=cwd or None,
-        **popen_options(engine, env),
+        **popen_options(engine, env), **group_kwargs(),
     )
     try:
         for line in process.stdout:
@@ -166,9 +171,27 @@ def stream_command(command: List[str], cwd: str, on_line: Callable[[str], None],
                     on_stage(last, tracker.percent)
         return process.wait()
     except BaseException:
-        process.terminate()
-        process.wait()
+        stop_process(process)
         raise
+
+
+def stop_process(process, grace: float = 5.0) -> None:
+    """End ``process`` and its group, never waiting more than ``grace`` seconds.
+
+    A plain ``terminate(); wait()`` hung on an engine whose children ignored
+    the signal: the engine stayed in ``wait`` for a pipe its child still held.
+    """
+    terminate_tree(process)
+    try:
+        process.wait(timeout=grace)
+        return
+    except subprocess.TimeoutExpired:
+        pass
+    kill_tree(process)
+    try:
+        process.wait(timeout=grace)
+    except subprocess.TimeoutExpired:
+        pass
 
 
 def run_build(prepared: PreparedBuild, on_line: Callable[[str], None],

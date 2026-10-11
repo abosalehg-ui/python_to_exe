@@ -73,3 +73,40 @@ def test_a_shared_config_cannot_name_an_interpreter():
     """The environment is a flag; its path is derived locally, never loaded."""
     data = BuildConfig(isolated_env=True).to_dict()
     assert not any("python" in key for key in data)
+
+
+# ── Type-strict loading (hand-edited settings files) ──────────────────────
+
+
+def test_from_dict_coerces_a_digit_string_for_an_int():
+    assert BuildConfig.from_dict({"optimize": "2"}).optimize == 2
+
+
+def test_from_dict_never_turns_a_string_into_a_list():
+    # ``list("data")`` gave ['d', 'a', 't', 'a'] and a build that bundled
+    # four one-letter files.
+    config = BuildConfig.from_dict({"extra_files": "data", "hidden_imports": "x"})
+    assert config.extra_files == [] and config.hidden_imports == []
+
+
+def test_from_dict_keeps_the_default_for_a_string_pretending_to_be_a_bool():
+    warnings = []
+    config = BuildConfig.from_dict({"onefile": "yes", "windowed": 1}, warnings)
+    assert config.onefile is True and config.windowed is False
+    assert any("onefile" in w for w in warnings) and any("windowed" in w for w in warnings)
+
+
+def test_from_dict_reports_unknown_keys_and_survives_non_dict_input():
+    warnings = []
+    BuildConfig.from_dict({"nope": 1}, warnings)
+    assert warnings == ["build.nope: unknown setting, ignored"]
+    assert BuildConfig.from_dict(None) == BuildConfig()
+    assert BuildConfig.from_dict(["source"]) == BuildConfig()
+
+
+def test_from_dict_still_handles_engine_and_runtime_kit():
+    config = BuildConfig.from_dict({
+        "engine": "unknown", "runtime_kit": {"crash_reporter": True, "app_version": 3},
+    })
+    assert config.engine == "pyinstaller"
+    assert config.runtime_kit.crash_reporter is True and config.runtime_kit.app_version == ""

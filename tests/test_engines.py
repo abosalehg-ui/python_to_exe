@@ -155,7 +155,11 @@ def test_the_shim_always_builds_pyinstaller(source_file, monkeypatch):
 
 
 def test_the_error_path_is_unchanged():
-    assert get_engine().build_command(BuildConfig()) == build_pyinstaller_command(BuildConfig())
+    # The engine returns a code; the shim keeps its old contract of a sentence.
+    from py2exe_gui.core.engines.base import describe_error
+
+    cmd, code = get_engine().build_command(BuildConfig())
+    assert (cmd, describe_error(code)) == build_pyinstaller_command(BuildConfig())
     assert build_pyinstaller_command(BuildConfig())[0] is None
 
 
@@ -325,3 +329,35 @@ def test_a_wrongly_typed_engine_is_reported_and_ignored(tmp_path):
     project, warnings = loads_project("schema = 2\n[build]\nengine = 1\n", str(tmp_path))
     assert project.build.engine == "pyinstaller"
     assert any("build.engine" in w for w in warnings)
+
+
+# ── build_command error codes ─────────────────────────────────────────────
+
+
+def test_build_command_returns_a_code_not_a_sentence(tmp_path):
+    from py2exe_gui.core.engines import base
+
+    for name in engine_names():
+        cmd, error = get_engine(name).build_command(BuildConfig(source=str(tmp_path / "no.py")))
+        assert cmd is None and error == base.ERROR_SOURCE_MISSING
+    assert base.ERROR_SOURCE_MISSING in base.ERROR_CODES
+
+
+def test_describe_error_translates_the_code_and_passes_text_through():
+    from py2exe_gui.core.engines.base import ERROR_SOURCE_MISSING, describe_error
+    from py2exe_gui.strings import S
+
+    assert describe_error(ERROR_SOURCE_MISSING) == S.ERR_NO_SOURCE
+    assert describe_error("already a sentence") == "already a sentence"
+    assert describe_error(None) == "" and describe_error("") == ""
+
+
+def test_callers_show_text_not_the_code(tmp_path):
+    from py2exe_gui.strings import S
+
+    _cmd, error = build_pyinstaller_command(BuildConfig(source=""))
+    assert error == S.ERR_NO_SOURCE
+    from py2exe_gui.core.project_file import ProjectConfig
+
+    prepared = prepare_build(ProjectConfig(), sys.executable)
+    assert prepared.error == S.ERR_NO_SOURCE

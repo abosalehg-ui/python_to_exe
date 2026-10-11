@@ -173,8 +173,19 @@ def _q(text: str) -> str:
 
 
 def _sh(text: str) -> str:
-    """A path for a POSIX ``run:`` line (and pwsh, which also takes double quotes)."""
-    return '"' + text.replace('"', '\\"') + '"'
+    """A POSIX single-quoted word for a ``run:`` line.
+
+    Single quotes are the only quoting the shell never looks inside: a
+    double-quoted word would still expand ``$VAR``, ``$(...)`` and
+    backticks, so a project name (which comes from a shared file) could run
+    a command on the runner. A literal ``'`` is written as ``'\\''``.
+    """
+    return "'" + text.replace("'", "'\\''") + "'"
+
+
+def _ps(text: str) -> str:
+    """A PowerShell single-quoted literal (no interpolation; ``'`` is doubled)."""
+    return "'" + text.replace("'", "''") + "'"
 
 
 def _artifact_stem(name: str) -> str:
@@ -281,7 +292,7 @@ def _build_job(opts: CiOptions) -> List[str]:
         add("        env:")
         add("          CERT_BASE64: ${{ secrets.WINDOWS_CERT_BASE64 }}")
         add("        run: |")
-        add(f"          $target = {_sh(opts.cert_path_rel)}")
+        add(f"          $target = {_ps(opts.cert_path_rel)}")
         add("          New-Item -ItemType Directory -Force -Path (Split-Path -Parent $target) | Out-Null")
         add("          [IO.File]::WriteAllBytes($target, [Convert]::FromBase64String($env:CERT_BASE64))")
     if opts.notarize_macos:
@@ -355,13 +366,17 @@ def _release_job(opts: CiOptions) -> List[str]:
     add("      - name: Merge the checksum files and create the release")
     add("        env:")
     add("          GH_TOKEN: ${{ github.token }}")
+    # The app name reaches the shell through the environment, never inline:
+    # a quoted YAML scalar cannot run anything, and "$APP_TITLE" expands to
+    # the bytes as written.
+    add(f"          APP_TITLE: {_q(opts.app_name)}")
     add("        run: |")
     add("          set -eu")
     add("          cat artifacts/*/*/SHA256SUMS.txt | sort -k2 > SHA256SUMS.txt")
     add("          notes=$(find artifacts -mindepth 3 -maxdepth 3 -name RELEASE_NOTES.md | head -n 1)")
     add("          files=$(find artifacts -mindepth 3 -maxdepth 3 -type f \\")
     add("            ! -name SHA256SUMS.txt ! -name RELEASE_NOTES.md ! -name '*.iss' | sort)")
-    flags = ["--verify-tag", '--title "' + opts.app_name + ' $GITHUB_REF_NAME"']
+    flags = ["--verify-tag", '--title "$APP_TITLE $GITHUB_REF_NAME"']
     if opts.draft:
         flags.append("--draft")
     if opts.prerelease:

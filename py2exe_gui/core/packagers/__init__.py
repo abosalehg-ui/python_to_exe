@@ -6,8 +6,7 @@ entry points; the release pipeline, the command line and the GUI share them.
 
 import os
 import subprocess
-import sys
-from typing import Callable, Dict, List, Optional, Sequence
+from typing import Callable, Dict, List, Optional, Sequence, Union
 
 from py2exe_gui.core.diagnostics import build_name
 from py2exe_gui.core.packagers.appimage import (
@@ -27,7 +26,7 @@ from py2exe_gui.core.packagers.base import (
 )
 from py2exe_gui.core.packagers.deb import DebPackager
 from py2exe_gui.core.packagers.dmg import DmgPackager
-from py2exe_gui.core.platform_support import PACKAGE_FORMATS, is_supported
+from py2exe_gui.core.platform_support import PACKAGE_FORMATS, is_supported, resolve
 
 #: format name → packager, in the order the UI lists them.
 _PACKAGERS: Dict[str, Packager] = {
@@ -35,8 +34,12 @@ _PACKAGERS: Dict[str, Packager] = {
 }
 assert tuple(_PACKAGERS) == PACKAGE_FORMATS
 
-#: A consent callback: ``(url, target_path) -> True`` to download.
-Consent = Callable[[str, str], bool]
+#: A consent callback: ``(url, target_path) -> True`` to download a file
+#: whose SHA-256 matches the recorded one, or the string ``"unverified"`` to
+#: also accept a file whose digest differs (a newer upstream build the user
+#: chose to trust); anything else refuses.
+Consent = Callable[[str, str], Union[bool, str]]
+UNVERIFIED = "unverified"
 
 
 class UnknownFormatError(KeyError):
@@ -112,10 +115,12 @@ def run_packaging(
     """Build every format in ``formats`` that this host can; one result each.
 
     ``appimagetool`` (and the runtime file it embeds) is fetched only when it
-    is missing **and** ``download_consent(url, tools_dir)`` returns True;
-    without a callback the AppImage is reported as blocked, never downloaded.
+    is missing **and** ``download_consent(url, tools_dir)`` returns True (or
+    ``"unverified"``, which also accepts a download whose SHA-256 differs
+    from the recorded one); without a callback the AppImage is reported as
+    blocked, never downloaded.
     """
-    plat = platform if platform is not None else sys.platform
+    plat = resolve(platform)
     results = []
     for name in formats:
         packager = get_packager(name)
@@ -124,10 +129,12 @@ def run_packaging(
         if (blocking and isinstance(packager, AppImagePackager)
                 and all(f.code == "appimagetool_missing" for f in blocking)):
             url = appimagetool_url(spec.machine())
-            if download_consent is not None and download_consent(url, packager.tools_dir):
+            consent = download_consent(url, packager.tools_dir) if download_consent else False
+            if consent is True or consent == UNVERIFIED:
                 try:
                     path, digest, matches = downloader(packager.tools_dir, log, spec.machine(),
-                                                       env=env)
+                                                       env=env,
+                                                       allow_unverified=consent == UNVERIFIED)
                 except (OSError, ValueError) as e:
                     results.append(PackageResult(name, False, error_code="appimagetool_download_failed",
                                                  error=str(e), findings=findings))

@@ -130,3 +130,13 @@ def test_defaults_read_the_running_platform():
     assert isinstance(is_windows(), bool)
     assert isinstance(unsupported_features(), list)
     assert platform_label()
+
+
+def test_resolve_returns_the_argument_or_the_running_platform():
+    import sys
+
+    from py2exe_gui.core.platform_support import resolve
+
+    assert resolve("win32") == "win32"
+    assert resolve(None) == sys.platform
+    assert resolve() == sys.platform

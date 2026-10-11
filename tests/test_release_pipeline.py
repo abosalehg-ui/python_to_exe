@@ -334,6 +334,42 @@ def test_publish_errors_are_reported(repo):
     assert publish.reason == "publish_failed" and TOKEN not in publish.params["error"]
 
 
+@pytest.mark.parametrize("prefix", ["-v", "v 1", 'v"', "v;rm", "v$(x)", "release-\n"])
+def test_invalid_tag_prefix_fails_the_plan(repo, prefix):
+    ctx = context(repo, publish=False, dry_run=True)
+    ctx.project.release.tag_prefix = prefix
+    results = plan_release(ctx)
+    version = next(r for r in results if r.key == "version")
+    assert version.status == FAILED and version.reason == "tag_prefix_invalid"
+    assert version.params["prefix"] == prefix and has_blocking_problems(results)
+
+
+@pytest.mark.parametrize("prefix", ["v", "release-", "app/v", "V1.", ""])
+def test_valid_tag_prefixes(repo, prefix):
+    ctx = context(repo, publish=False, dry_run=True)
+    ctx.project.release.tag_prefix = prefix
+    results = plan_release(ctx)
+    assert next(r for r in results if r.key == "version").status == PLANNED
+
+
+def test_tag_step_errors_hide_secrets_and_url_credentials(repo):
+    """git prints the remote URL in its errors; the token in it and the
+    signing password must never reach the step result or the log."""
+    def runner(cmd, **kwargs):
+        if cmd[:2] == ["git", "push"]:
+            return subprocess.CompletedProcess(
+                cmd, 128, "",
+                f"fatal: unable to access 'https://me:ghp_TOKEN99@github.com/me/app/' {PASSWORD}")
+        return subprocess.run(cmd, **kwargs)
+
+    ctx = context(repo, publish=False, push_tag=True, sign_password=PASSWORD)
+    ctx.runner = runner
+    tag = {r.key: r for r in run_release(ctx)}["tag"]
+    assert tag.status == FAILED and tag.reason == "tag_failed"
+    assert "ghp_TOKEN99" not in tag.params["error"] and PASSWORD not in tag.params["error"]
+    assert "https://***@github.com/me/app/" in tag.params["error"]
+
+
 def test_tag_conflict(repo):
     git(repo, "tag", "-a", "v1.1.0", "-m", "elsewhere", "HEAD~1")
     results = run_release(context(repo, publish=False))
@@ -539,6 +575,16 @@ def test_missing_inno_setup(repo, monkeypatch):
     monkeypatch.setattr(pipeline, "find_iscc", lambda: None)
     ctx = windows_context(repo, Recorder(), [], iscc_path="")
     assert {r.key: r.reason for r in run_release(ctx)}["installer"] == "iscc_missing"
+
+
+def test_installer_fields_with_a_double_quote_are_a_validation_error(repo):
+    """Inno Setup cannot escape a " inside a string: the step fails with the
+    validator's message instead of a traceback from escape_iss."""
+    ctx = windows_context(repo, Recorder(), [], sign_password="")
+    ctx.project.installer.publisher = 'Me "Inc"'
+    installer = {r.key: r for r in run_release(ctx)}["installer"]
+    assert installer.status == FAILED and installer.reason == "installer_failed"
+    assert "publisher" in installer.params["error"]
 
 
 def test_signing_without_a_certificate(repo):

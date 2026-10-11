@@ -33,11 +33,18 @@ from py2exe_gui.core.installer import (
     generate_iss_script,
     installer_output_path,
 )
+from py2exe_gui.core.installer import validate as validate_installer
 from py2exe_gui.core.release import artifacts, git, winget
 from py2exe_gui.core.release.changelog import draft_notes
 from py2exe_gui.core.release.credentials import Token, find_token, redact
 from py2exe_gui.core.release.github import API_URL, GitHubClient, GitHubError, publish_release
-from py2exe_gui.core.release.versioning import apply_version, normalize, parse_semver, tag_for
+from py2exe_gui.core.release.versioning import (
+    apply_version,
+    is_valid_tag_prefix,
+    normalize,
+    parse_semver,
+    tag_for,
+)
 from py2exe_gui.core.runtime_kit import preview_options
 
 STEPS = (
@@ -203,6 +210,10 @@ def step_version(ctx: ReleaseContext) -> StepResult:
         parse_semver(ctx.version)
     except ValueError:
         return _result("version", FAILED, "version_invalid", version=ctx.version)
+    prefix = ctx.project.release.tag_prefix or "v"
+    if not is_valid_tag_prefix(prefix):
+        # The tag name is built from it and handed to git and to release URLs.
+        return _result("version", FAILED, "tag_prefix_invalid", prefix=prefix)
     if ctx.project.build.runtime_kit.updater:
         from p2e_runtime.updates import parse_version
 
@@ -324,6 +335,11 @@ def step_installer(ctx: ReleaseContext) -> StepResult:
     if not iscc:
         return _result("installer", FAILED, "iscc_missing")
     inst = ctx.installer_config()
+    # A field holding a double quote cannot be written into an .iss file at
+    # all (escape_iss raises): report it as a validation message, not a crash.
+    problem = validate_installer(inst, ctx.files.get("built") or "(built later)")
+    if problem:
+        return _result("installer", FAILED, "installer_failed", error=problem)
     target = installer_output_path(inst)
     iss_path = os.path.join(ctx.out_dir, f"{artifacts.safe_name(inst.app_name)}.iss")
     sign_command = None
@@ -531,6 +547,11 @@ def step_update_manifest(ctx: ReleaseContext, results: Dict[str, StepResult]) ->
     return _result("update_manifest", DONE, "update_ok", actions, url=url)
 
 
+def _git_error(ctx: ReleaseContext, error: Exception) -> str:
+    """A git message fit to show: no token, no password, no URL credential."""
+    return redact(git.scrub_remote_credentials(str(error)), ctx.secrets)
+
+
 def step_tag(ctx: ReleaseContext) -> StepResult:
     if not ctx.options.create_tag:
         return _result("tag", SKIPPED, "tag_off")
@@ -549,7 +570,7 @@ def step_tag(ctx: ReleaseContext) -> StepResult:
             commit_project = git.is_tracked(cwd, rel, ctx.runner) and (
                 will_change or rel in git.changed_files(cwd, ctx.runner))
     except git.GitError as e:
-        return _result("tag", FAILED, "tag_failed", error=str(e))
+        return _result("tag", FAILED, "tag_failed", error=_git_error(ctx, e))
 
     if existing and not commit_project:
         if existing == head:
@@ -575,7 +596,7 @@ def step_tag(ctx: ReleaseContext) -> StepResult:
         if ctx.options.push_tag:
             git.push_tag(cwd, ctx.tag, runner=ctx.runner)
     except git.GitError as e:
-        return _result("tag", FAILED, "tag_failed", error=str(e))
+        return _result("tag", FAILED, "tag_failed", error=_git_error(ctx, e))
     ctx.target_commitish = commit
     return _result("tag", DONE, "tag_ok", actions, tag=ctx.tag, commit=commit[:10])
 

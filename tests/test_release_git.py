@@ -184,6 +184,48 @@ def test_remote_slug(repo):
     assert git.remote_slug(str(repo)) == "me/app"
 
 
+@pytest.mark.parametrize("text,expected", [
+    ("fatal: unable to access 'https://me:ghp_abc123@github.com/me/app.git/'",
+     "fatal: unable to access 'https://***@github.com/me/app.git/'"),
+    ("https://ghp_tok@github.com/x and ssh://git@host/x", "https://***@github.com/x and ssh://***@host/x"),
+    ("no credentials: https://github.com/me/app.git", "no credentials: https://github.com/me/app.git"),
+    ("", ""),
+])
+def test_scrub_remote_credentials(text, expected):
+    assert git.scrub_remote_credentials(text) == expected
+
+
+def test_git_errors_never_carry_url_credentials(tmp_path):
+    def runner(cmd, **kwargs):
+        return subprocess.CompletedProcess(
+            cmd, 128, "", "fatal: could not read from 'https://x:ghp_SECRET@github.com/a/b'")
+
+    with pytest.raises(GitError) as e:
+        git.push_tag(str(tmp_path), "v1.0.0", runner=runner)
+    assert "ghp_SECRET" not in str(e.value) and "https://***@github.com/a/b" in str(e.value)
+
+    def broken(cmd, **kwargs):
+        raise subprocess.TimeoutExpired(["git", "push", "https://u:pw@h/r"], 1)
+
+    with pytest.raises(GitError) as e:
+        git.run_git(["push"], str(tmp_path), broken)
+    assert "u:pw@" not in str(e.value) and "***@h/r" in str(e.value)
+
+
+def test_tag_names_come_after_end_of_options(tmp_path):
+    """A tag name that looks like an option can never be read as one."""
+    calls = []
+
+    def runner(cmd, **kwargs):
+        calls.append(cmd)
+        return subprocess.CompletedProcess(cmd, 0, "abc\n", "")
+
+    git.create_tag(str(tmp_path), "-v1", "msg", runner)
+    tag, verify = calls
+    assert tag == ["git", "tag", "-a", "-m", "msg", "--end-of-options", "-v1"]
+    assert verify[-2:] == ["--end-of-options", "refs/tags/-v1^{commit}"]
+
+
 def test_git_missing_is_a_git_error(tmp_path):
     def runner(*_a, **_k):
         raise FileNotFoundError("git")

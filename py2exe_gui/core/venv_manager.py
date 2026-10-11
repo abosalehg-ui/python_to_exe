@@ -17,11 +17,12 @@ import os
 import re
 import shutil
 import subprocess
-import sys
 from dataclasses import dataclass, field
-from typing import Callable, Dict, Iterable, List, Optional, Sequence
+from typing import Callable, Dict, Iterable, List, Optional, Sequence, Tuple
 
+from py2exe_gui.core.fsutil import folder_size
 from py2exe_gui.core.knowledge import pip_name_for
+from py2exe_gui.core.platform_support import resolve as resolve_platform
 from py2exe_gui.core.project_scan import third_party_imports
 
 LOCK_FILE_NAME = "p2e-build.lock"
@@ -50,8 +51,7 @@ def env_dir_for(source: str, root: str) -> str:
 
 def env_python(env_dir: str, platform: Optional[str] = None) -> str:
     """The interpreter inside a virtual environment."""
-    plat = platform if platform is not None else sys.platform
-    if plat == "win32":
+    if resolve_platform(platform) == "win32":
         return os.path.join(env_dir, "Scripts", "python.exe")
     return os.path.join(env_dir, "bin", "python")
 
@@ -241,15 +241,37 @@ def read_pyvenv_version(env_dir: str) -> str:
     return values.get("version_info") or values.get("version") or ""
 
 
-def folder_size(path: str) -> int:
-    total = 0
-    for root, _dirs, files in os.walk(path):
-        for name in files:
-            try:
-                total += os.path.getsize(os.path.join(root, name))
-            except OSError:
-                pass
-    return total
+#: ``env_dir -> ((pyvenv.cfg mtime, env_dir mtime), size)``. Walking a
+#: 300 MB environment takes a noticeable moment, and the status is asked for
+#: on every tab switch; the two mtimes change whenever ``venv`` recreates the
+#: environment or pip adds a top-level entry, which is when the size moves.
+_SIZE_CACHE: Dict[str, Tuple[Tuple[float, float], int]] = {}
+
+
+def clear_size_cache() -> None:
+    """Forget cached environment sizes (tests, and after a delete)."""
+    _SIZE_CACHE.clear()
+
+
+def _size_key(env_dir: str) -> Optional[Tuple[float, float]]:
+    try:
+        return (os.path.getmtime(os.path.join(env_dir, "pyvenv.cfg")),
+                os.path.getmtime(env_dir))
+    except OSError:
+        return None
+
+
+def env_size(env_dir: str) -> int:
+    """``folder_size`` of an environment, served from the cache while its
+    ``pyvenv.cfg`` and top-level folder keep their modification times."""
+    key = _size_key(env_dir)
+    cached = _SIZE_CACHE.get(env_dir)
+    if key is not None and cached is not None and cached[0] == key:
+        return cached[1]
+    size = folder_size(env_dir)
+    if key is not None:
+        _SIZE_CACHE[env_dir] = (key, size)
+    return size
 
 
 def env_status(env_dir: str, platform: Optional[str] = None, with_size: bool = True) -> EnvStatus:
@@ -267,7 +289,7 @@ def env_status(env_dir: str, platform: Optional[str] = None, with_size: bool = T
         True,
         env_dir,
         python_version=read_pyvenv_version(env_dir),
-        size_bytes=folder_size(env_dir) if with_size else 0,
+        size_bytes=env_size(env_dir) if with_size else 0,
         metadata=metadata,
     )
 
@@ -294,6 +316,7 @@ def delete_env(env_dir: str, root: str) -> bool:
     if not os.path.isfile(os.path.join(env_dir, "pyvenv.cfg")):
         return False
     shutil.rmtree(env_dir, ignore_errors=True)
+    _SIZE_CACHE.pop(env_dir, None)
     return not os.path.exists(env_dir)
 
 

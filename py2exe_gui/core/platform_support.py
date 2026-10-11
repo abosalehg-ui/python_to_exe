@@ -48,8 +48,17 @@ MACOS_ONLY = (DMG,)
 WINDOWS, LINUX, MACOS = "windows", "linux", "macos"
 
 
-def _platform(platform: Optional[str] = None) -> str:
+def resolve(platform: Optional[str] = None) -> str:
+    """``platform`` when given, else the running interpreter's ``sys.platform``.
+
+    Every function that takes an optional ``platform`` (so tests and the CI
+    generator can ask about another OS) resolves it this way; one spelling of
+    the fallback keeps them from drifting apart.
+    """
     return platform if platform is not None else sys.platform
+
+
+_platform = resolve
 
 
 def is_windows(platform: Optional[str] = None) -> bool:

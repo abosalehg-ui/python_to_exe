@@ -174,3 +174,71 @@ def test_smoke_test_runs_the_exe_without_runtime_kit_dialogs(tmp_path):
     exe.chmod(0o755)
     result = run_smoke_test(str(exe), timeout=10)
     assert "dialogs=1" in result.output
+
+
+# ─── Capped output ───────────────────────────────────────────────────────
+
+
+class _Firehose:
+    """A text pipe that hands out ``total`` characters, never all at once."""
+
+    def __init__(self, total, tail="THE END"):
+        self.left = total - len(tail)
+        self.tail = tail
+        self.handed = 0
+
+    def read(self, n=-1):
+        assert n > 0, "an unbounded read() would buffer the whole stream"
+        if self.left > 0:
+            piece = "x" * min(n, self.left)
+            self.left -= len(piece)
+        elif self.tail:
+            piece, self.tail = self.tail, ""
+        else:
+            return ""
+        self.handed += len(piece)
+        return piece
+
+
+class _FakeProcess:
+    def __init__(self, stdout, stderr, returncode=0):
+        self.stdout, self.stderr, self.returncode = stdout, stderr, returncode
+        self.pid = None
+
+    def wait(self, timeout=None):
+        return self.returncode
+
+    def poll(self):
+        return self.returncode
+
+    def kill(self):
+        pass
+
+
+def test_run_smoke_test_keeps_only_the_tail_of_a_chatty_program(tmp_path):
+    from py2exe_gui.core.smoke_test import MAX_OUTPUT_CHARS
+
+    exe = tmp_path / "chatty"
+    exe.write_text("")
+    total = MAX_OUTPUT_CHARS * 50
+    out, err = _Firehose(total), _Firehose(1000, tail="Traceback: boom")
+    process = _FakeProcess(out, err, returncode=1)
+    result = run_smoke_test(str(exe), timeout=1.0, popen=lambda *a, **k: process)
+    assert out.handed == total and err.handed == 1000  # drained, so it never blocks
+    assert len(result.output) <= MAX_OUTPUT_CHARS
+    assert result.output.endswith("Traceback: boom") and "THE END" in result.output
+    assert result.returncode == 1 and len(result.error) <= 500  # the short summary
+
+
+def test_read_tail_bounds_memory():
+    import tracemalloc
+
+    from py2exe_gui.core.process_tree import read_tail
+
+    total = 8_000_000
+    tracemalloc.start()
+    kept = read_tail(_Firehose(total), 2000, chunk=4096)
+    _current, peak = tracemalloc.get_traced_memory()
+    tracemalloc.stop()
+    assert len(kept) == 2000 and kept.endswith("THE END")
+    assert peak < total // 4

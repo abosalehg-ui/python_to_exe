@@ -59,6 +59,9 @@ class UpdaterConfig:
     #: Test-only: accept plain ``http://`` to localhost. The converter never
     #: sets this from its UI or from a settings file.
     allow_insecure_localhost: bool = False
+    #: Where the ``issued`` stamp of the last accepted manifest is kept, so a
+    #: replayed older manifest is refused. '' = the per-user state folder.
+    state_dir: str = ""
 
 
 @dataclass(frozen=True)
@@ -175,6 +178,7 @@ def parse_config(data: Any) -> RuntimeConfig:
             prompt_title=_str(section, "prompt_title"),
             prompt_message=_str(section, "prompt_message"),
             allow_insecure_localhost=section.get("allow_insecure_localhost") is True,
+            state_dir=_str(section, "state_dir"),
         )
 
     licensing = None

@@ -73,6 +73,26 @@ def test_escape_iss_strips_newlines():
     assert escape_iss("line1\nline2") == "line1 line2"
 
 
+def test_escape_iss_refuses_a_double_quote():
+    # Inno Setup has no in-string escape for ", so the value cannot be emitted.
+    with pytest.raises(ValueError, match="double quote"):
+        escape_iss('a"b')
+
+
+def test_validate_reports_a_double_quote_instead_of_a_traceback(base_config, exe_path):
+    base_config.app_name = 'My "App"'
+    base_config.readme_file = 'C:\\docs\\read"me.txt'
+    message = validate(base_config, exe_path)
+    assert message is not None and "app_name" in message and "readme_file" in message
+    base_config.app_name = "My App"
+    base_config.readme_file = ""
+    base_config.output_base_filename = 'setup"'
+    assert "output_base_filename" in (validate(base_config, exe_path) or "")
+    base_config.output_base_filename = ""
+    assert validate(base_config, exe_path) is None
+    assert "app_path" in (validate(base_config, exe_path + '"') or "")
+
+
 def test_escape_iss_handles_empty():
     assert escape_iss("") == ""
 

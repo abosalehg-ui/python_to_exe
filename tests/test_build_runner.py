@@ -1,7 +1,10 @@
 """The headless build runner shared by the CLI and the release pipeline."""
 
 import os
+import subprocess
 import sys
+
+import pytest
 
 from py2exe_gui.core.build_runner import (
     PreparedBuild,
@@ -9,6 +12,7 @@ from py2exe_gui.core.build_runner import (
     run_build,
     stream_command,
 )
+from py2exe_gui.core.process_tree import group_kwargs
 from py2exe_gui.core.project_file import ProjectConfig
 
 
@@ -91,25 +95,67 @@ def test_run_build_success_failure_and_missing_tool(tmp_path):
     assert not outcome.ok and outcome.error
 
 
-def test_stream_command_terminates_on_interrupt(tmp_path):
-    class Process:
-        terminated = False
+class FakeProcess:
+    """A stand-in engine process: records how it is stopped.
 
-        def __init__(self):
-            self.stdout = iter(["one\n", "two\n"])
+    ``wait()`` without a timeout would block forever (``hangs``): the old
+    ``terminate(); wait()`` did exactly that on an engine whose child kept
+    the pipe open. No ``pid`` on purpose: ``kill_tree`` must never signal a
+    group it cannot prove is the engine's own.
+    """
 
-        def terminate(self):
-            Process.terminated = True
+    def __init__(self, hangs=False):
+        self.stdout = iter(["one\n", "two\n"])
+        self.calls = []
+        self.hangs = hangs
+        self.returncode = None
 
-        def wait(self):
-            return -15
+    def terminate(self):
+        self.calls.append("terminate")
 
-    def on_line(line):
-        if line == "two":
-            raise KeyboardInterrupt
+    def kill(self):
+        self.calls.append("kill")
+        self.returncode = -9
 
-    try:
-        stream_command(["x"], "", on_line, popen=lambda *a, **k: Process())
-    except KeyboardInterrupt:
-        pass
-    assert Process.terminated
+    def poll(self):
+        return self.returncode
+
+    def wait(self, timeout=None):
+        self.calls.append(("wait", timeout))
+        if self.hangs and self.returncode is None:
+            if timeout is None:
+                raise AssertionError("wait() without a timeout would block forever")
+            raise subprocess.TimeoutExpired("x", timeout)
+        self.returncode = -15 if self.returncode is None else self.returncode
+        return self.returncode
+
+
+def _interrupt_on_second_line(line):
+    if line == "two":
+        raise KeyboardInterrupt
+
+
+def test_stream_command_terminates_on_interrupt_and_waits_with_a_timeout():
+    process = FakeProcess()
+    with pytest.raises(KeyboardInterrupt):
+        stream_command(["x"], "", _interrupt_on_second_line, popen=lambda *a, **k: process)
+    assert process.calls == ["terminate", ("wait", 5.0)]
+
+
+def test_stream_command_kills_an_engine_that_ignores_terminate():
+    process = FakeProcess(hangs=True)
+    with pytest.raises(KeyboardInterrupt):
+        stream_command(["x"], "", _interrupt_on_second_line, popen=lambda *a, **k: process)
+    # Polite first, then the whole tree; neither wait is unbounded.
+    assert process.calls == ["terminate", ("wait", 5.0), "kill", ("wait", 5.0)]
+
+
+def test_stream_command_starts_the_engine_in_its_own_group():
+    seen = {}
+
+    def popen(*args, **kwargs):
+        seen.update(kwargs)
+        return FakeProcess()
+
+    stream_command(["x"], "", lambda _l: None, popen=popen)
+    assert all(seen.get(k) == v for k, v in group_kwargs().items())

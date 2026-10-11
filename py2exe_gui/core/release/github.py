@@ -104,8 +104,9 @@ class GitHubClient:
             return
         raise GitHubError(f"refusing a non-HTTPS URL: {url}")
 
-    def _request(self, method: str, url: str, payload=None, data: Optional[bytes] = None,
-                 content_type: str = "", expect=(200, 201, 204)):
+    def _request(self, method: str, url: str, payload=None, data=None,
+                 content_type: str = "", expect=(200, 201, 204),
+                 content_length: Optional[int] = None):
         self._check_url(url)
         host = (urllib.parse.urlsplit(url).hostname or "").lower()
         if host not in self._token_hosts:
@@ -121,6 +122,9 @@ class GitHubClient:
             content_type = "application/json"
         if content_type:
             headers["Content-Type"] = content_type
+        if content_length is not None:
+            # A file-like body: urllib refuses to guess its length.
+            headers["Content-Length"] = str(content_length)
         request = urllib.request.Request(url, data=data, method=method, headers=headers)
         try:
             with self._opener.open(request, timeout=self.timeout) as response:
@@ -194,9 +198,12 @@ class GitHubClient:
             raise GitHubError("the release has no upload URL")
         url = f"{upload}?{urllib.parse.urlencode({'name': name})}"
         content_type = mimetypes.guess_type(name)[0] or "application/octet-stream"
+        # Streamed from the file: an installer can be hundreds of MB, and
+        # reading it whole doubled the memory of the release step. urllib
+        # sends a file-like body as is once Content-Length is given.
         with open(path, "rb") as f:
-            data = f.read()
-        return self._request("POST", url, data=data, content_type=content_type)
+            return self._request("POST", url, data=f, content_type=content_type,
+                                 content_length=os.fstat(f.fileno()).st_size)
 
 
 def publish_release(client: GitHubClient, tag: str, name: str, notes: str,

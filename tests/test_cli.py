@@ -15,6 +15,7 @@ import pytest
 
 from py2exe_gui import cli
 from py2exe_gui.core.project_file import load_project, save_project
+from py2exe_gui.core.release.credentials import Token
 from py2exe_gui.strings import Ar, En
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -480,6 +481,52 @@ def repo_project(project, tmp_path, monkeypatch):
     return project
 
 
+def test_extra_files_outside_the_project_need_consent(project, tmp_path):
+    """A shared project file must not silently bundle files from this machine."""
+    outside = tmp_path.parent / f"{tmp_path.name}-outside"
+    outside.mkdir(exist_ok=True)
+    (outside / "secret.txt").write_text("s")
+    edit(project, lambda p: setattr(p.build, "extra_files", [str(outside / "secret.txt")]))
+    r = run("build")  # the review comes before any environment is needed
+    assert r.code == cli.EXIT_CONSENT
+    assert "secret.txt" in r.out and "outside the project folder" in r.out
+    r = run("build", interactive=True, answers=["n"])
+    assert r.code == cli.EXIT_CONSENT
+
+
+def test_release_to_another_api_host_needs_a_person_even_with_yes(repo_project, monkeypatch):
+    """A stored (keyring) token would be sent to that host: --yes is not consent."""
+    from py2exe_gui.core.release import credentials, pipeline
+
+    stored = Token(TOKEN, "keyring")
+    monkeypatch.setattr(credentials, "find_token", lambda *a, **k: stored)
+    monkeypatch.setattr(pipeline, "find_token", lambda *a, **k: stored)
+    r = run("release", "--set-version", "1.0.1", "--api-url", "https://ghe.example/api/v3",
+            "--yes")
+    assert r.code == cli.EXIT_CONSENT
+    assert "ghe.example" in r.out and "Release plan" not in r.out
+    r = run("release", "--set-version", "1.0.1", "--api-url", "https://ghe.example/api/v3",
+            "--yes", interactive=True, answers=["n"])
+    assert r.code == cli.EXIT_CONSENT and "Release plan" not in r.out
+    # A yes typed by a person goes on to the plan (which then fails: no such host).
+    r = run("release", "--set-version", "1.0.1", "--api-url", "https://ghe.example/api/v3",
+            "--yes", interactive=True, answers=["y"])
+    assert "Release plan" in r.out
+    # The default host, a dry run, or --no-publish never ask.
+    for extra in (["--dry-run"], ["--no-publish", "--dry-run"]):
+        r = run("release", "--set-version", "1.0.1", "--api-url", "https://ghe.example/api/v3",
+                *extra)
+        assert "ghe.example" not in r.out, extra
+    r = run("release", "--set-version", "1.0.1", "--dry-run")
+    assert r.code == cli.EXIT_OK and "token would be sent" not in r.out
+    # A token from GITHUB_TOKEN was chosen together with the host: no question.
+    env_token = Token(TOKEN, "env")
+    monkeypatch.setattr(credentials, "find_token", lambda *a, **k: env_token)
+    r = run("release", "--set-version", "1.0.1", "--api-url", "https://ghe.example/api/v3",
+            "--yes")
+    assert "token would be sent" not in r.out
+
+
 def test_release_dry_run_changes_nothing(repo_project, tmp_path, monkeypatch):
     monkeypatch.setenv("GITHUB_TOKEN", TOKEN)
     before = repo_project.read_text()
@@ -782,3 +829,19 @@ def test_license_key_file_broken(project):
     assert r.code == cli.EXIT_PROJECT
     with open(cli.LICENSE_KEY_FILE) as f:
         assert f.read() == "{broken"  # never replaced silently
+
+
+def test_env_lock_tool_failure_is_a_tool_exit(project, tmp_path, monkeypatch):
+    fake_env(tmp_path, project)
+
+    def missing(*_a, **_k):
+        raise FileNotFoundError("no such interpreter")
+
+    monkeypatch.setattr(cli.subprocess, "run", missing)
+    assert run("env", "lock").code == cli.EXIT_TOOL
+
+    def hangs(*a, **_k):
+        raise subprocess.TimeoutExpired(a[0], 120)
+
+    monkeypatch.setattr(cli.subprocess, "run", hangs)
+    assert run("env", "lock").code == cli.EXIT_TOOL

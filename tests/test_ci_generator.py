@@ -9,6 +9,7 @@ installed and is skipped cleanly otherwise.
 
 import os
 import re
+import shlex
 import shutil
 import subprocess
 
@@ -24,6 +25,8 @@ from py2exe_gui.core.ci_generator import (
     SECRET_NAMES,
     WORKFLOW_RELATIVE,
     CiOptions,
+    _ps,
+    _sh,
     formats_by_runner,
     options_for,
     referenced_secrets,
@@ -122,10 +125,10 @@ def test_build_steps_install_cache_run_and_upload():
     assert cache["uses"] == ACTIONS["cache"] and "build" in cache["with"]["path"].split()
     assert "hashFiles('p2e.toml', 'requirements.txt')" in cache["with"]["key"]
     install = named(doc, "build", "Install Python to EXE")
-    assert f'--no-deps "{DEFAULT_TOOL_REQUIREMENT}"' in install["run"]
+    assert f"--no-deps '{DEFAULT_TOOL_REQUIREMENT}'" in install["run"]
     assert '"pyinstaller>=6.0"' in install["run"] and "nuitka" not in install["run"]
     release = named(doc, "build", "py2exe-gui release")
-    assert release["run"] == ('py2exe-gui --lang en release --project "p2e.toml" --yes '
+    assert release["run"] == ("py2exe-gui --lang en release --project 'p2e.toml' --yes "
                               '--no-tag --no-publish --allow-downloads')
     upload = steps_of(doc, "build")[-1]
     assert upload["uses"] == ACTIONS["upload"]
@@ -167,6 +170,32 @@ def test_release_job_runs_on_tags_only_and_creates_the_release():
     assert "--draft" not in steps_of(plain, "release")[1]["run"]
 
 
+@pytest.mark.parametrize("text", ["$(id)", "a'b", "`id`", "$HOME x", 'say "hi"', "plain"])
+def test_sh_quotes_so_the_shell_expands_nothing(text):
+    """A single-quoted word comes back verbatim from a POSIX shell."""
+    assert shlex.split(_sh(text)) == [text]
+
+
+def test_ps_quotes_a_powershell_literal():
+    assert _ps("a'b$(id)") == "'a''b$(id)'"
+
+
+def test_hostile_app_name_never_reaches_a_run_line_unquoted():
+    name = 'Evil" $(id) `id` $HOME'
+    text = render_workflow(full_options(app_name=name))
+    doc = yaml.safe_load(text)
+    for job in ("build", "release"):
+        for step in steps_of(doc, job):
+            assert name not in step.get("run", "")
+    create = steps_of(doc, "release")[1]
+    assert create["env"]["APP_TITLE"] == name
+    assert '--title "$APP_TITLE $GITHUB_REF_NAME"' in create["run"]
+    # The hostile text is only ever inside single quotes on a run: line.
+    for line in text.splitlines():
+        if "$(id)" in line and "run:" in line:
+            raise AssertionError(line)
+
+
 def test_custom_tag_prefix_and_branch():
     doc = yaml.safe_load(render_workflow(CiOptions(tag_prefix="release-", branch="develop")))
     assert doc["on"]["push"]["tags"] == ["release-*"]
@@ -187,7 +216,7 @@ def test_signing_and_notarization_steps_appear_only_when_asked():
     assert windows["if"] == "runner.os == 'Windows' && github.event_name != 'pull_request'"
     assert windows["shell"] == "pwsh"
     assert windows["env"] == {"CERT_BASE64": "${{ secrets.WINDOWS_CERT_BASE64 }}"}
-    assert '$target = "certs/app.pfx"' in windows["run"]
+    assert "$target = 'certs/app.pfx'" in windows["run"]
     mac = named(doc, "build", "macOS signing certificate")
     assert mac["if"] == "runner.os == 'macOS' && github.event_name != 'pull_request'"
     assert "security import" in mac["run"]
@@ -266,7 +295,7 @@ def test_options_for_a_project_in_a_subfolder(tmp_path):
     assert opts.app_name == "My App" and opts.engine == "pyinstaller"
     assert findings == []
     text = render_workflow(opts)
-    assert '--project "repo/p2e.toml"' in text and 'path: "repo/dist/release"' in text
+    assert "--project 'repo/p2e.toml'" in text and 'path: "repo/dist/release"' in text
 
 
 def test_options_without_output_dir_build_next_to_the_source(tmp_path):

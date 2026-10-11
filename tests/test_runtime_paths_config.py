@@ -104,6 +104,7 @@ FULL = {
             "installer_args": ["/SILENT"],
             "timeout": 5,
             "allow_insecure_localhost": True,
+            "state_dir": "/var/tmp/tool-state",
         },
     },
 }
@@ -120,6 +121,9 @@ def test_parse_full_config():
     assert cfg.updater.installer_args == ["/SILENT"]
     assert cfg.updater.allow_insecure_localhost is True
     assert cfg.updater.check_on_start is False
+    assert cfg.updater.state_dir == "/var/tmp/tool-state"
+    plain = rconfig.parse_config({"app": {"name": "T"}, "services": {"updater": {}}})
+    assert plain.updater.state_dir == ""  # the per-user state folder
 
 
 def test_nothing_is_enabled_by_default():

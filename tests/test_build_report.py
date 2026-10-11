@@ -143,6 +143,16 @@ def test_wsb_is_valid_xml_with_a_read_only_mapping():
         "Networking").text == "Disable"
 
 
+def test_wsb_escapes_quotes_in_paths():
+    """The command is quoted inside the XML: a " in a folder name must not
+    close the quotes and leave the rest to the shell."""
+    xml = generate_wsb('C:\\odd" & calc" dir\\dist', 'To"ol.exe')
+    assert "&quot;" in xml
+    root = ET.fromstring(xml)
+    assert root.find("MappedFolders/MappedFolder/HostFolder").text == 'C:\\odd" & calc" dir\\dist'
+    assert root.find("LogonCommand/Command").text == f'"{SANDBOX_APP_DIR}\\To"ol.exe"'
+
+
 def test_wsb_for_onefile_and_folder_builds():
     exe = os.path.join("p", "dist", "Tool.exe")
     assert wsb_for_output(exe, True) == (os.path.join("p", "dist"), "Tool.exe")

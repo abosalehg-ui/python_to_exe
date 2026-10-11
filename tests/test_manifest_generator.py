@@ -72,6 +72,19 @@ def test_empty_supported_os_omits_compat_block():
     assert "<compatibility" not in out
 
 
+def test_quotes_in_attribute_values_are_escaped():
+    """A " would end the attribute and let the name add attributes of its own."""
+    import xml.etree.ElementTree as ET
+
+    name = 'My" version="9" x="App'
+    out = generate_manifest(ManifestConfig(name=name, version='1"0', description='say "hi"'))
+    assert '&quot;' in out and 'version="9"' not in out
+    root = ET.fromstring(out)
+    identity = root.find("{urn:schemas-microsoft-com:asm.v1}assemblyIdentity")
+    assert identity.get("name") == name and identity.get("version") == '1"0'
+    assert root.find("{urn:schemas-microsoft-com:asm.v1}description").text == 'say "hi"'
+
+
 def test_special_chars_in_name_are_xml_escaped():
     out = generate_manifest(ManifestConfig(name='My&App<v2>'))
     assert "My&amp;App&lt;v2&gt;" in out

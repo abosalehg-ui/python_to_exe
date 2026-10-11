@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "py2exe-gui"
-version = "2.0.0"
+version = "2.1.0"
 description = "Arabic-first Qt (PySide6) GUI and command line to turn Python scripts into executables with PyInstaller or Nuitka"
 readme = "README.md"
 requires-python = ">=3.8"

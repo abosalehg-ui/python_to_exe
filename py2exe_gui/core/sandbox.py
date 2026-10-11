@@ -11,9 +11,10 @@ the build on the host.
 """
 
 import os
-import sys
 from typing import Optional
 from xml.sax.saxutils import escape
+
+from py2exe_gui.core.platform_support import resolve
 
 SANDBOX_USER_DESKTOP = r"C:\Users\WDAGUtilityAccount\Desktop"
 SANDBOX_APP_DIR = SANDBOX_USER_DESKTOP + r"\app"
@@ -29,7 +30,7 @@ def sandbox_executable(env: Optional[dict] = None) -> str:
 
 def sandbox_available(platform: Optional[str] = None, env: Optional[dict] = None) -> bool:
     """True only on Windows with the Windows Sandbox feature enabled."""
-    plat = platform if platform is not None else sys.platform
+    plat = resolve(platform)
     return plat == "win32" and bool(sandbox_executable(env))
 
 
@@ -42,18 +43,21 @@ def generate_wsb(host_folder: str, exe_relative: str, networking: bool = True) -
     """
     command = SANDBOX_APP_DIR + "\\" + exe_relative.replace("/", "\\")
     net = "Default" if networking else "Disable"
+    # The command is written inside quotes: a " in a folder name must not
+    # end them (the shell would then run whatever follows).
+    quotes = {'"': "&quot;"}
     return (
         "<Configuration>\n"
         "  <MappedFolders>\n"
         "    <MappedFolder>\n"
-        f"      <HostFolder>{escape(host_folder)}</HostFolder>\n"
-        f"      <SandboxFolder>{escape(SANDBOX_APP_DIR)}</SandboxFolder>\n"
+        f"      <HostFolder>{escape(host_folder, quotes)}</HostFolder>\n"
+        f"      <SandboxFolder>{escape(SANDBOX_APP_DIR, quotes)}</SandboxFolder>\n"
         "      <ReadOnly>true</ReadOnly>\n"
         "    </MappedFolder>\n"
         "  </MappedFolders>\n"
         f"  <Networking>{net}</Networking>\n"
         "  <LogonCommand>\n"
-        f'    <Command>"{escape(command)}"</Command>\n'
+        f'    <Command>"{escape(command, quotes)}"</Command>\n'
         "  </LogonCommand>\n"
         "</Configuration>\n"
     )

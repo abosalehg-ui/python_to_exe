@@ -19,6 +19,7 @@ from typing import Callable, List, Optional, Sequence, Tuple
 
 from py2exe_gui.core.build_history import BuildRecord
 from py2exe_gui.core.diagnostics import build_name, build_root
+from py2exe_gui.core.fsutil import same_path as _same_path
 from py2exe_gui.core.project_file import LoadedProject, ProjectFileError, load_project
 from py2exe_gui.core.release.artifacts import CHECKSUMS_NAME
 from py2exe_gui.core.release.versioning import parse_semver
@@ -85,12 +86,6 @@ class ProjectSummary:
 
 
 # ── Build history ─────────────────────────────────────────────────────────
-
-
-def _same_path(a: str, b: str) -> bool:
-    if not a or not b:
-        return False
-    return os.path.normcase(os.path.normpath(a)) == os.path.normcase(os.path.normpath(b))
 
 
 def project_records(records: Sequence[BuildRecord], source: str,

@@ -19,13 +19,14 @@ import re
 import shutil
 import stat
 import subprocess
-import sys
 from dataclasses import dataclass, field
 from typing import Callable, List, Optional, Sequence, Tuple
 
 from py2exe_gui.core.fixes import SEVERITY_ERROR, SEVERITY_WARNING, Finding
+from py2exe_gui.core.fsutil import folder_size  # noqa: F401 - packagers import it from here
 from py2exe_gui.core.packagers.icons import placeholder_png, png_from_icon_file
 from py2exe_gui.core.platform_support import is_supported, required_platform
+from py2exe_gui.core.platform_support import resolve as resolve_platform
 
 Runner = Callable[..., "subprocess.CompletedProcess[str]"]
 Log = Callable[[str], None]
@@ -126,8 +127,7 @@ class Packager:
               env: Optional[dict] = None) -> List[Finding]:
         """Findings before building: wrong host, missing tool, missing build."""
         findings = []
-        plat = platform if platform is not None else sys.platform
-        if not is_supported(self.name, plat):
+        if not is_supported(self.name, resolve_platform(platform)):
             findings.append(Finding("package_wrong_platform", SEVERITY_ERROR, {
                 "format": self.display_name, "platform": required_platform(self.name)}))
             return findings
@@ -232,24 +232,27 @@ def desktop_categories(text: str) -> str:
 
 
 def desktop_entry(spec: PackageSpec, exec_line: str, icon_name: str) -> str:
+    # Every field goes through _single_line: a newline inside any value would
+    # start a new key (``Exec=`` from a project name, say).
     lines = [
         "[Desktop Entry]",
         "Type=Application",
-        f"Name={spec.name}",
+        f"Name={_single_line(spec.name)}",
     ]
     if spec.description:
         lines.append(f"Comment={_single_line(spec.description)}")
     lines += [
-        f"Exec={exec_line}",
-        f"Icon={icon_name}",
+        f"Exec={_single_line(exec_line)}",
+        f"Icon={_single_line(icon_name)}",
         f"Terminal={'false' if spec.windowed else 'true'}",
-        f"Categories={desktop_categories(spec.categories)}",
+        f"Categories={_single_line(desktop_categories(spec.categories))}",
     ]
     return "\n".join(lines) + "\n"
 
 
 def _single_line(text: str) -> str:
-    return " ".join(text.split())
+    """``text`` with every run of whitespace (newlines included) as one space."""
+    return " ".join((text or "").split())
 
 
 def resolve_icon_png(spec: PackageSpec) -> Tuple[bytes, Optional[Finding]]:
@@ -305,16 +308,6 @@ def install_build(spec: PackageSpec, target: str) -> str:
 def _make_executable(path: str) -> None:
     mode = os.stat(path).st_mode
     os.chmod(path, mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
-
-
-def folder_size(path: str) -> int:
-    total = 0
-    for folder, _dirs, files in os.walk(path):
-        for name in files:
-            full = os.path.join(folder, name)
-            if not os.path.islink(full):
-                total += os.path.getsize(full)
-    return total
 
 
 def errors_in(findings: Sequence[Finding]) -> List[Finding]:
