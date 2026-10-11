@@ -8,14 +8,13 @@ import subprocess
 
 import pytest
 
-pytest.importorskip("PyQt5", reason="PyQt5 not installed")
-
-from PyQt5.QtWidgets import QMessageBox  # noqa: E402
+pytest.importorskip("py2exe_gui.qt", reason="no Qt binding (PySide6/PyQt5) installed")
 
 from py2exe_gui.core.build_runner import BuildOutcome  # noqa: E402
 from py2exe_gui.core.project_file import ProjectConfig, load_project, save_project  # noqa: E402
 from py2exe_gui.core.release import credentials  # noqa: E402
 from py2exe_gui.core.release.pipeline import STEPS, Confirmation, ReleaseOptions  # noqa: E402
+from py2exe_gui.qt import QMessageBox  # noqa: E402
 from py2exe_gui.strings import Ar, En, set_locale  # noqa: E402
 from py2exe_gui.ui.dialogs import ReleaseConfirmDialog  # noqa: E402
 from tests.conftest import MemoryKeyring  # noqa: E402
@@ -107,7 +106,7 @@ def repo(tmp_path, monkeypatch):
 
 
 def open_repo(window, repo, monkeypatch):
-    answer(monkeypatch, "question", QMessageBox.Yes)
+    answer(monkeypatch, "question", QMessageBox.StandardButton.Yes)
     assert window.open_project_path(str(repo / "p2e.toml"))
 
 
@@ -136,7 +135,7 @@ def test_bump_buttons_and_apply_to_every_tab(window):
 
 def test_apply_rejects_a_bad_version(window, monkeypatch):
     shown = []
-    answer(monkeypatch, "warning", QMessageBox.Ok, shown)
+    answer(monkeypatch, "warning", QMessageBox.StandardButton.Ok, shown)
     window.release_tab.version_input.setText("3.1")
     window.apply_release_version()
     assert shown and window.installer_tab.inst_version.text() == "1.0.0"
@@ -183,7 +182,7 @@ def test_token_from_the_environment(window, monkeypatch):
 def test_keyring_unavailable(window, monkeypatch):
     monkeypatch.setattr("py2exe_gui.ui.main_window.KEYRING", None)
     shown = []
-    answer(monkeypatch, "warning", QMessageBox.Ok, shown)
+    answer(monkeypatch, "warning", QMessageBox.StandardButton.Ok, shown)
     window.release_tab.token_input.setText(TOKEN)
     window.save_github_token()
     assert shown and TOKEN not in shown[0]
@@ -237,7 +236,7 @@ def test_blocked_plan_is_reported(qapp, window, repo, monkeypatch):
     open_repo(window, repo, monkeypatch)  # no token anywhere
     window.release_tab.version_input.setText("1.1.0")
     shown = []
-    answer(monkeypatch, "warning", QMessageBox.Ok, shown)
+    answer(monkeypatch, "warning", QMessageBox.StandardButton.Ok, shown)
     window.start_release()
     wait_release(qapp, window)
     assert shown == [Ar.RELEASE_RESULT_BLOCKED]
@@ -247,7 +246,7 @@ def test_blocked_plan_is_reported(qapp, window, repo, monkeypatch):
 
 def test_start_release_checks(window, tmp_path, monkeypatch):
     shown = []
-    answer(monkeypatch, "warning", QMessageBox.Ok, shown)
+    answer(monkeypatch, "warning", QMessageBox.StandardButton.Ok, shown)
     window.release_tab.version_input.setText("1.0")
     window.start_release()
     window.release_tab.version_input.setText("1.0.0")
@@ -278,7 +277,7 @@ def test_release_from_the_window_against_the_fake_api(qapp, window, repo, monkey
         confirmed.append(dialog.text_view.toPlainText())
         return 1
 
-    monkeypatch.setattr(ReleaseConfirmDialog, "exec_", accept)
+    monkeypatch.setattr(ReleaseConfirmDialog, "exec", accept)
     with FakeGitHub(TOKEN) as fake:
         # The window never allows http; the fake API needs it, so only the
         # options class is wrapped here.
@@ -327,7 +326,7 @@ def test_cancelling_the_confirmation_changes_nothing(qapp, window, repo, monkeyp
     open_repo(window, repo, monkeypatch)
     window.release_tab.version_input.setText("1.1.0")
     window.release_tab.dry_run_check.setChecked(False)
-    monkeypatch.setattr(ReleaseConfirmDialog, "exec_", lambda _d: 0)
+    monkeypatch.setattr(ReleaseConfirmDialog, "exec", lambda _d: 0)
     window.start_release()
     wait_release(qapp, window)
     assert not (repo / "release").exists()

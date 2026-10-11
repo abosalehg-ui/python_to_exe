@@ -5,14 +5,15 @@ import os
 
 import pytest
 
-pytest.importorskip("PyQt5", reason="PyQt5 not installed")
-
-from PyQt5.QtCore import Qt  # noqa: E402
-from PyQt5.QtWidgets import QMessageBox  # noqa: E402
+pytest.importorskip("py2exe_gui.qt", reason="no Qt binding (PySide6/PyQt5) installed")
 
 from py2exe_gui.core.build_history import make_record  # noqa: E402
 from py2exe_gui.core.project_file import ProjectConfig, save_project  # noqa: E402
 from py2exe_gui.core.workspace import ProjectSummary  # noqa: E402
+from py2exe_gui.qt import (
+    QMessageBox,  # noqa: E402
+    Qt,  # noqa: E402
+)
 from py2exe_gui.strings import Ar, En, set_locale  # noqa: E402
 from py2exe_gui.ui.main_window import SIMPLE_MODE_TABS  # noqa: E402
 from py2exe_gui.ui.tabs.home_tab import HomeTab, ProjectCard, SizeSparkline  # noqa: E402
@@ -53,7 +54,7 @@ def answer(monkeypatch, kind, reply):
 
 def texts(card):
     """Every label on a card, without the bidi marks the view adds."""
-    from PyQt5.QtWidgets import QLabel
+    from py2exe_gui.qt import QLabel
 
     joined = "\n".join(label.text() for label in card.findChildren(QLabel))
     return joined.replace("\u2066", "").replace("\u2069", "").replace("\u200f", "")
@@ -137,7 +138,7 @@ def test_card_shows_last_build_sparkline_and_release(window, tmp_path):
     points = card.sparkline.points()
     assert len(points) == 2
     # Right-to-left window: the newest build is drawn at the left edge.
-    assert window.layoutDirection() == Qt.RightToLeft
+    assert window.layoutDirection() == Qt.LayoutDirection.RightToLeft
     assert points[-1][0] < points[0][0]
     assert "6.8 MB" in card.sparkline.toolTip() and "7.1 MB" in card.sparkline.accessibleName()
 
@@ -149,7 +150,7 @@ def test_sparkline_runs_left_to_right_in_english(window, tmp_path):
     window.open_project_path(path)
     window.retranslate("en")
     card = window.home_tab.card_for(path)
-    assert window.layoutDirection() == Qt.LeftToRight
+    assert window.layoutDirection() == Qt.LayoutDirection.LeftToRight
     points = card.sparkline.points()
     assert points[-1][0] > points[0][0]
     assert En.HOME_CURRENT_PROJECT in texts(card)
@@ -282,7 +283,7 @@ def test_a_declined_open_starts_nothing(window, tmp_path, monkeypatch):
     config.build.extra_args = "--runtime-hook evil.py"
     save_project(config, path)
     window._remember_project(path)
-    answer(monkeypatch, "question", QMessageBox.No)
+    answer(monkeypatch, "question", QMessageBox.StandardButton.No)
     started = []
     monkeypatch.setattr(window, "start_conversion", lambda: started.append(True))
     window.build_project(path)
@@ -316,7 +317,7 @@ def test_cards_follow_a_finished_build(window, tmp_path, monkeypatch):
     path, source = make_project(tmp_path / "proj")
     window.open_project_path(path)
     assert window.home_tab.card_for(path).summary.last_build is None
-    answer(monkeypatch, "critical", QMessageBox.Ok)
+    answer(monkeypatch, "critical", QMessageBox.StandardButton.Ok)
     window._build_config_snapshot = {"source": source, "output_name": "Tool"}
     window._build_start_time = 0.0
     window.on_conversion_finished(False, "boom")
@@ -338,7 +339,7 @@ def test_cards_are_rebuilt_on_theme_and_language_change(window, tmp_path):
 
 
 def test_every_home_button_has_an_accessible_name(window, tmp_path):
-    from PyQt5.QtWidgets import QPushButton
+    from py2exe_gui.qt import QPushButton
 
     path, _ = make_project(tmp_path / "proj")
     window._remember_project(str(tmp_path / "gone.toml"))

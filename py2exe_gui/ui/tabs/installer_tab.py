@@ -1,6 +1,9 @@
 """Inno Setup installer configuration."""
 
-from PyQt5.QtWidgets import (
+from py2exe_gui.core import InstallerConfig
+from py2exe_gui.core.installer import COMPRESSION_CHOICES, LANGUAGE_LABELS
+from py2exe_gui.core.platform_support import INSTALLER
+from py2exe_gui.qt import (
     QCheckBox,
     QComboBox,
     QGridLayout,
@@ -12,10 +15,6 @@ from PyQt5.QtWidgets import (
     QVBoxLayout,
     QWidget,
 )
-
-from py2exe_gui.core import InstallerConfig
-from py2exe_gui.core.installer import COMPRESSION_CHOICES, LANGUAGE_LABELS
-from py2exe_gui.core.platform_support import INSTALLER
 from py2exe_gui.strings import S
 from py2exe_gui.ui.tabs.base import BaseTab, browse_button, platform_notice
 

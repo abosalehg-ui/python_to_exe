@@ -15,25 +15,6 @@ import time
 import webbrowser
 from dataclasses import replace
 
-from PyQt5.QtCore import Qt, QTimer, QUrl
-from PyQt5.QtGui import QDesktopServices, QFont, QKeySequence
-from PyQt5.QtWidgets import (
-    QAction,
-    QFileDialog,
-    QFrame,
-    QGroupBox,
-    QHBoxLayout,
-    QLabel,
-    QMainWindow,
-    QMessageBox,
-    QProgressBar,
-    QPushButton,
-    QShortcut,
-    QTabWidget,
-    QVBoxLayout,
-    QWidget,
-)
-
 from py2exe_gui.constants import (
     APP_NAME,
     APP_VERSION,
@@ -171,6 +152,28 @@ from py2exe_gui.core.venv_manager import (
 )
 from py2exe_gui.core.workspace import summarize_projects
 from py2exe_gui.paths import envs_dir, license_key_path, signing_key_path
+from py2exe_gui.qt import (
+    QAction,
+    QDesktopServices,
+    QFileDialog,
+    QFrame,
+    QGroupBox,
+    QHBoxLayout,
+    QKeySequence,
+    QLabel,
+    QMainWindow,
+    QMessageBox,
+    QProgressBar,
+    QPushButton,
+    QShortcut,
+    Qt,
+    QTabWidget,
+    QTimer,
+    QUrl,
+    QVBoxLayout,
+    QWidget,
+    application_font,
+)
 from py2exe_gui.strings import (
     LOCALE_LAYOUT,
     S,
@@ -363,9 +366,9 @@ class MainWindow(QMainWindow):
 
     def _apply_layout_direction(self):
         self.setLayoutDirection(
-            Qt.RightToLeft
+            Qt.LayoutDirection.RightToLeft
             if LOCALE_LAYOUT.get(current_locale(), "rtl") == "rtl"
-            else Qt.LeftToRight
+            else Qt.LayoutDirection.LeftToRight
         )
 
     def _build_central_widget(self) -> QWidget:
@@ -477,15 +480,15 @@ class MainWindow(QMainWindow):
     def _create_header(self):
         header = QFrame()
         header_layout = QVBoxLayout(header)
-        header_layout.setAlignment(Qt.AlignCenter)
+        header_layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
         title = QLabel(S.HEADER_TITLE)
         title.setObjectName("titleLabel")
-        title.setAlignment(Qt.AlignCenter)
+        title.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
         subtitle = QLabel(S.HEADER_SUBTITLE)
         subtitle.setObjectName("subtitleLabel")
-        subtitle.setAlignment(Qt.AlignCenter)
+        subtitle.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
         header_layout.addWidget(title)
         header_layout.addWidget(subtitle)
@@ -512,7 +515,9 @@ class MainWindow(QMainWindow):
             button.setMinimumHeight(50)
             button.setAccessibleName(text)
             if primary:
-                button.setFont(QFont("Segoe UI", 14, QFont.Bold))
+                font = application_font(14)
+                font.setBold(True)
+                button.setFont(font)
             button.clicked.connect(handler)
             row.addWidget(button)
             return button
@@ -719,10 +724,10 @@ class MainWindow(QMainWindow):
                     flags="\n".join(f"  • {f}" for f in flags),
                     args=shown,
                 ),
-                QMessageBox.Yes | QMessageBox.No,
-                QMessageBox.No,
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                QMessageBox.StandardButton.No,
             )
-            if reply != QMessageBox.Yes:
+            if reply != QMessageBox.StandardButton.Yes:
                 return False
         # The Runtime Kit cannot inject code (it is flags and text), but an
         # updater trusting someone else's key would install what they sign.
@@ -736,10 +741,10 @@ class MainWindow(QMainWindow):
             self,
             S.MSG_CONFIRM,
             S.MSG_KIT_RISKS_CONFIRM.format(risks="\n\n".join(lines)),
-            QMessageBox.Yes | QMessageBox.No,
-            QMessageBox.No,
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.No,
         )
-        return reply == QMessageBox.Yes
+        return reply == QMessageBox.StandardButton.Yes
 
     # ─── Presets ────────────────────────────────────────────────────────
 
@@ -750,7 +755,7 @@ class MainWindow(QMainWindow):
     def save_current_preset(self):
         """Store the current form under a name the user chooses."""
         dialog = PresetNameDialog(self, initial=self.main_tab.output_name.text().strip())
-        if not dialog.exec_():
+        if not dialog.exec():
             return
         name = dialog.get_value()
         if not name:
@@ -762,10 +767,10 @@ class MainWindow(QMainWindow):
                 self,
                 S.MSG_CONFIRM,
                 S.PRESET_OVERWRITE_CONFIRM.format(name=name),
-                QMessageBox.Yes | QMessageBox.No,
-                QMessageBox.No,
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                QMessageBox.StandardButton.No,
             )
-            if reply != QMessageBox.Yes:
+            if reply != QMessageBox.StandardButton.Yes:
                 return
 
         if not self.presets.put(name, self._current_project().to_settings_dict()):
@@ -800,10 +805,10 @@ class MainWindow(QMainWindow):
             self,
             S.MSG_CONFIRM,
             S.MSG_PRESET_DELETE_CONFIRM.format(name=name),
-            QMessageBox.Yes | QMessageBox.No,
-            QMessageBox.No,
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.No,
         )
-        if reply != QMessageBox.Yes:
+        if reply != QMessageBox.StandardButton.Yes:
             return
         if self.presets.delete(name):
             self._refresh_presets_list()
@@ -885,10 +890,10 @@ class MainWindow(QMainWindow):
             self,
             S.MSG_CONFIRM,
             S.MSG_BATCH_CANCEL_CONFIRM,
-            QMessageBox.Yes | QMessageBox.No,
-            QMessageBox.No,
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.No,
         )
-        if reply == QMessageBox.Yes:
+        if reply == QMessageBox.StandardButton.Yes:
             self.batch_thread.cancel()
 
     def _on_batch_job_update(self, index, _total, _status):
@@ -1015,9 +1020,9 @@ class MainWindow(QMainWindow):
         """Ask before letting the engine download a tool; True allows the next build."""
         reply = QMessageBox.question(
             self, S.MSG_CONFIRM, S.MSG_NUITKA_DOWNLOAD_CONFIRM.format(tool=tool or "?"),
-            QMessageBox.Yes | QMessageBox.No, QMessageBox.No,
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No, QMessageBox.StandardButton.No,
         )
-        if reply != QMessageBox.Yes:
+        if reply != QMessageBox.StandardButton.Yes:
             return False
         self._allow_downloads_once = True
         self._append_log(S.LOG_NUITKA_DOWNLOAD_ALLOWED)
@@ -1035,9 +1040,9 @@ class MainWindow(QMainWindow):
             self, S.MSG_CONFIRM,
             S.MSG_INSTALL_ENGINE_CONFIRM.format(engine=engine.display_name,
                                                 cmd=quote_command(install_cmd)),
-            QMessageBox.Yes | QMessageBox.No, QMessageBox.No,
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No, QMessageBox.StandardButton.No,
         )
-        if reply != QMessageBox.Yes:
+        if reply != QMessageBox.StandardButton.Yes:
             self._append_log(S.LOG_INSTALL_ENGINE_DECLINED.format(engine=engine.display_name))
             return False
         self._append_log(S.LOG_INSTALL_ENGINE.format(engine=engine.display_name))
@@ -1074,10 +1079,10 @@ class MainWindow(QMainWindow):
             self,
             S.MSG_CONFIRM,
             S.MSG_INSTALL_PYINSTALLER_CONFIRM.format(cmd=" ".join(install_cmd)),
-            QMessageBox.Yes | QMessageBox.No,
-            QMessageBox.No,
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.No,
         )
-        if reply != QMessageBox.Yes:
+        if reply != QMessageBox.StandardButton.Yes:
             self._append_log(S.LOG_INSTALL_PYINSTALLER_DECLINED)
             return False
 
@@ -1138,9 +1143,9 @@ class MainWindow(QMainWindow):
             self._cleanup_temp_files()
             reply = QMessageBox.question(
                 self, S.MSG_CONFIRM, S.MSG_ENV_NEEDED,
-                QMessageBox.Yes | QMessageBox.No, QMessageBox.Yes,
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No, QMessageBox.StandardButton.Yes,
             )
-            if reply == QMessageBox.Yes:
+            if reply == QMessageBox.StandardButton.Yes:
                 self.create_build_env(then_build=True)
             return
 
@@ -1308,7 +1313,7 @@ class MainWindow(QMainWindow):
         if error:
             QMessageBox.warning(self, S.MSG_WARNING, error)
             return
-        CommandPreviewDialog(cmd, parent=self).exec_()
+        CommandPreviewDialog(cmd, parent=self).exec()
 
     def open_output_folder(self):
         output_dir = self.main_tab.output_dir.text() or os.path.dirname(
@@ -1431,7 +1436,7 @@ class MainWindow(QMainWindow):
             return
         self.settings["welcomed"] = True
         dialog = WelcomeDialog(self)
-        dialog.exec_()
+        dialog.exec()
         self.set_simple_mode(dialog.simple_mode)
         self.save_settings()
 
@@ -1461,10 +1466,10 @@ class MainWindow(QMainWindow):
             self,
             S.MSG_INFO_TITLE,
             S.UPDATE_AVAILABLE_FMT.format(version=info.version, current=APP_VERSION),
-            QMessageBox.Open | QMessageBox.Close,
-            QMessageBox.Close,
+            QMessageBox.StandardButton.Open | QMessageBox.StandardButton.Close,
+            QMessageBox.StandardButton.Close,
         )
-        if reply == QMessageBox.Open:
+        if reply == QMessageBox.StandardButton.Open:
             webbrowser.open(info.url or RELEASES_PAGE_URL)
 
     def _on_language_changed(self, index):
@@ -1626,10 +1631,10 @@ class MainWindow(QMainWindow):
             self,
             S.MSG_CONFIRM,
             S.MSG_CLEAR_HISTORY_CONFIRM.format(count=len(self.history)),
-            QMessageBox.Yes | QMessageBox.No,
-            QMessageBox.No,
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.No,
         )
-        if reply != QMessageBox.Yes:
+        if reply != QMessageBox.StandardButton.Yes:
             return
         if not self.history.clear():
             self._append_log(S.LOG_HISTORY_SAVE_FAIL.format(error=self.history.last_error))
@@ -1929,9 +1934,9 @@ class MainWindow(QMainWindow):
         commands = "\n\n".join(quote_command(c) for c in plan.all_commands())
         reply = QMessageBox.question(
             self, S.MSG_CONFIRM, S.MSG_ENV_CONFIRM.format(commands=commands),
-            QMessageBox.Yes | QMessageBox.No, QMessageBox.No,
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No, QMessageBox.StandardButton.No,
         )
-        if reply != QMessageBox.Yes:
+        if reply != QMessageBox.StandardButton.Yes:
             return
         if recreate and env_exists(plan.env_dir):
             delete_env(plan.env_dir, ENVS_ROOT)
@@ -1980,9 +1985,9 @@ class MainWindow(QMainWindow):
         size = format_size(int(status.metadata.get("size_bytes", 0) or 0))
         reply = QMessageBox.question(
             self, S.MSG_CONFIRM, S.MSG_ENV_DELETE_CONFIRM.format(size=size),
-            QMessageBox.Yes | QMessageBox.No, QMessageBox.No,
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No, QMessageBox.StandardButton.No,
         )
-        if reply != QMessageBox.Yes:
+        if reply != QMessageBox.StandardButton.Yes:
             return
         if delete_env(env_dir, ENVS_ROOT):
             self._append_log(S.LOG_ENV_DELETED)
@@ -2193,9 +2198,9 @@ class MainWindow(QMainWindow):
             reply = QMessageBox.question(
                 self, S.MSG_CONFIRM,
                 S.MSG_KIT_KEY_REPLACE_CONFIRM.format(fingerprint=fingerprint(existing) or "?"),
-                QMessageBox.Yes | QMessageBox.No, QMessageBox.No,
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No, QMessageBox.StandardButton.No,
             )
-            if reply != QMessageBox.Yes:
+            if reply != QMessageBox.StandardButton.Yes:
                 return
         key = new_signing_key()
         try:
@@ -2233,9 +2238,9 @@ class MainWindow(QMainWindow):
             QMessageBox.warning(self, S.MSG_WARNING, S.ERR_KIT_KEY_READ.format(error=str(e)))
             return
         reply = QMessageBox.warning(
-            self, S.MSG_CONFIRM, warning, QMessageBox.Yes | QMessageBox.No, QMessageBox.No,
+            self, S.MSG_CONFIRM, warning, QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No, QMessageBox.StandardButton.No,
         )
-        if reply != QMessageBox.Yes:
+        if reply != QMessageBox.StandardButton.Yes:
             return
         path, _ = QFileDialog.getSaveFileName(
             self, title, os.path.basename(key_file), S.DIALOG_FILTER_KEY
@@ -2275,9 +2280,9 @@ class MainWindow(QMainWindow):
             reply = QMessageBox.question(
                 self, S.MSG_CONFIRM,
                 replace_fmt.format(fingerprint=fingerprint(existing) or "?"),
-                QMessageBox.Yes | QMessageBox.No, QMessageBox.No,
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No, QMessageBox.StandardButton.No,
             )
-            if reply != QMessageBox.Yes:
+            if reply != QMessageBox.StandardButton.Yes:
                 return
         try:
             backup = backup_existing(key_file)
@@ -2305,9 +2310,9 @@ class MainWindow(QMainWindow):
                 self, S.MSG_CONFIRM,
                 S.MSG_KIT_LICENSE_KEY_REPLACE_CONFIRM.format(
                     fingerprint=fingerprint(existing) or "?"),
-                QMessageBox.Yes | QMessageBox.No, QMessageBox.No,
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No, QMessageBox.StandardButton.No,
             )
-            if reply != QMessageBox.Yes:
+            if reply != QMessageBox.StandardButton.Yes:
                 return
         try:
             key, backup = licensing.replace_key(LICENSE_KEY_FILE)
@@ -2352,7 +2357,7 @@ class MainWindow(QMainWindow):
             product = build_name(config)
         dialog = LicenseGeneratorDialog(self._issue_license, product, self)
         self._license_dialog = dialog  # tests reach it; the user sees it modal
-        dialog.exec_()
+        dialog.exec()
 
     def publish_update(self):
         """Write and sign update.json for a new build. Uploads nothing."""
@@ -2413,7 +2418,7 @@ class MainWindow(QMainWindow):
         )
         start_dir = os.path.dirname(source) if source else ""
         dialog = IconStudioDialog(self, app_name=name, start_dir=start_dir)
-        if dialog.exec_() and dialog.saved_path:
+        if dialog.exec() and dialog.saved_path:
             self.main_tab.icon_input.setText(dialog.saved_path)
             self._append_log(
                 S.LOG_ICON_STUDIO_SAVED.format(sizes="16–256", path=dialog.saved_path)
@@ -2635,7 +2640,10 @@ class MainWindow(QMainWindow):
         """The Project menu. Rebuilt on a language switch, like the widgets."""
         bar = self.menuBar()
         bar.clear()
-        menu = bar.addMenu(S.MENU_PROJECT)
+        # Kept on self: PySide6 6.10 hands the new menu to Python, and an
+        # unreferenced one is deleted with its wrapper (6.12 and PyQt5 leave
+        # it with the bar). A reference is harmless on every binding.
+        self.project_menu = menu = bar.addMenu(S.MENU_PROJECT)
 
         def item(text, handler, keys=""):
             # The shortcut is shown in the menu but bound once, as a
@@ -2749,7 +2757,7 @@ class MainWindow(QMainWindow):
 
     def _watch_project_fields(self):
         """Re-check the unsaved-changes marker whenever any project field changes."""
-        from PyQt5.QtWidgets import (
+        from py2exe_gui.qt import (
             QAbstractButton,
             QComboBox,
             QLineEdit,
@@ -2806,11 +2814,11 @@ class MainWindow(QMainWindow):
         reply = QMessageBox.question(
             self, S.MSG_CONFIRM,
             S.MSG_PROJECT_UNSAVED.format(path=self.project_path),
-            QMessageBox.Save | QMessageBox.Discard | QMessageBox.Cancel, QMessageBox.Save,
+            QMessageBox.StandardButton.Save | QMessageBox.StandardButton.Discard | QMessageBox.StandardButton.Cancel, QMessageBox.StandardButton.Save,
         )
-        if reply == QMessageBox.Cancel:
+        if reply == QMessageBox.StandardButton.Cancel:
             return False
-        if reply == QMessageBox.Save:
+        if reply == QMessageBox.StandardButton.Save:
             return self.save_project()
         return True
 
@@ -2914,9 +2922,9 @@ class MainWindow(QMainWindow):
         if os.path.exists(path):
             reply = QMessageBox.question(
                 self, S.MSG_CONFIRM, S.MSG_PROJECT_OVERWRITE.format(path=path),
-                QMessageBox.Yes | QMessageBox.No, QMessageBox.No,
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No, QMessageBox.StandardButton.No,
             )
-            if reply != QMessageBox.Yes:
+            if reply != QMessageBox.StandardButton.Yes:
                 return
         current = self._current_project()
         version = current.version if is_semver(current.version) else ""
@@ -3067,7 +3075,7 @@ class MainWindow(QMainWindow):
                 self.release_tab.show_result(S.RELEASE_RESULT_PLANNED, False)
                 return
             dialog = ReleaseConfirmDialog(confirmation(results), context.version, self)
-            if not dialog.exec_():
+            if not dialog.exec():
                 self._append_log(S.LOG_RELEASE_CANCELLED)
                 return
             self._append_log(S.LOG_RELEASE_STARTED.format(version=context.version))
@@ -3134,9 +3142,9 @@ class MainWindow(QMainWindow):
                 self, S.MSG_CONFIRM,
                 S.MSG_APPIMAGETOOL_CONFIRM.format(url=appimagetool_url(spec.machine()),
                                                   path=packager.tools_dir),
-                QMessageBox.Yes | QMessageBox.No, QMessageBox.No,
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No, QMessageBox.StandardButton.No,
             )
-            if reply == QMessageBox.Yes:
+            if reply == QMessageBox.StandardButton.Yes:
                 allow_download = True
             else:
                 self._append_log(S.LOG_APPIMAGETOOL_DECLINED)
@@ -3211,7 +3219,7 @@ class MainWindow(QMainWindow):
         text = render_workflow(opts)
         path = workflow_path(root or project_dir)
         dialog = CiPreviewDialog(text, path, os.path.exists(path), opts.secrets_used(), self)
-        if not dialog.exec_():
+        if not dialog.exec():
             self._append_log(S.LOG_CI_CANCELLED)
             return
         write_workflow(text, path)
@@ -3303,9 +3311,9 @@ class MainWindow(QMainWindow):
                 self,
                 S.MSG_CONFIRM,
                 S.MSG_CLOSE_CONFIRM,
-                QMessageBox.Yes | QMessageBox.No,
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
             )
-            if reply != QMessageBox.Yes:
+            if reply != QMessageBox.StandardButton.Yes:
                 event.ignore()
                 return
             # Both threads spawn a child process; leaving either running

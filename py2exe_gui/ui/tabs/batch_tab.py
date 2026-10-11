@@ -2,7 +2,8 @@
 
 import os
 
-from PyQt5.QtWidgets import (
+from py2exe_gui.core.batch_runner import make_jobs, summarize
+from py2exe_gui.qt import (
     QFileDialog,
     QGroupBox,
     QHBoxLayout,
@@ -11,8 +12,6 @@ from PyQt5.QtWidgets import (
     QPushButton,
     QVBoxLayout,
 )
-
-from py2exe_gui.core.batch_runner import make_jobs, summarize
 from py2exe_gui.strings import S
 from py2exe_gui.ui.tabs.base import BaseTab
 
@@ -31,7 +30,7 @@ class BatchTab(BaseTab):
         files_layout.addWidget(hint)
 
         self.file_list = QListWidget()
-        self.file_list.setSelectionMode(QListWidget.ExtendedSelection)
+        self.file_list.setSelectionMode(QListWidget.SelectionMode.ExtendedSelection)
         self.file_list.setAccessibleName(S.GROUP_BATCH_FILES)
         self.file_list.setMinimumHeight(160)
         files_layout.addWidget(self.file_list)
@@ -118,7 +117,7 @@ class BatchTab(BaseTab):
     def _add_row(self, job):
         self.file_list.addItem(job.source)
         item = self.file_list.item(self.file_list.count() - 1)
-        # Qt.UserRole == 256: keep the real path even once the row shows status.
+        # Qt.ItemDataRole.UserRole == 256: keep the real path even once the row shows status.
         item.setData(256, job.source)
 
     def jobs(self):

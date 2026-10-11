@@ -8,9 +8,7 @@ import sys
 
 import pytest
 
-pytest.importorskip("PyQt5", reason="PyQt5 not installed")
-
-from PyQt5.QtWidgets import QApplication, QFileDialog, QMessageBox  # noqa: E402
+pytest.importorskip("py2exe_gui.qt", reason="no Qt binding (PySide6/PyQt5) installed")
 
 from p2e_runtime import license as rlic  # noqa: E402
 from py2exe_gui.core.licensing import LicenseRequest  # noqa: E402
@@ -19,6 +17,7 @@ from py2exe_gui.core.update_signing import (  # noqa: E402
     read_key_file,
     write_key_file,
 )
+from py2exe_gui.qt import QApplication, QFileDialog, QMessageBox  # noqa: E402
 from py2exe_gui.strings import Ar, En, S, set_locale  # noqa: E402
 from py2exe_gui.ui.license_dialog import LicenseGeneratorDialog, problem_text  # noqa: E402
 from tests.conftest import MemoryKeyring  # noqa: E402
@@ -70,7 +69,7 @@ def make_source(tmp_path):
 @pytest.fixture
 def no_exec(monkeypatch):
     """The dialog opens without blocking; the test drives it through the window."""
-    monkeypatch.setattr(LicenseGeneratorDialog, "exec_", lambda self: 0)
+    monkeypatch.setattr(LicenseGeneratorDialog, "exec", lambda self: 0)
 
 
 # ── The tab ────────────────────────────────────────────────────────────────
@@ -157,11 +156,11 @@ def test_replacing_the_license_key_needs_a_yes_and_keeps_the_old_one(window, mon
     window.create_license_key()
     first = read_key_file(key_file())
     asked = []
-    answer(monkeypatch, "question", QMessageBox.No, asked)
+    answer(monkeypatch, "question", QMessageBox.StandardButton.No, asked)
     window.create_license_key()
     assert read_key_file(key_file()) == first and asked
     assert first.public_hex[:4] in asked[0]
-    answer(monkeypatch, "question", QMessageBox.Yes)
+    answer(monkeypatch, "question", QMessageBox.StandardButton.Yes)
     window.create_license_key()
     assert read_key_file(key_file()) != first
     backups = [n for n in os.listdir(os.path.dirname(key_file())) if ".replaced-" in n]
@@ -172,7 +171,7 @@ def test_replacing_the_license_key_needs_a_yes_and_keeps_the_old_one(window, mon
 def test_export_license_key(window, tmp_path, monkeypatch):
     window.create_license_key()
     warned = []
-    answer(monkeypatch, "warning", QMessageBox.Yes, warned)
+    answer(monkeypatch, "warning", QMessageBox.StandardButton.Yes, warned)
     target = tmp_path / "backup" / "license_signing_key.json"
     target.parent.mkdir()
     monkeypatch.setattr(QFileDialog, "getSaveFileName",
@@ -187,7 +186,7 @@ def test_export_refused_inside_the_project(window, tmp_path, monkeypatch):
     source = make_source(tmp_path)
     window.main_tab.source_input.setText(source)
     window.create_license_key()
-    answer(monkeypatch, "warning", QMessageBox.Yes)
+    answer(monkeypatch, "warning", QMessageBox.StandardButton.Yes)
     inside = os.path.join(os.path.dirname(source), "key.json")
     monkeypatch.setattr(QFileDialog, "getSaveFileName",
                         staticmethod(lambda *a, **k: (inside, "")))
@@ -205,7 +204,7 @@ def test_import_license_key(window, tmp_path, monkeypatch):
     assert read_key_file(key_file()) == other
     assert other.public_hex[:4] in window.runtime_tab.license_key_status.text()
     asked = []
-    answer(monkeypatch, "question", QMessageBox.No, asked)
+    answer(monkeypatch, "question", QMessageBox.StandardButton.No, asked)
     write_key_file(str(path), new_signing_key(), overwrite=True)
     window.import_license_key()
     assert asked and read_key_file(key_file()) == other
@@ -216,7 +215,7 @@ def test_import_license_key(window, tmp_path, monkeypatch):
 
 def test_generator_refuses_to_open_without_a_key(window, monkeypatch, no_exec):
     warned = []
-    answer(monkeypatch, "warning", QMessageBox.Ok, warned)
+    answer(monkeypatch, "warning", QMessageBox.StandardButton.Ok, warned)
     window.open_license_generator()
     assert warned == [S.ERR_KIT_LICENSE_NO_KEY]
     assert not hasattr(window, "_license_dialog")

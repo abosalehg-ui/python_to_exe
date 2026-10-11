@@ -8,25 +8,24 @@ anything was happening.
 
 import subprocess
 
-from PyQt5.QtCore import QThread, pyqtSignal
-
 from py2exe_gui.core import (
     build_signtool_command,
     redact_password,
 )
 from py2exe_gui.core.smoke_test import run_from_neutral_folder
+from py2exe_gui.qt import QThread, Signal
 from py2exe_gui.strings import S
 
 
 class PostBuildThread(QThread):
     """Signs and/or smoke-tests a freshly built executable."""
 
-    log_signal = pyqtSignal(str)
+    log_signal = Signal(str)
     #: (signing_attempted, signing_succeeded) — lets the caller decide whether
     #: to continue to the installer step.
-    finished_signal = pyqtSignal(bool, bool)
+    finished_signal = Signal(bool, bool)
     #: (passed, everything the EXE printed) — fed to the doctor's diagnostics.
-    smoke_signal = pyqtSignal(bool, str)
+    smoke_signal = Signal(bool, str)
 
     def __init__(
         self,

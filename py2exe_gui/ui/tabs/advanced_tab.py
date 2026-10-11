@@ -1,6 +1,6 @@
 """Extra data files, hidden imports, optimisation and raw arguments."""
 
-from PyQt5.QtWidgets import (
+from py2exe_gui.qt import (
     QCheckBox,
     QComboBox,
     QDialog,
@@ -13,7 +13,6 @@ from PyQt5.QtWidgets import (
     QPushButton,
     QVBoxLayout,
 )
-
 from py2exe_gui.strings import S
 from py2exe_gui.ui.dialogs import AddImportDialog
 from py2exe_gui.ui.tabs.base import BaseTab, browse_button
@@ -116,7 +115,7 @@ class AdvancedTab(BaseTab):
 
     def add_hidden_import(self):
         dialog = AddImportDialog(self)
-        if dialog.exec_() == QDialog.Accepted:
+        if dialog.exec() == QDialog.DialogCode.Accepted:
             value = dialog.get_value()
             if value:
                 self.hidden_imports_list.addItem(value)

@@ -1,5 +1,6 @@
 """Shared fixtures. Makes the project importable from any working directory."""
 
+import gc
 import os
 import sys
 
@@ -21,12 +22,24 @@ def qapp():
     Qt permits only one instance per process, so this is session-scoped and
     reused; individual tests create and close their own windows.
     """
-    pytest.importorskip("PyQt5", reason="PyQt5 not installed")
-    from PyQt5.QtWidgets import QApplication
+    pytest.importorskip("py2exe_gui.qt", reason="no Qt binding (PySide6/PyQt5) installed")
+    from py2exe_gui.qt import QApplication, QEvent
 
     app = QApplication.instance() or QApplication([])
     yield app
+    # Tear Qt down in order while the interpreter is still whole. Widgets
+    # that outlive the QApplication (a local a test forgot, a frame kept by
+    # a traceback) are destroyed during interpreter shutdown, after Qt's own
+    # statics, and PySide6 then dies with a segfault *after* "N passed".
+    app.closeAllWindows()
+    for widget in app.topLevelWidgets():
+        widget.deleteLater()
     app.processEvents()
+    app.sendPostedEvents(None, QEvent.Type.DeferredDelete)
+    gc.collect()
+    app.processEvents()
+    if hasattr(app, "shutdown"):  # PySide6: delete the C++ application now
+        app.shutdown()
 
 
 @pytest.fixture(autouse=True)

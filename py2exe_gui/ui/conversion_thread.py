@@ -3,20 +3,19 @@
 import subprocess
 from datetime import datetime
 
-from PyQt5.QtCore import QThread, pyqtSignal
-
 from py2exe_gui.core.build_stages import BuildStageTracker
+from py2exe_gui.qt import QThread, Signal
 from py2exe_gui.strings import S
 
 
 class ConversionThread(QThread):
     """خيط منفصل لعملية التحويل."""
 
-    log_signal = pyqtSignal(str)
-    progress_signal = pyqtSignal(int)
+    log_signal = Signal(str)
+    progress_signal = Signal(int)
     # Stage key from build_stages, so the window can label the progress bar.
-    stage_signal = pyqtSignal(str)
-    finished_signal = pyqtSignal(bool, str)
+    stage_signal = Signal(str)
+    finished_signal = Signal(bool, str)
 
     def __init__(self, command, output_dir, stages=None, popen_kwargs=None):
         super().__init__()

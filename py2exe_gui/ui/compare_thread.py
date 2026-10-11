@@ -2,22 +2,21 @@
 
 import subprocess
 
-from PyQt5.QtCore import QThread, pyqtSignal
-
 from py2exe_gui.core.build_runner import run_build
 from py2exe_gui.core.compare import recommend, run_compare
+from py2exe_gui.qt import QThread, Signal
 
 
 class CompareThread(QThread):
     """Runs ``core.compare.run_compare``; reports progress and the result."""
 
-    log_signal = pyqtSignal(str)
+    log_signal = Signal(str)
     #: (engine, phase) — "build", "smoke", "startup"
-    phase_signal = pyqtSignal(str, str)
+    phase_signal = Signal(str, str)
     #: (engine, stage key, percent) while an engine builds
-    stage_signal = pyqtSignal(str, str, int)
+    stage_signal = Signal(str, str, int)
     #: (rows, recommendation)
-    finished_signal = pyqtSignal(object, object)
+    finished_signal = Signal(object, object)
 
     def __init__(self, project, python, runs=5, timeout=10.0, texts=None, rtl=False,
                  allow_downloads=False):

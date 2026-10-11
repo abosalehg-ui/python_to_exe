@@ -2,25 +2,26 @@
 
 import os
 
-from PyQt5.QtCore import QSize, Qt, QTimer
-from PyQt5.QtGui import QIcon
-from PyQt5.QtWidgets import (
+from py2exe_gui.core import classify_line, format_html
+from py2exe_gui.core.engines import engine_names, get_engine
+from py2exe_gui.qt import (
     QCheckBox,
     QComboBox,
     QFileDialog,
     QGridLayout,
     QGroupBox,
     QHBoxLayout,
+    QIcon,
     QLabel,
     QLineEdit,
     QMessageBox,
     QPushButton,
+    QSize,
+    Qt,
     QTextEdit,
+    QTimer,
     QVBoxLayout,
 )
-
-from py2exe_gui.core import classify_line, format_html
-from py2exe_gui.core.engines import engine_names, get_engine
 from py2exe_gui.strings import S
 from py2exe_gui.ui.tabs.base import BaseTab, browse_button
 
@@ -91,7 +92,7 @@ class MainTab(BaseTab):
         for size in ICON_PREVIEW_SIZES:
             slot = QLabel()
             slot.setFixedSize(QSize(size, size))
-            slot.setAlignment(Qt.AlignCenter)
+            slot.setAlignment(Qt.AlignmentFlag.AlignCenter)
             slot.setAccessibleName(f"{S.ICON_PREVIEW_LABEL} {size}px")
             preview_row.addWidget(slot)
             self.icon_previews.append((size, slot))

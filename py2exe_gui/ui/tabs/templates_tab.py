@@ -1,6 +1,6 @@
 """Project templates, settings save/load and the language selector."""
 
-from PyQt5.QtWidgets import (
+from py2exe_gui.qt import (
     QComboBox,
     QGroupBox,
     QHBoxLayout,
@@ -9,7 +9,6 @@ from PyQt5.QtWidgets import (
     QTextEdit,
     QVBoxLayout,
 )
-
 from py2exe_gui.strings import S, available_locales, current_locale
 from py2exe_gui.templates import TEMPLATES, template_description, template_name
 from py2exe_gui.ui.tabs.base import BaseTab

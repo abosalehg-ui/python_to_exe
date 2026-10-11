@@ -9,23 +9,22 @@ one so a single bad name doesn't leave the environment empty.
 import subprocess
 from datetime import datetime
 
-from PyQt5.QtCore import QThread, pyqtSignal
-
 from py2exe_gui.core.venv_manager import (
     folder_size,
     quote_command,
     single_install_command,
     write_metadata,
 )
+from py2exe_gui.qt import QThread, Signal
 from py2exe_gui.strings import S
 
 
 class EnvThread(QThread):
     """Execute an environment plan."""
 
-    log_signal = pyqtSignal(str)
+    log_signal = Signal(str)
     #: (succeeded, names that could not be installed, error message)
-    finished_signal = pyqtSignal(bool, list, str)
+    finished_signal = Signal(bool, list, str)
 
     def __init__(self, plan, base_python: str = ""):
         super().__init__()

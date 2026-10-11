@@ -7,8 +7,8 @@ isolated environment is the biggest lever for taking things out of it.
 import os
 import sys
 
-from PyQt5.QtCore import Qt
-from PyQt5.QtWidgets import (
+from py2exe_gui.core.size_analyzer import format_size, group_label_key
+from py2exe_gui.qt import (
     QButtonGroup,
     QCheckBox,
     QGroupBox,
@@ -21,6 +21,7 @@ from PyQt5.QtWidgets import (
     QPushButton,
     QRadioButton,
     QSpinBox,
+    Qt,
     QTableWidget,
     QTableWidgetItem,
     QTreeWidget,
@@ -28,13 +29,11 @@ from PyQt5.QtWidgets import (
     QVBoxLayout,
     QWidget,
 )
-
-from py2exe_gui.core.size_analyzer import format_size, group_label_key
 from py2exe_gui.strings import S
 from py2exe_gui.ui.finding_text import finding_detail, finding_label
 from py2exe_gui.ui.tabs.base import BaseTab, browse_button, scrollable
 
-FINDING_ROLE = Qt.UserRole
+FINDING_ROLE = Qt.ItemDataRole.UserRole
 _LRI, _PDI = "\u2066", "\u2069"
 
 
@@ -109,7 +108,7 @@ class SizeTab(BaseTab):
 
         self.env_status = QLabel(S.ENV_STATUS_NO_SOURCE)
         self.env_status.setWordWrap(True)
-        self.env_status.setTextInteractionFlags(Qt.TextSelectableByMouse)
+        self.env_status.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
         self.env_requirements = _muted()
         self.env_uv = _muted()
         box.addWidget(self.env_status)
@@ -192,9 +191,9 @@ class SizeTab(BaseTab):
         self.breakdown.setRootIsDecorated(False)
         self.breakdown.setMinimumHeight(220)
         header = self.breakdown.header()
-        header.setSectionResizeMode(0, QHeaderView.Stretch)
-        header.setSectionResizeMode(1, QHeaderView.ResizeToContents)
-        header.setSectionResizeMode(2, QHeaderView.ResizeToContents)
+        header.setSectionResizeMode(0, QHeaderView.ResizeMode.Stretch)
+        header.setSectionResizeMode(1, QHeaderView.ResizeMode.ResizeToContents)
+        header.setSectionResizeMode(2, QHeaderView.ResizeMode.ResizeToContents)
         box.addWidget(self.breakdown)
 
         self.size_hints = _muted()
@@ -203,7 +202,7 @@ class SizeTab(BaseTab):
         refresh = QPushButton(S.BTN_SIZE_REFRESH)
         refresh.setAccessibleName(S.BTN_SIZE_REFRESH)
         refresh.clicked.connect(self.window_action("analyze_last_build"))
-        box.addWidget(refresh, alignment=Qt.AlignLeading)
+        box.addWidget(refresh, alignment=Qt.AlignmentFlag.AlignLeading)
         return group
 
     def show_size_report(self, report, previous_bytes: int = 0, hints=()):
@@ -239,8 +238,8 @@ class SizeTab(BaseTab):
 
     def _add_row(self, name: str, size: int, total: int):
         item = QTreeWidgetItem([name, size_text(size), ltr(f"{size * 100.0 / total:.1f}%")])
-        item.setTextAlignment(1, Qt.AlignRight | Qt.AlignVCenter)
-        item.setTextAlignment(2, Qt.AlignRight | Qt.AlignVCenter)
+        item.setTextAlignment(1, Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
+        item.setTextAlignment(2, Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
         self.breakdown.addTopLevelItem(item)
 
     # ── Suggestions ────────────────────────────────────────────────────────
@@ -276,8 +275,8 @@ class SizeTab(BaseTab):
             item = QListWidgetItem(finding_label(finding))
             item.setToolTip(finding_detail(finding))
             item.setData(FINDING_ROLE, finding)
-            item.setFlags(item.flags() | Qt.ItemIsUserCheckable)
-            item.setCheckState(Qt.Checked)
+            item.setFlags(item.flags() | Qt.ItemFlag.ItemIsUserCheckable)
+            item.setCheckState(Qt.CheckState.Checked)
             self.suggestions.addItem(item)
         self.apply_btn.setEnabled(True)
         self.rebuild_btn.setEnabled(True)
@@ -287,7 +286,7 @@ class SizeTab(BaseTab):
         for row in range(self.suggestions.count()):
             item = self.suggestions.item(row)
             finding = item.data(FINDING_ROLE)
-            if finding is not None and item.checkState() == Qt.Checked:
+            if finding is not None and item.checkState() == Qt.CheckState.Checked:
                 fixes.extend(f for f in finding.fixes if f not in fixes)
         return fixes
 
@@ -327,13 +326,13 @@ class SizeTab(BaseTab):
         box.addLayout(row)
 
         self.compare_table = QTableWidget(0, 0)
-        self.compare_table.setEditTriggers(QTableWidget.NoEditTriggers)
+        self.compare_table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
         self.compare_table.setWordWrap(True)
         self.compare_table.setVisible(False)
         box.addWidget(self.compare_table)
         self.compare_result = QLabel("")
         self.compare_result.setWordWrap(True)
-        self.compare_result.setTextInteractionFlags(Qt.TextSelectableByMouse)
+        self.compare_result.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
         self.compare_result.setVisible(False)
         box.addWidget(self.compare_result)
         return group
@@ -358,7 +357,7 @@ class SizeTab(BaseTab):
                 item.setToolTip(text)
                 self.compare_table.setItem(i, j, item)
         header = self.compare_table.horizontalHeader()
-        header.setSectionResizeMode(QHeaderView.Stretch)
+        header.setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
         self.compare_table.resizeRowsToContents()
         # Every row visible: the table is short, and a scroll bar inside the
         # tab's own scroll area hides the last rows.

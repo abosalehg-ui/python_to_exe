@@ -1,7 +1,7 @@
 """The command line: ``py2exe-gui <command>``, driven by the project file.
 
 ``py2exe-gui`` with no arguments opens the window; with a command it runs
-headless and never imports PyQt5, so it works on a CI runner with no display
+headless and never imports Qt, so it works on a CI runner with no display
 and no Qt installed.
 
 The consent rules of the GUI carry over unchanged: nothing reaches the network

@@ -6,15 +6,6 @@ that owns its own controls and the browse handlers that belong to it; the
 window keeps orchestration (threads, the build pipeline, shortcuts).
 """
 
-from PyQt5.QtWidgets import (
-    QFileDialog,
-    QLabel,
-    QPushButton,
-    QScrollArea,
-    QVBoxLayout,
-    QWidget,
-)
-
 from py2exe_gui.core.platform_support import (
     LINUX,
     MACOS,
@@ -22,6 +13,14 @@ from py2exe_gui.core.platform_support import (
     platform_label,
     required_platform,
     unsupported_features,
+)
+from py2exe_gui.qt import (
+    QFileDialog,
+    QLabel,
+    QPushButton,
+    QScrollArea,
+    QVBoxLayout,
+    QWidget,
 )
 from py2exe_gui.strings import S
 

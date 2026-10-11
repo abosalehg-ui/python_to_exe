@@ -6,8 +6,10 @@ Building the packages and writing the workflow are the window's job (through
 can build and what the generated workflow will build elsewhere.
 """
 
-from PyQt5.QtCore import Qt
-from PyQt5.QtWidgets import (
+from py2exe_gui.core.ci_generator import DEFAULT_TOOL_REQUIREMENT, SECRET_NAMES
+from py2exe_gui.core.platform_support import PACKAGE_FORMATS
+from py2exe_gui.core.project_file import CiSettings, PackagingSettings
+from py2exe_gui.qt import (
     QCheckBox,
     QFormLayout,
     QGridLayout,
@@ -16,13 +18,10 @@ from PyQt5.QtWidgets import (
     QLabel,
     QLineEdit,
     QPushButton,
+    Qt,
     QVBoxLayout,
     QWidget,
 )
-
-from py2exe_gui.core.ci_generator import DEFAULT_TOOL_REQUIREMENT, SECRET_NAMES
-from py2exe_gui.core.platform_support import PACKAGE_FORMATS
-from py2exe_gui.core.project_file import CiSettings, PackagingSettings
 from py2exe_gui.strings import S
 from py2exe_gui.ui.tabs.base import BaseTab, platform_notice, scrollable
 from py2exe_gui.ui.tabs.runtime_tab import _ltr_line, _muted, bidi
@@ -97,7 +96,7 @@ class PlatformsTab(BaseTab):
         form.addRow(row)
         self.packages_result = QLabel()
         self.packages_result.setWordWrap(True)
-        self.packages_result.setTextInteractionFlags(Qt.TextSelectableByMouse)
+        self.packages_result.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
         form.addRow(self.packages_result)
         return group
 

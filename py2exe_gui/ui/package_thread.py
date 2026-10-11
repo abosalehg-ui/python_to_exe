@@ -2,17 +2,16 @@
 formats this host can build, with the consent already given (or refused)
 by the window before the thread starts."""
 
-from PyQt5.QtCore import QThread, pyqtSignal
-
 from py2exe_gui.core.packagers import run_packaging
+from py2exe_gui.qt import QThread, Signal
 
 
 class PackageThread(QThread):
     """Builds the packages of ``spec``; reports log lines and the results."""
 
-    log_signal = pyqtSignal(str)
+    log_signal = Signal(str)
     #: list of PackageResult
-    finished_signal = pyqtSignal(object)
+    finished_signal = Signal(object)
 
     def __init__(self, spec, formats, allow_download: bool = False):
         super().__init__()

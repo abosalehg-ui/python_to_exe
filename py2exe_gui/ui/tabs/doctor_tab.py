@@ -1,20 +1,19 @@
 """Project doctor: readiness score, findings, and one-click fixes."""
 
-from PyQt5.QtCore import Qt
-from PyQt5.QtGui import QFont
-from PyQt5.QtWidgets import (
+from py2exe_gui.core.fixes import readiness_score
+from py2exe_gui.qt import (
     QApplication,
+    QFont,
     QGroupBox,
     QHBoxLayout,
     QLabel,
     QListWidget,
     QListWidgetItem,
     QPushButton,
+    Qt,
     QTextEdit,
     QVBoxLayout,
 )
-
-from py2exe_gui.core.fixes import readiness_score
 from py2exe_gui.strings import S
 from py2exe_gui.ui.finding_text import (
     copy_text,
@@ -26,7 +25,7 @@ from py2exe_gui.ui.finding_text import (
 from py2exe_gui.ui.tabs.base import BaseTab
 
 # Data roles on each list item: the Finding itself.
-FINDING_ROLE = Qt.UserRole
+FINDING_ROLE = Qt.ItemDataRole.UserRole
 
 
 class DoctorTab(BaseTab):
@@ -152,10 +151,10 @@ class DoctorTab(BaseTab):
             item.setData(FINDING_ROLE, finding)
             item.setToolTip(origin_label(finding.origin))
             if finding.auto_fixable:
-                item.setFlags(item.flags() | Qt.ItemIsUserCheckable)
+                item.setFlags(item.flags() | Qt.ItemFlag.ItemIsUserCheckable)
                 # Errors and warnings are ticked by default; info is opt-in.
                 checked = finding.severity != "info"
-                item.setCheckState(Qt.Checked if checked else Qt.Unchecked)
+                item.setCheckState(Qt.CheckState.Checked if checked else Qt.CheckState.Unchecked)
             self.findings_list.addItem(item)
         self._set_actions_enabled(any(f.auto_fixable for f in everything))
         self.findings_list.setCurrentRow(0)
@@ -197,7 +196,7 @@ class DoctorTab(BaseTab):
             finding = item.data(FINDING_ROLE)
             if finding is None or not finding.auto_fixable:
                 continue
-            if item.checkState() != Qt.Checked:
+            if item.checkState() != Qt.CheckState.Checked:
                 continue
             fixes.extend(f for f in finding.fixes if f not in fixes)
         return fixes

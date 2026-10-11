@@ -4,8 +4,8 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "py2exe-gui"
-version = "1.6.0"
-description = "Arabic-localized PyQt5 GUI to convert Python scripts to Windows executables via PyInstaller"
+version = "2.0.0"
+description = "Arabic-first Qt (PySide6) GUI and command line to turn Python scripts into executables with PyInstaller or Nuitka"
 readme = "README.md"
 requires-python = ">=3.8"
 authors = [{ name = "عبدالكريم العبود", email = "abo.saleh.g@gmail.com" }]
@@ -25,7 +25,10 @@ classifiers = [
     "Natural Language :: Arabic",
 ]
 dependencies = [
-    "PyQt5>=5.15",
+    # The GUI's Qt binding (LGPL-3.0). PyQt5 (GPL-3.0 or commercial) is the
+    # optional fallback below; py2exe_gui/qt.py picks whichever is installed.
+    # 6.5 is the first line with wheels for every Python this project supports.
+    "PySide6>=6.5",
     # 6.0 is the floor: --optimize only exists from 6.0 onwards, and 6.0 also
     # carries the fix for the onefile temp-dir privilege issue in earlier lines.
     "pyinstaller>=6.0",
@@ -34,6 +37,11 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
+# 2.0: PyQt5 instead of PySide6 (``pip install py2exe-gui[pyqt5]`` and then
+# remove PySide6, or set QT_API=pyqt5). The code runs unchanged on both.
+pyqt5 = [
+    "PyQt5>=5.15",
+]
 # Stores the GitHub token in the OS credential store (Windows Credential
 # Manager, macOS Keychain, Secret Service). Without it, GITHUB_TOKEN is used.
 release = [
@@ -69,7 +77,7 @@ testpaths = ["tests"]
 python_files = ["test_*.py"]
 markers = [
     "slow: runs a real PyInstaller build (minutes); deselect with -m 'not slow'",
-    "gui: needs PyQt5; runs headless via QT_QPA_PLATFORM=offscreen",
+    "gui: needs a Qt binding (PySide6 or PyQt5); runs headless via QT_QPA_PLATFORM=offscreen",
 ]
 
 [tool.ruff]
