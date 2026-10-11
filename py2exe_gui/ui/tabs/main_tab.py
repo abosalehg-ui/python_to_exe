@@ -23,7 +23,7 @@ from py2exe_gui.qt import (
     QVBoxLayout,
 )
 from py2exe_gui.strings import S
-from py2exe_gui.ui.tabs.base import BaseTab, browse_button
+from py2exe_gui.ui.tabs.base import BaseTab, browse_button, scrolled_layout
 
 # The sizes Windows actually pulls out of a multi-resolution .ico. Showing all
 # four is how a PNG renamed to .ico gives itself away: it has only one.
@@ -34,7 +34,7 @@ class MainTab(BaseTab):
     """The primary tab: what to build, and what happened when it ran."""
 
     def _build(self):
-        layout = QVBoxLayout(self)
+        layout = scrolled_layout(self)
 
         source_group = QGroupBox(S.GROUP_SOURCE)
         source_layout = QHBoxLayout(source_group)

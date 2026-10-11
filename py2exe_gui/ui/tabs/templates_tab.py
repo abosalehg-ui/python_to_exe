@@ -11,7 +11,7 @@ from py2exe_gui.qt import (
 )
 from py2exe_gui.strings import S, available_locales, current_locale
 from py2exe_gui.templates import TEMPLATES, template_description, template_name
-from py2exe_gui.ui.tabs.base import BaseTab
+from py2exe_gui.ui.tabs.base import BaseTab, scrolled_layout
 
 # Theme value → the locale attribute holding its display name. "auto" first,
 # matching styles.theme_names().
@@ -28,7 +28,7 @@ class TemplatesTab(BaseTab):
     """Templates, saved presets, appearance and language."""
 
     def _build(self):
-        layout = QVBoxLayout(self)
+        layout = scrolled_layout(self)
 
         templates_group = QGroupBox(S.GROUP_TEMPLATES)
         templates_layout = QVBoxLayout(templates_group)

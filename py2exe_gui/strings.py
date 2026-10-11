@@ -4,6 +4,8 @@ All UI text lives here so Phase 3 (multi-language support) can replace this
 module with a QTranslator-based system without touching the UI code.
 """
 
+import re as _re
+
 
 class Ar:
     """Arabic strings (default locale)."""
@@ -3785,6 +3787,40 @@ LOCALE_NATIVE_NAMES = {"ar": "العربية", "en": "English"}
 
 # Layout direction per locale ("rtl" or "ltr").
 LOCALE_LAYOUT = {"ar": "rtl", "en": "ltr"}
+
+# ── Bidirectional isolation of command-line flags ──────────────────────────
+# A flag such as ``--onefile`` is neutral text to the bidi algorithm, so inside
+# a right-to-left paragraph it was laid out as "(onefile--)" with the dashes
+# on the wrong side. Wrapping each flag in a left-to-right isolate (U+2066 …
+# U+2069) pins its reading order and is invisible otherwise. Done once at
+# import for every right-to-left locale, so the source strings stay readable.
+LRI = "\u2066"
+PDI = "\u2069"
+_FLAG_RE = _re.compile(r"(?<![A-Za-z0-9\u2066-])(--[A-Za-z][A-Za-z0-9-]*)")
+
+
+def isolate_flags(text: str) -> str:
+    """``text`` with every ``--flag`` wrapped in a left-to-right isolate."""
+    return _FLAG_RE.sub(lambda m: LRI + m.group(1) + PDI, text)
+
+
+def _isolate_flags_in(klass) -> None:
+    for name, value in list(vars(klass).items()):
+        if name.startswith("_"):
+            continue
+        if isinstance(value, str):
+            fixed = isolate_flags(value)
+        elif isinstance(value, tuple) and all(isinstance(v, str) for v in value):
+            fixed = tuple(isolate_flags(v) for v in value)
+        else:
+            continue
+        if fixed != value:
+            setattr(klass, name, fixed)
+
+
+for _code, _klass in LOCALES.items():
+    if LOCALE_LAYOUT.get(_code) == "rtl":
+        _isolate_flags_in(_klass)
 
 DEFAULT_LOCALE = "ar"
 

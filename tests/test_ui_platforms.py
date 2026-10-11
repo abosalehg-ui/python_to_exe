@@ -121,7 +121,7 @@ def test_banner_names_the_macos_only_format_on_linux(window):
     from py2exe_gui.qt import QLabel
 
     texts = [w.text() for w in window.platforms_tab.findChildren(QLabel)
-             if w.objectName() == "warningNotice"]
+             if w.objectName() == "noticeWarning"]
     assert any(Ar.FEATURE_DMG in t and "macOS" in t for t in texts)
     assert not any(Ar.FEATURE_DEB in t for t in texts)
 

@@ -126,7 +126,8 @@ def platform_notice(*features, platform=None):
             paragraphs.append(getattr(S, attr).format(platform=platform_label(platform),
                                                       features=names))
     label = QLabel("\n".join(paragraphs))
-    label.setObjectName("warningNotice")
+    # A caution, not an error: the feature is skipped here, nothing breaks.
+    label.setObjectName("noticeWarning")
     label.setWordWrap(True)
     label.setAccessibleName(label.text())
     return label
@@ -142,4 +143,23 @@ def scrollable(widget: QWidget) -> QScrollArea:
 
 def vbox(parent: QWidget) -> QVBoxLayout:
     layout = QVBoxLayout(parent)
+    return layout
+
+
+def scrolled_layout(tab: QWidget) -> QVBoxLayout:
+    """The layout a tab adds its groups to, inside a scroll area.
+
+    Every tab goes through here. Eight of fifteen tabs used to lay their
+    groups straight onto the widget, and when the window was shorter than
+    their content (the default 1080x800 window, any 1366x768 laptop) Qt
+    squeezed the fields to a couple of pixels instead of scrolling.
+    """
+    outer = QVBoxLayout(tab)
+    outer.setContentsMargins(0, 0, 0, 0)
+    content = QWidget()
+    layout = QVBoxLayout(content)
+    # Room above the first group box: its title sits in the margin and
+    # would be clipped by the top edge of the scroll area.
+    layout.setContentsMargins(6, 14, 6, 6)
+    outer.addWidget(scrollable(content))
     return layout

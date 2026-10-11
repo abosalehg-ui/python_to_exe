@@ -14,14 +14,14 @@ from py2exe_gui.qt import (
     QVBoxLayout,
 )
 from py2exe_gui.strings import S
-from py2exe_gui.ui.tabs.base import BaseTab, browse_button, platform_notice
+from py2exe_gui.ui.tabs.base import BaseTab, browse_button, platform_notice, scrolled_layout
 
 
 class DeployTab(BaseTab):
     """Everything applied to the EXE after PyInstaller produces it."""
 
     def _build(self):
-        layout = QVBoxLayout(self)
+        layout = scrolled_layout(self)
 
         # Signing needs signtool.exe and a manifest is a Windows PE resource;
         # off Windows both silently do nothing, so say so before the build.

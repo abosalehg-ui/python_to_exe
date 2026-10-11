@@ -140,6 +140,8 @@ PALETTES: Dict[str, Dict[str, str]] = {
         "disabled_text": "#a6adc8",
         "danger": "#f38ba8",
         "danger_hover": "#eba0ac",
+        "warning": "#f9e2af",
+        "on_warning": "#1e1e2e",
         "success": "#a6e3a1",
         "success_hover": "#94e2d5",
         "tab_bg": "#45475a",
@@ -171,6 +173,8 @@ PALETTES: Dict[str, Dict[str, str]] = {
         "disabled_text": "#565a66",
         "danger": "#c00d33",
         "danger_hover": "#b82836",
+        "warning": "#9a6700",
+        "on_warning": "#ffffff",
         "success": "#166b2d",
         "success_hover": "#0f7278",
         "tab_bg": "#ccd0da",
@@ -200,6 +204,8 @@ PALETTES: Dict[str, Dict[str, str]] = {
         # so the button colours are lifted while keeping the hue.
         "danger": "#d88b94",
         "danger_hover": "#e3ab99",
+        "warning": "#ebcb8b",
+        "on_warning": "#2e3440",
         "success": "#a3be8c",
         "success_hover": "#b5cfa3",
         "tab_bg": "#434c5e",
@@ -228,6 +234,8 @@ PALETTES: Dict[str, Dict[str, str]] = {
         "disabled_text": "#a0a0a0",
         "danger": "#ff8080",
         "danger_hover": "#ffb0b0",
+        "warning": "#ffff00",
+        "on_warning": "#000000",
         "success": "#00ff00",
         "success_hover": "#a0ffa0",
         "tab_bg": "#000000",
@@ -258,14 +266,20 @@ QGroupBox {{
     font-size: {pt_group};
     border: 2px solid {border};
     border-radius: 8px;
-    margin-top: 12px;
-    padding-top: 10px;
+    /* The title lives in this margin, wholly above the frame: with 12px it
+       was taller than the margin and the frame line ran through it. */
+    margin-top: 18px;
+    padding-top: 8px;
     background-color: {surface};
 }}
 QGroupBox::title {{
     subcontrol-origin: margin;
-    subcontrol-position: top right;
-    padding: 0 10px;
+    /* Follows the layout direction; it used to be pinned to the right in
+       the English UI too. */
+    subcontrol-position: top {title_side};
+    {title_side}: 8px;
+    top: 0px;
+    padding: 0 4px;
     color: {accent};
 }}
 QPushButton {{
@@ -487,6 +501,15 @@ QLabel#warningNotice {{
     border-radius: 6px;
     padding: 8px 12px;
 }}
+/* "Does nothing on this OS" is a caution, not a failure: the platform
+   banner used the danger colour and red lost its meaning. */
+QLabel#noticeWarning {{
+    font-size: {pt_small};
+    color: {on_warning};
+    background-color: {warning};
+    border-radius: 6px;
+    padding: 8px 12px;
+}}
 /* About tab. Previously these colours were inline in the HTML, so the tab
    stayed dark-themed (and unreadable) after switching to the light theme. */
 QLabel#aboutHeading {{
@@ -534,6 +557,14 @@ QLabel#projectCurrent {{
 """
 
 
+def _is_rtl(locale: str) -> bool:
+    # Imported lazily: strings.py has no Qt and no dependency on this module,
+    # but keeping styles importable on its own is worth the local import.
+    from py2exe_gui.strings import LOCALE_LAYOUT
+
+    return LOCALE_LAYOUT.get(locale) == "rtl"
+
+
 def render_theme(
     theme: str,
     locale: str = "default",
@@ -544,6 +575,7 @@ def render_theme(
     factor = clamp_scale(scale)
     values = dict(palette)
     values["font_family"] = font_family_css(locale)
+    values["title_side"] = "right" if _is_rtl(locale) else "left"
     values.update({f"pt_{name}": _pt(name, factor) for name in _BASE_SIZES})
     return _TEMPLATE.format(**values)
 

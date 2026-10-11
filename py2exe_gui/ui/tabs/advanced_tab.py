@@ -15,14 +15,14 @@ from py2exe_gui.qt import (
 )
 from py2exe_gui.strings import S
 from py2exe_gui.ui.dialogs import AddImportDialog
-from py2exe_gui.ui.tabs.base import BaseTab, browse_button
+from py2exe_gui.ui.tabs.base import BaseTab, browse_button, scrolled_layout
 
 
 class AdvancedTab(BaseTab):
     """Options that map to the less common PyInstaller flags."""
 
     def _build(self):
-        layout = QVBoxLayout(self)
+        layout = scrolled_layout(self)
 
         files_group = QGroupBox(S.GROUP_EXTRA_FILES)
         files_layout = QVBoxLayout(files_group)

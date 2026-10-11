@@ -526,7 +526,10 @@ class MainWindow(QMainWindow):
             S.BTN_CONVERT, self.start_conversion, "successBtn", primary=True
         )
         self.cancel_btn = action(S.BTN_CANCEL, self.cancel_conversion, "dangerBtn")
+        # Cancel takes the Build button's place while a build runs: a red
+        # button that is almost always disabled is noise, not an affordance.
         self.cancel_btn.setEnabled(False)
+        self.cancel_btn.setVisible(False)
         self.preview_btn = action(S.BTN_PREVIEW_CMD, self.preview_command)
         self.open_folder_btn = action(S.BTN_OPEN_FOLDER, self.open_output_folder)
         self.theme_btn = action(S.BTN_TOGGLE_THEME, self.toggle_theme)
@@ -1182,8 +1185,7 @@ class MainWindow(QMainWindow):
             self.main_tab.source_input.text()
         )
 
-        self.convert_btn.setEnabled(False)
-        self.cancel_btn.setEnabled(True)
+        self._set_building(True)
         self.progress_bar.setValue(0)
         self.progress_bar.setFormat(S.PROGRESS_CONVERTING)
 
@@ -1224,9 +1226,15 @@ class MainWindow(QMainWindow):
             self.conversion_thread.cancel()
             self._append_log(S.LOG_CANCELLING)
 
+    def _set_building(self, active: bool):
+        """Swap the Build and Cancel buttons; only one is ever shown."""
+        self.convert_btn.setEnabled(not active)
+        self.convert_btn.setVisible(not active)
+        self.cancel_btn.setEnabled(active)
+        self.cancel_btn.setVisible(active)
+
     def on_conversion_finished(self, success, message):
-        self.convert_btn.setEnabled(True)
-        self.cancel_btn.setEnabled(False)
+        self._set_building(False)
         duration = max(0.0, time.monotonic() - self._build_start_time)
         snapshot = self._build_config_snapshot
 

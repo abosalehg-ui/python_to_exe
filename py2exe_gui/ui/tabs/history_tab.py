@@ -8,14 +8,14 @@ from py2exe_gui.qt import (
     QVBoxLayout,
 )
 from py2exe_gui.strings import S
-from py2exe_gui.ui.tabs.base import BaseTab
+from py2exe_gui.ui.tabs.base import BaseTab, scrolled_layout
 
 
 class HistoryTab(BaseTab):
     """List of recent builds with restore + clear actions."""
 
     def _build(self):
-        layout = QVBoxLayout(self)
+        layout = scrolled_layout(self)
 
         group = QGroupBox(S.GROUP_HISTORY)
         group_layout = QVBoxLayout(group)
