@@ -12,3 +12,7 @@ py2exe_history.json
 *.iss
 Output/
 .venv/
+
+# promo video renders
+promo/out/
+promo/video/
