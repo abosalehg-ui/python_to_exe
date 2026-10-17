@@ -1,0 +1,56 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Python to EXE — Promo</title>
+<style>
+  html, body { margin: 0; background: #000; overflow: hidden; }
+  #stage { position: relative; width: 1920px; height: 1080px; overflow: hidden; background: #04060d;
+           font-family: 'Inter', 'Inter Display', 'DejaVu Sans', sans-serif; color: #fff; }
+  canvas { position: absolute; left: 0; top: 0; }
+  #cam { position: absolute; inset: 0; transform-origin: 960px 540px; }
+  #layer { position: absolute; inset: 0; perspective: 1800px; perspective-origin: 960px 540px; }
+  #grain { mix-blend-mode: overlay; opacity: .10; }
+  #vignette { position: absolute; inset: 0; pointer-events: none;
+              background: radial-gradient(ellipse at center, rgba(0,0,0,0) 55%, rgba(0,0,0,.55) 100%); }
+  #flash { position: absolute; inset: 0; background: #fff; opacity: 0; }
+
+  .el { position: absolute; left: 0; top: 0; display: none; transform-origin: 50% 50%; }
+  .mono { font-family: 'DejaVu Sans Mono', 'Liberation Mono', monospace; }
+  .ch { display: inline-block; white-space: pre; will-change: transform; }
+
+  .card { border-radius: 18px; overflow: hidden; background: #1b2232;
+          box-shadow: 0 40px 90px rgba(0,0,0,.6), 0 0 0 1px rgba(255,255,255,.14), 0 0 60px rgba(55,118,171,.25); }
+  .card img { display: block; position: absolute; left: 0; top: 0; }
+  .sheen { position: absolute; inset: 0; pointer-events: none;
+           background: linear-gradient(115deg, rgba(255,255,255,0) 35%, rgba(255,255,255,.22) 48%, rgba(255,255,255,0) 60%);
+           background-size: 300% 100%; }
+
+  .label { font-size: 22px; font-weight: 600; letter-spacing: .32em; color: #8fb8ff; text-transform: uppercase; white-space: nowrap; }
+  .label b { color: #FFD43B; font-weight: 800; margin-right: 18px; }
+  .h1 { font-weight: 900; letter-spacing: -0.03em; line-height: 1; white-space: nowrap; }
+  .grad { background: linear-gradient(90deg, #4B8BBE, #FFD43B); -webkit-background-clip: text; background-clip: text; color: transparent; }
+  .yellow { color: #FFD43B; }
+  .glass { background: linear-gradient(180deg, rgba(30,40,64,.92), rgba(16,22,38,.92));
+           border: 1px solid rgba(255,255,255,.14); border-radius: 18px;
+           box-shadow: 0 30px 70px rgba(0,0,0,.55), inset 0 1px 0 rgba(255,255,255,.08); }
+  .chip { display: flex; align-items: center; gap: 14px; padding: 0 22px; height: 52px; border-radius: 14px;
+          font-size: 22px; font-weight: 600; white-space: nowrap; box-sizing: border-box; }
+  .icon svg { width: 100%; height: 100%; display: block; }
+</style>
+</head>
+<body>
+<div id="stage">
+  <canvas id="bg" width="1920" height="1080"></canvas>
+  <div id="cam">
+    <div id="layer"></div>
+    <canvas id="fx" width="1920" height="1080"></canvas>
+  </div>
+  <canvas id="grain" width="1920" height="1080"></canvas>
+  <div id="vignette"></div>
+  <div id="flash"></div>
+  <div id="black" style="position:absolute;inset:0;background:#000;opacity:0"></div>
+</div>
+<script src="promo.js"></script>
+</body>
+</html>
