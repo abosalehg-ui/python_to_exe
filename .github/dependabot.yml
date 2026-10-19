@@ -1,19 +1,25 @@
 version: 2
 
+# Updates are batched: one PR per group per month, so they never pile up and
+# go stale against main. Majors are split out because they are the ones that
+# can break the build.
 updates:
   # Keeps GitHub Actions current. Preferred over hand-pinning SHAs: the tags
   # stay readable and Dependabot opens a PR when an action moves.
   - package-ecosystem: github-actions
     directory: "/"
     schedule:
-      interval: weekly
+      interval: monthly
     commit-message:
       prefix: "ci"
+    groups:
+      github-actions:
+        patterns: ["*"]
 
   - package-ecosystem: pip
     directory: "/"
     schedule:
-      interval: weekly
+      interval: monthly
     commit-message:
       prefix: "deps"
     groups:
@@ -21,3 +27,9 @@ updates:
         patterns:
           - "pytest*"
           - "ruff"
+      minor-and-patch:
+        patterns: ["*"]
+        update-types: ["minor", "patch"]
+      major:
+        patterns: ["*"]
+        update-types: ["major"]
