@@ -50,7 +50,7 @@ pyqt5 = [
 # Stores the GitHub token in the OS credential store (Windows Credential
 # Manager, macOS Keychain, Secret Service). Without it, GITHUB_TOKEN is used.
 release = [
-    "keyring>=23",
+    "keyring>=25.7.0",
 ]
 # 2.0: the Nuitka build engine (also offered, with consent, on first use).
 # "onefile" is upstream's extra: zstandard, to compress one-file builds.
