@@ -15,7 +15,7 @@ APP_NAME = "Python to EXE Converter"
 APP_VERSION = "2.1.0"
 DEVELOPER = "عبدالكريم العبود"
 EMAIL = "abo.saleh.g@gmail.com"
-COPYRIGHT = "© 2025 [Python to EXE] - All Rights Reserved"
+COPYRIGHT = "© 2025 عبدالكريم العبود — MIT License"
 
 # Version range used when offering to install PyInstaller. Pinned rather than
 # bare "pyinstaller": --optimize needs 6.0+, and an upper bound keeps a future

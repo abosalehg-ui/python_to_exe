@@ -44,6 +44,31 @@ jobs:
           --cov=py2exe_gui.core --cov=p2e_runtime --cov-report=term
           --cov-fail-under=90
 
+  runtime-py38:
+    name: Runtime kit (Python 3.8)
+    # The app needs 3.9+, but p2e_runtime is copied into users' programs and
+    # Nuitka can still target 3.8, so the kit's 3.8 promise is tested here.
+    # ubuntu-22.04: setup-python still ships 3.8 builds for it.
+    runs-on: ubuntu-22.04
+    timeout-minutes: 10
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python 3.8
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.8"
+          cache: pip
+
+      - name: Install test dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install pytest "tomli>=1.1"
+
+      - name: Run runtime kit tests
+        run: pytest tests/test_runtime_*.py -v -m "not slow" -o faulthandler_timeout=300
+
   gui:
     name: GUI tests (headless, ${{ matrix.binding }})
     runs-on: ubuntu-latest
@@ -95,6 +120,7 @@ jobs:
         run: >
           pytest tests/ -v -m "not slow" -o faulthandler_timeout=300
           --cov=py2exe_gui --cov-report=term
+          --cov-fail-under=90
 
   qt-leak:
     name: Qt does not leak into builds

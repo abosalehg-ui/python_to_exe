@@ -48,7 +48,7 @@ version metadata, build history, and a Windows manifest editor.
 
 ## Requirements
 
-- Python 3.8+
+- Python 3.9+ (the embedded `p2e_runtime` package runs on 3.8+)
 - PySide6 >= 6.5 (below 6.12 on Python older than 3.12; LGPL). Optional fallback:
   PyQt5 >= 5.15 (`pip install py2exe-gui[pyqt5]`, then remove PySide6, or `QT_API=pyqt5`)
 - PyInstaller >= 6.0 (offered for install on first build, with consent)
@@ -602,7 +602,7 @@ migrated once on first run.
 
 ```bash
 pip install -r requirements-dev.txt
-pytest tests/ -m "not slow"                  # 1950 tests
+pytest tests/ -m "not slow"                  # 2177 tests
 ruff check py2exe_gui/ p2e_runtime/ tests/   # lint
 ```
 
@@ -684,7 +684,8 @@ pytest tests/test_builder.py -v            # one module
 pytest --cov=py2exe_gui.core --cov-report=term
 ```
 
-CI runs pytest on Python 3.9 – 3.12 plus ruff on every push.
+CI runs pytest on Python 3.9 – 3.12, the `p2e_runtime` tests on 3.8, plus ruff on every push.
+Coverage floors: 90% for the core and 90% for the whole `py2exe_gui` package with the GUI.
 
 ## Roadmap
 
@@ -746,7 +747,7 @@ ImageMagick can convert: `convert in.png -define icon:auto-resize=256,128,64,48,
 
 ## License
 
-© 2025 — All rights reserved.
+Released under the [MIT License](LICENSE). © 2025 Abdulkarim Alaboud.
 
 ## Credits
 

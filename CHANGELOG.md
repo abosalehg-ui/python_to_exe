@@ -5,6 +5,19 @@ follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Licensing and CI honesty
+
+- **MIT License.** The project is now open source in fact, not just in name:
+  a `LICENSE` file, `license = "MIT"` in `pyproject.toml`, and the README,
+  About tab and entry point no longer say "All Rights Reserved".
+- **Python 3.9+ for the app.** 3.8 was declared but never tested in CI, and it
+  reached end of life in October 2024. `p2e_runtime` keeps its 3.8 promise,
+  since it runs inside users' programs, and a new `runtime-py38` CI job tests it.
+- **GUI coverage floor.** The `gui` job now fails under 90% coverage of
+  `py2exe_gui` (it measured 92.6%), like the core job already did.
+- **Test counts from a real run:** 2169 passed, 8 skipped (no PyInstaller or
+  Nuitka) and 7 slow, replacing the stale 2045 and 1950.
+
 ### 2.1.0 — The window, redesigned
 
 The UX plan in [UX_REDESIGN_PLAN.md](UX_REDESIGN_PLAN.md), applied in four

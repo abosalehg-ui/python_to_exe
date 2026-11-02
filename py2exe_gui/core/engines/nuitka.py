@@ -58,7 +58,7 @@ VERIFIED_VERSION = "4.2.2"
 REQUIREMENT = "nuitka[onefile]>=4.2,<5"
 
 #: Python versions Nuitka 4.2.2 supports (``nuitka.PythonVersions``), from
-#: 3.8, the oldest this app supports; and those it only runs experimentally
+#: 3.8, the oldest a built program may target (p2e_runtime runs there); and those it only runs experimentally
 #: (a real 3.15 build printed "only experimentally supported").
 SUPPORTED_PYTHONS = ("3.8", "3.9", "3.10", "3.11", "3.12", "3.13", "3.14")
 EXPERIMENTAL_PYTHONS = ("3.15",)
