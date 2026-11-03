@@ -5,11 +5,11 @@
 ### أداة احترافية لتحويل تطبيقات بايثون إلى ملفات تنفيذية
 
 ![Version](https://img.shields.io/badge/الإصدار-2.1.0-blue?style=for-the-badge)
-![Python](https://img.shields.io/badge/Python-3.8+-green?style=for-the-badge&logo=python&logoColor=white)
+![Python](https://img.shields.io/badge/Python-3.9+-green?style=for-the-badge&logo=python&logoColor=white)
 ![PySide6](https://img.shields.io/badge/PySide6-Qt_6-orange?style=for-the-badge&logo=qt&logoColor=white)
-![Tests](https://img.shields.io/badge/الاختبارات-2045_passing-brightgreen?style=for-the-badge)
+![Tests](https://img.shields.io/badge/الاختبارات-2169_passing-brightgreen?style=for-the-badge)
 ![Languages](https://img.shields.io/badge/اللغات-عربي_+_English-purple?style=for-the-badge)
-![License](https://img.shields.io/badge/الرخصة-All%20Rights%20Reserved-red?style=for-the-badge)
+![License](https://img.shields.io/badge/الرخصة-MIT-blue?style=for-the-badge)
 
 <br>
 
@@ -30,7 +30,7 @@
 
 ## 📖 نظرة عامة
 
-**Python to EXE Converter** هي أداة احترافية مفتوحة المصدر لتحويل ملفات بايثون (`.py`) إلى ملفات تنفيذية (`.exe`) بدون أوامر سطر الأوامر.
+**Python to EXE Converter** هي أداة احترافية مفتوحة المصدر (رخصة [MIT](LICENSE)) لتحويل ملفات بايثون (`.py`) إلى ملفات تنفيذية (`.exe`) بدون أوامر سطر الأوامر.
 
 تجمع الأداة بين سهولة الاستخدام (واجهة عربية/إنجليزية ثنائية الاتجاه) والقوة الكاملة لـ PyInstaller، مع إضافات احترافية مثل التوقيع الرقمي، محرر metadata، سجل البناءات السابقة، ومحلل تبعيات ذكي يعتمد على AST.
 
@@ -284,7 +284,7 @@ Manager، macOS Keychain، Secret Service) ثبّت الإضافة الاختي�
 
 | المتطلب | الإصدار | الوصف |
 |---------|---------|-------|
-| Python | 3.8+ | لغة البرمجة |
+| Python | 3.9+ | لغة البرمجة (حزمة `p2e_runtime` المضمّنة في برامجك تعمل من 3.8) |
 | PySide6 | 6.5+ (أقل من 6.12 على Python أقدم من 3.12) | الواجهة الرسومية (LGPL). بديل اختياري: PyQt5 5.15+ عبر `pip install py2exe-gui[pyqt5]` ثم إزالة PySide6، أو `QT_API=pyqt5` |
 | PyInstaller | 6.0+ | محرك التحويل (يُعرض عليك تثبيته عند الحاجة) |
 
@@ -796,7 +796,7 @@ python_to_exe/
 │           ├── history_tab.py
 │           └── about_tab.py
 │
-├── tests/                      # 1950 اختباراً (وحدة + واجهة headless + تكامل)
+├── tests/                      # 2184 اختباراً (وحدة + واجهة headless + تكامل)
 └── .github/
     ├── workflows/ci.yml        # pytest + GUI + ruff + pip-audit
     ├── dependabot.yml
@@ -809,13 +809,14 @@ python_to_exe/
 
 ```bash
 pip install -r requirements-dev.txt
-pytest tests/ -m "not slow"                # 1950 اختباراً سريعاً
+pytest tests/ -m "not slow"                # 2177 اختباراً سريعاً
 pytest tests/ -m slow                      # بناءات PyInstaller حقيقية (دقائق)
 ruff check py2exe_gui/ p2e_runtime/ tests/ # فحص الكود
 pytest --cov=py2exe_gui.core --cov-report=term
 ```
 
-**GitHub Actions** يُشغّل الاختبارات على Python 3.9 – 3.12 + ruff عند كل push.
+**GitHub Actions** يُشغّل الاختبارات على Python 3.9 – 3.12، واختبارات `p2e_runtime` على 3.8، + ruff عند كل push.
+حد التغطية الأدنى 90% للنواة و90% لحزمة `py2exe_gui` كاملة مع الواجهة.
 
 ---
 
@@ -956,8 +957,11 @@ else:
 
 ## 📄 الرخصة
 
+مرخّص برخصة **MIT** — انظر ملف [LICENSE](LICENSE). يحق لك الاستخدام والتعديل
+وإعادة التوزيع، تجارياً أو غير تجاري، بشرط الإبقاء على إشعار حقوق النشر والرخصة.
+
 ```
-© 2025 [Python to EXE Converter] - All Rights Reserved
+© 2025 عبدالكريم العبود — MIT License
 
 تطوير: عبدالكريم العبود
 البريد: abo.saleh.g@gmail.com
