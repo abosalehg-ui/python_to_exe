@@ -58,9 +58,9 @@ nuitka = [
     "nuitka[onefile]>=4.2,<5",
 ]
 dev = [
-    "pytest>=7.0",
-    "pytest-cov>=4.0",
-    "ruff>=0.1",
+    "pytest>=9.1.1",
+    "pytest-cov>=7.1.0",
+    "ruff>=0.17.1",
     "PyYAML>=6.0",
 ]
 
